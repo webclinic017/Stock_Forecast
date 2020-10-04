@@ -66,13 +66,11 @@ begin_date = int(begin_date)
 
 
 
-
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
 
 
 def init(path):
-    
 
     return ''
 
@@ -209,11 +207,6 @@ def get_stock_name():
     sql = "select * from stock_name;"    
     results = ar.db_query(sql)
     return results
-
-
-
-# Add lead and lag
-# https://stackoverflow.com/questions/23664877/pandas-equivalent-of-oracle-lead-lag-function
 
 
 
