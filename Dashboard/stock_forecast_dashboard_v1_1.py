@@ -215,6 +215,8 @@ def get_stock_name():
 # Application ----------------------
 master()
 
+
+
 app = dash.Dash()
 
 colors = {
@@ -222,41 +224,90 @@ colors = {
     'text': '#303030'
 }
 
-app.layout = html.Div(
-    children=[
-    # html.H1(
-    #     children='Stock Forecast',
-    #     style={
-    #         'textAlign': 'center',
-    #         'color': colors['text']
-    #     }
-    # ),
-    # html.Div(
-    #     children='Description',
-    #     style={
-    #         'textAlign': 'center',
-    #         'color': colors['text']
-    #     }
-    # ),
-    dcc.Dropdown(
-        id='name_dropdown',
-        options=stock_list,
-        multi=True,
-        value="MTL"
-    ),
+
+container_style = {
+    'backgroundColor': colors['background'],
+    'padding': '0 30px',
+    }
+
+
+header_style = {
+    'display': 'block'
+    }
+
+title_style = {
+    'textAlign': 'left',
+    'color': '#303030',
+    'padding-top': '20px',
+    'disply': 'inline-block',
+    'width': '50%'
+    }
+
+name_dropdown_style = {
+    'width': '50%', 
+    'padding-top': '10px', 
+    'display': 'block'
+    }
+
+
+btn_max_style = {
+    # 'width': '100px', 
+    'display': 'flex',
+    'justify-content': 'left',
+    'align-items': 'center',
+    'padding-top': '10px',
+    }
+
+debug_style = {
+    'display': 'none',
+    }
+
+
+app.layout = html.Div([
     
-    daq.ToggleSwitch(
-        id='btn_max',
-        value=False
-    ),
     
-    html.Div(id='debug'),
+    html.Div([
+        
+        html.H1(
+            '台股趨勢圖',
+            style=title_style
+        ),
+    
+        
+    ],style=header_style),
+    
+    
+    html.Div([
+        dcc.Dropdown(
+            id='name_dropdown',
+            options=stock_list,
+            multi=True,
+            value="MTL"
+        ),
+    ],style=name_dropdown_style),
+    
+    html.Div([
+        html.P('三年資料'),
+        daq.ToggleSwitch(
+            id='btn_max',
+            value=False,
+            style={'padding':'0 10px'}
+        ),
+        html.P('全部資料'),
+    ],style=btn_max_style),        
+    
+    
+    
+    
+    html.Div(id='debug',
+             style = debug_style),
     
     
     html.Div(id="line_chart"),
     # html.P('Data Source'),
     ],
-    style={'backgroundColor': colors['background']}
+    
+    style=container_style
 )
 
 
