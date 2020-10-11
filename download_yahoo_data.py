@@ -18,8 +18,6 @@ import h5py
 import yfinance as yf # https://pypi.org/project/yfinance/
 
 
-
-
 # 設定工作目錄 .....
 path = '/Users/Aron/Documents/GitHub/Data/Stock-Forecast'
 
@@ -37,43 +35,12 @@ import arsenal as ar
 import codebase_yz as cbyz
 
 
+
+stock_type = 'tw'
+stock_type = 'us'
+
+
 # Load Data ----------------
-
-# # Local DB .....
-# import mysql.connector
-
-# db = mysql.connector.connect(
-#  host="localhost",
-#  user="aron",
-#  password="57diyyLCHH4q1kwD",
-#  port="8889",
-#  database="twstock"
-# )
-
-
-# PythonAnywhere .....
-# import MySQLdb
-
-# db=MySQLdb.connect(
-#     host='aronhack.mysql.pythonanywhere-services.com',
-#     user='aronhack',
-#     passwd='pythonmysql2020',
-#     db='aronhack$aronhack_dashboard',
-#     charset = 'utf8')
-
-# cursor = db.cursor()
-
-# cursor.execute("select * "
-#                "from stock_name;")
-
-# stock_list = pd.DataFrame(cursor.fetchall())
-# stock_list.columns = ['STOCK_SYMBOL', 'NAME']
-
-
-
-
-
-
 
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
@@ -99,29 +66,25 @@ def load_data():
     '''
     讀取資料及重新整理
     '''
+   
     # Get stock list
-    stock_list = ar.get_twstock_list()
-
-
+    stock_list = ar.stock_get_list(stock_type=stock_type)
+    
+    
+    begin_time = datetime.now()   
+    
     # Get historical data
     hist_data_raw = pd.DataFrame()
     
-    # 約40分鐘
-    
-    # 0, 300
-    # 300, 600
-    # 600, 900
-    # 900, 1200
-    
-    begin_time = datetime.now()   
-    # Method 1 .....
-    
-    # for i in range(0, 2):
-    for i in range(0, len(stock_list)):
+    for i in range(0, 10):
+    # for i in range(0, len(stock_list)):
     # for i in range(190, 200):
     
-        # Get data    
-        stock_id = stock_list.loc[i, 'STOCK_SYMBOL'] + '.TW'
+        # Get data
+        if stock_type == 'tw':
+            stock_id = stock_list.loc[i, 'STOCK_SYMBOL'] + '.TW'
+        elif stock_type == 'us':
+            stock_id = stock_list.loc[i, 'STOCK_SYMBOL']
     
         data = yf.Ticker(stock_id)
         df = data.history(period="max")
@@ -142,6 +105,7 @@ def load_data():
     
     hist_data = hist_data_raw.copy()
     hist_data.reset_index(level=0, inplace=True)
+    hist_data['Date'] = hist_data['Date'].astype('str')
     
     
     # Rename
@@ -159,6 +123,14 @@ def load_data():
     cols = ['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
             'HIGH', 'LOW', 'CLOSE', 'VOLUME']
     hist_data = hist_data[cols]
+    
+    
+    # Upload
+    if stock_type == 'tw':
+        ar.db_upload(data=hist_data, table_name='stock_data')
+    elif stock_type == 'us':
+        ar.db_upload(data=hist_data, table_name='stock_data_us')
+    
     
     
     # Export
@@ -184,7 +156,6 @@ def master():
 
 
 
-
 def check():
     '''
     資料驗證
@@ -193,14 +164,53 @@ def check():
 
 
 
+# US Stock --------
+    
+
+results = pd.DataFrame()
+
+for i in us_stock:
+    
+    data = yf.Ticker(i)
+    df = data.history(period="max")
+    df['STOCK_SYMBOL'] = i
+
+    results = results.append(df)
+        
+
+results.reset_index(level=0, inplace=True)
+
+
+# Rename
+results.rename(columns={'Date':'WORK_DATE',
+                            'Open':'OPEN',
+                            'High':'HIGH',
+                            'Low':'LOW',
+                            'Close':'CLOSE',
+                            'Volume':'VOLUME'
+                                }, 
+                       inplace=True)
+
+# Filter columns
+cols = ['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
+        'HIGH', 'LOW', 'CLOSE', 'VOLUME']
+results = results[cols]
+
+
+
+Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
+
+# results['WORK_DATE'] = results['WORK_DATE'].apply(cbyz.ymd)
+results['WORK_DATE'] = results['WORK_DATE'].astype('str')
+
+ar.db_upload(results,
+             'stock_data_us')
+
+
 
 
 
 # -------------------------
-
-
-
-
 
 
 
@@ -236,7 +246,7 @@ stock_id = "0050.TW"
 # -------------------------
 
 
-# msft = yf.Ticker("MSFT")
+msft = yf.Ticker("MSFT")
 msft = yf.Ticker("0051.TW")
 
 

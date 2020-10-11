@@ -17,6 +17,7 @@ Version Note
 1. Add dropdown
 """
 
+
 # -*- coding: utf-8 -*-
 import dash
 import dash_core_components as dcc
@@ -32,12 +33,21 @@ import sys, arrow
 from flask import Flask, request
 
 
+
 # 設定工作目錄 .....
-path = '/Users/Aron/Documents/GitHub/Data/Stock-Forecast'
+
+# Local
+# path = '/Users/Aron/Documents/GitHub/Data/Stock-Forecast'
+
+# Server
+path = '/home/aronhack/stock_forecast/dashboard'
+
+
 
 # Codebase
 path_codebase = ['/Users/Aron/Documents/GitHub/Arsenal',
-                 '/Users/Aron/Documents/GitHub/Codebase_YZ']
+                 '/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 path + '/Function']
 
 
 for i in path_codebase:    
@@ -64,6 +74,12 @@ begin_date = begin_date.format('YYYYMMDD')
 begin_date = int(begin_date)
 
 
+local = False
+local = True
+
+
+# stock_type = 'us'
+stock_type = 'tw'
 
 
 # 自動設定區 -------
@@ -84,24 +100,15 @@ def load_data():
     # Load Data --------------------------
     
     # Historical Data .....
-    global begin_date, end_date, stock_data
-    stock_data = get_stock_data(begin_date, end_date)
-    
-    
-    # Forecast Data .....
-    # sql_forcast_data = "select work_date, STOCK_SYMBOL, " + \
-    #                "high_price, close_price, low_price " + \
-    #                "from stock_forecast;"
-    
-    # forecast_data = ar.db_query(sql_forcast_data)
-    # forecast_data.columns = cols
-    # forecast_data['TYPE'] = 'FORECAST'
-    
-    # forecast_data
-    
+    stock_data = get_stock_data(begin_date, end_date, 
+                                stock_type=stock_type)
     
     # Stock Name .....
-    stock_name = get_stock_name()
+    global stock_name
+    if stock_type == 'tw':
+        stock_name = ar.stock_get_list(stock_type=stock_type)
+    elif stock_type == 'us':
+        stock_name = ar.stock_get_list(stock_type=stock_type)
 
 
     # Work Area -------------
@@ -119,25 +126,28 @@ def load_data():
     
     main_data['STOCK'] = (main_data['STOCK_SYMBOL'] 
                           + ' ' 
-                          + main_data['NAME'])
+                          + main_data['STOCK_NAME'])
+    
+    global target_data, target_symbol
+    target_symbol = []
+    target_data = pd.DataFrame()
+    
     
     # Dash ----------------------
     
     # Stock List
     global stock_list, stock_list_pre
-    stock_list_pre = (main_data[['STOCK_SYMBOL', 'STOCK']]
-                    .drop_duplicates()
-                    .reset_index(drop=True)
-                    )
+    stock_list_pre = main_data[['STOCK_SYMBOL', 'STOCK']] \
+                        .drop_duplicates() \
+                        .reset_index(drop=True)
+                    
                     
     stock_list = []
-    
     for i in range(0, len(stock_list_pre)):
         stock_list.append({'label': stock_list_pre.loc[i, 'STOCK'],
                            'value': stock_list_pre.loc[i, 'STOCK_SYMBOL']
                            })
 
-    
     return ''
 
 
@@ -159,17 +169,24 @@ def check():
 
 # %% Inner Function -------
 
-def get_stock_data(begin_date=None, end_date=None, stock=None):
+def get_stock_data(begin_date=None, end_date=None, 
+                   stock_type='tw', stock_symbol=None):
     
     
+    if stock_type == 'tw':
+        stock_tb = 'stock_data_tw'
+    elif stock_type == 'us':
+        stock_tb = 'stock_data_us'
+    
+
     # Convert stock to list
-    stock_li = [stock]
+    stock_li = [stock_symbol]
     stock_li = cbyz.list_flatten(stock_li)    
     
     
     if (begin_date != None) & (end_date != None):
         
-        if stock != None:
+        if stock_symbol != None:
             sql_stock = cbyz.list_add_quote(stock_li, "'")
             sql_stock = ', '.join(sql_stock)
             sql_stock = ' and stock_symbol in (' + sql_stock + ')'
@@ -184,29 +201,27 @@ def get_stock_data(begin_date=None, end_date=None, stock=None):
         sql_stock = ', '.join(sql_stock)
         sql_cond = ' where stock_symbol in (' + sql_stock + ')'
     
-    
-    # sql = "select date_format(work_date, '%Y%m%d') work_date, " + \
-    #       "stock_symbol, high, close, low " + \
-    #       "from stock_data " + \
-    #       "where date_format(work_date, '%Y%m%d') between " + str(begin_date) + " and " + str(end_date)
-
 
     sql = ( "select date_format(work_date, '%Y%m%d') work_date, " 
     + " stock_symbol, high, close, low "
-    + " from stock_data "
+    + " from " + stock_tb + " "
     + sql_cond
     )
     
         
-    results = ar.db_query(sql)
+    results = ar.db_query(sql, local=local)
     return results
 
 
-def get_stock_name():
+# def stock_get_name(stock_type='tw'):
     
-    sql = "select * from stock_name;"    
-    results = ar.db_query(sql)
-    return results
+#     if stock_type == 'tw':
+#         sql = "select * from stock_name;"
+#     elif stock_type == 'us':
+#         sql = "select * from stock_name_us;"
+        
+#     results = ar.db_query(sql, local=local)
+#     return results
 
 
 
@@ -231,10 +246,6 @@ container_style = {
     }
 
 
-header_style = {
-    'display': 'block'
-    }
-
 title_style = {
     'textAlign': 'left',
     'color': '#303030',
@@ -245,10 +256,9 @@ title_style = {
 
 name_dropdown_style = {
     'width': '50%', 
-    'padding-top': '10px', 
+    'padding-top': '40px', 
     'display': 'block'
     }
-
 
 btn_max_style = {
     # 'width': '100px', 
@@ -264,30 +274,18 @@ debug_style = {
 
 
 app.layout = html.Div([
-    
-    
-    html.Div([
         
-        html.H1(
-            '台股趨勢圖',
-            style=title_style
-        ),
-    
-        
-    ],style=header_style),
-    
-    
     html.Div([
         dcc.Dropdown(
             id='name_dropdown',
             options=stock_list,
             multi=True,
-            value="MTL"
+            value=[]
         ),
     ],style=name_dropdown_style),
     
     html.Div([
-        html.P('三年資料'),
+        html.P('半年資料'),
         daq.ToggleSwitch(
             id='btn_max',
             value=False,
@@ -324,9 +322,6 @@ app.layout = html.Div([
 
 
 
-# target_data = get_stock_data(stock='006205')
-
-
 def update_output(dropdown_value, btn_max):
 
     global stock_list_pre
@@ -337,13 +332,25 @@ def update_output(dropdown_value, btn_max):
 
     if btn_max == True:
         
-        # Optimize, keep existing data.
-        global target_data
-        target_data = get_stock_data(stock=dropdown_value)
+        # Add loading icon
         
-        target_data['TYPE'] = 'HISTORICAL'
-        target_data['WORK_DATE'] = target_data['WORK_DATE'].apply(ar.ymd)
+        global target_data, target_symbol
+        list_inter = ar.list_intersect(dropdown_value, target_symbol)
+
+        # Remove data
+        if len(target_data)>0:
+            target_data = target_data[target_data['STOCK_SYMBOL'] \
+                                      .isin(list_inter['Intersect'])]
         
+        # Add new data
+        if len(list_inter['Diff_L']) > 0:
+            new_data = get_stock_data(stock_type=stock_type,
+                                      stock_symbol=list_inter['Diff_L'])
+            new_data['TYPE'] = 'HISTORICAL'
+            new_data['WORK_DATE'] = new_data['WORK_DATE'].apply(ar.ymd)
+            target_data = target_data.append(new_data)
+        
+        target_symbol = dropdown_value
         plot_data = target_data
         
     else:
@@ -367,6 +374,7 @@ def update_output(dropdown_value, btn_max):
     #               'type': 'line',
     #               'name': val + " - 交易量",
     #               } for val in dropdown_value]
+        
 
     figure = [
         dcc.Graph(
@@ -397,3 +405,22 @@ def update_output(dropdown_value, btn_max):
 if __name__ == '__main__':
     app.run_server()
     # app.run_server(debug=True)
+
+
+
+
+
+# Test -------------
+    
+# stock_name
+    
+# other-listed
+# import requests
+# link2 = 'https://datahub.io/core/nasdaq-listings/r/nasdaq-listed.json'
+# r2 = requests.get(link2)
+# results2 = pd.DataFrame(r2.json())
+# results2.columns
+
+
+# chk = results.copy()
+# chk = chk[chk['STOCK_SYMBOL']=='MSFT']
