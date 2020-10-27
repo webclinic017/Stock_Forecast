@@ -40,11 +40,13 @@ from flask import Flask, request
 # 設定工作目錄 .....
 
 # Local
-# path = '/Users/Aron/Documents/GitHub/Data/Stock-Forecast'
+path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+
+
 
 # Server
-path = '/home/aronhack/stock_forecast/dashboard'
-path = '/home/aronhack/stock_analysis_us/dashboard'
+# path = '/home/aronhack/stock_forecast/dashboard'
+# path = '/home/aronhack/stock_analysis_us/dashboard'
 
 
 
@@ -84,7 +86,7 @@ local = True
 
 
 stock_type = 'us'
-# stock_type = 'tw'
+stock_type = 'tw'
 
 
 # 自動設定區 -------
@@ -110,10 +112,8 @@ def load_data():
     
     # Stock Name .....
     global stock_name
-    if stock_type == 'tw':
-        stock_name = ar.stock_get_list(stock_type=stock_type)
-    elif stock_type == 'us':
-        stock_name = ar.stock_get_list(stock_type=stock_type)
+    stock_name = ar.stock_get_list(stock_type=stock_type)
+
 
 
     # Work Area -------------
@@ -374,6 +374,21 @@ def update_output(dropdown_value, btn_max):
               } for i in range(0, len(selected_list))]
         
 
+    historical_plot =  dcc.Graph(
+                            id='example-graph',
+                            figure={
+                                'data': data1,
+                                'layout': {
+                                    'plot_bgcolor': colors['background'],
+                                    'paper_bgcolor': colors['background'],
+                                    'font': {
+                                        'color': colors['text']
+                                    },
+                #                    'title': 'DASH'
+                                }
+                            },
+                        )
+
     # data5 = [{'x': df[df[1] == val][0],
     #               'y': df[df[1] == val][6],
     #               'type': 'line',
@@ -381,22 +396,7 @@ def update_output(dropdown_value, btn_max):
     #               } for val in dropdown_value]
         
 
-    figure = [
-        dcc.Graph(
-            id='example-graph',
-            figure={
-                'data': data1,
-                'layout': {
-                    'plot_bgcolor': colors['background'],
-                    'paper_bgcolor': colors['background'],
-                    'font': {
-                        'color': colors['text']
-                    },
-#                    'title': 'DASH'
-                }
-            }
-        ),
-    ]
+    figure = [historical_plot, historical_plot]
 
 
     # Debug
@@ -429,3 +429,26 @@ if __name__ == '__main__':
 
 # chk = results.copy()
 # chk = chk[chk['STOCK_SYMBOL']=='MSFT']
+    
+    
+
+dict1 = {'VALUE1':1, 'VALUE2':2}
+dict2 = str(dict1)
+
+
+test = ar.df_cross_join(stock_name, remove_same=True)
+
+test = test[['STOCK_SYMBOL_x', 'STOCK_SYMBOL_y']]
+test.columns = ['STOCK_Y', 'STOCK_VAR']
+test['RULE_ID'] = 1
+test['RESULTS'] = dict2
+test['STOCK_Y'] = test['STOCK_Y'].astype(str)
+test = test[['RULE_ID', 'STOCK_Y', 'STOCK_VAR', 'RESULTS']]
+
+
+upload = test.iloc[0:10000, :]
+upload.to_csv(path + '/stock_rule.csv', index=False)
+
+
+ar.db_upload(upload, 'stock_rule_tw', True)
+

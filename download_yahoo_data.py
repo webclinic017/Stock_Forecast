@@ -19,7 +19,7 @@ import yfinance as yf # https://pypi.org/project/yfinance/
 
 
 # 設定工作目錄 .....
-path = '/Users/Aron/Documents/GitHub/Data/Stock-Forecast'
+path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
 
 # Codebase
 path_codebase = ['/Users/Aron/Documents/GitHub/Arsenal',
@@ -38,6 +38,9 @@ import codebase_yz as cbyz
 
 stock_type = 'tw'
 stock_type = 'us'
+
+local = False
+local = True
 
 
 # Load Data ----------------
@@ -127,9 +130,14 @@ def load_data():
     
     # Upload
     if stock_type == 'tw':
-        ar.db_upload(data=hist_data, table_name='stock_data')
+        ar.db_upload(data=hist_data, 
+                     table_name='stock_data',
+                     local=local)
+        
     elif stock_type == 'us':
-        ar.db_upload(data=hist_data, table_name='stock_data_us')
+        ar.db_upload(data=hist_data, 
+                     table_name='stock_data_us',
+                     local=local)
     
     
     
