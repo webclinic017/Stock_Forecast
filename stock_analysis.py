@@ -11,32 +11,30 @@ import re
 import requests
 import numpy as np
 import pandas as pd
-from datetime import datetime, date
+import datetime
 # from flask import Flask, request
-import time
-import h5py
-import yfinance as yf # https://pypi.org/project/yfinance/
-
-# 將project_home指定為你的專案路徑
-project_home = u'/Users/Aron/Documents/GitHub/Arsenal/'
-if project_home not in sys.path:
-    sys.path = [project_home] + sys.path
 
 
-path = '/Users/Aron/Documents/GitHub/Data/Stock-Forecast'
+# Path .....
+if local == True:
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+else:
+    path = '/home/aronhack/stock_forecast/dashboard'
+    # path = '/home/aronhack/stock_analysis_us/dashboard'
 
-# Load Data ----------------
 
-# data = pd.read_hdf(path + '/Export/0050_20200723.h5', 's')
-data = pd.read_hdf(path + '/Export/2230_20200723.h5', 's')
+# Codebase ......
+path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
+                 r'/Users/Aron/Documents/GitHub/Codebase_YZ']
 
 
+for i in path_codebase:    
+    if i not in sys.path:
+        sys.path = [i] + sys.path
 
-df = data.copy()
-df.columns.upper()
-df2 = col_upper(df)
 
-test = df.columns.str.upper()
+import codebase_yz as cbyz
+import arsenal as ar
 
 
 
@@ -51,6 +49,54 @@ data['PRICE_DIFF_RATIO'] = data['PRICE_DIFF'] / data['LAST_CLOSE']
 data['LIMIT_UP'] = data['PRICE_DIFF_RATIO'] > 0.095
 data['LIMIT_DOWN'] = data['PRICE_DIFF_RATIO'] < -0.095
 
+
+
+def initialize(path):
+
+    # 新增工作資料夾
+    global path_resource, path_function, path_temp, path_export
+    path_resource = path + '/Resource'
+    path_function = path + '/Function'
+    path_temp = path + '/Temp'
+    path_export = path + '/Export'
+    
+    
+    cbyz.create_folder(path=[path_resource, path_function, 
+                             path_temp, path_export])        
+    return ''
+
+
+
+
+def load_data():
+    '''
+    讀取資料及重新整理
+    '''
+    return ''
+
+
+
+def master():
+    '''
+    主工作區
+    '''
+    
+    return ''
+
+
+
+
+def check():
+    '''
+    資料驗證
+    '''    
+    return ''
+
+
+
+
+if __name__ == '__main__':
+    master()
 
 
 
