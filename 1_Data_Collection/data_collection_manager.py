@@ -1,38 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jul 23 22:35:30 2020
+Created on Sat Nov 14 17:22:57 2020
 
 @author: Aron
 """
 
-import os, sys
-import re
-import requests
-import numpy as np
+
+# % 讀取套件 -------
 import pandas as pd
-import datetime
+import numpy as np
+import sys, time, os, gc
 
 
-
-
-
-# Outline
-# (1) Data Collection
-# (2) Price Manager
-# > Price Forcast 
-# > Export Buy Signal
-# (3) Backtest Manager
-# > Fee Manager
-# > Profit Manager
-
-
-
+local = False
+local = True
 
 
 # Path .....
-local = True
-
 if local == True:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
 else:
@@ -42,10 +27,7 @@ else:
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 path + '/1_Data_Collection',
-                 path + '/2_Stock_Analysis',
-                 path + '/3_Backtest']
+                 r'/Users/Aron/Documents/GitHub/Codebase_YZ']
 
 
 for i in path_codebase:    
@@ -56,34 +38,10 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 
-import data_collection_manager as dcm
-import stock_analysis_manager as sam
-import backtest_manager as btm
 
-
-
-
-for i in range(1, len(data)):
-    
-    data.loc[i, 'LAST_CLOSE'] = data.loc[i-1, 'Close']
-    print(i)
-
-data['PRICE_DIFF'] = data['Close'] - data['LAST_CLOSE']
-data['PRICE_DIFF_RATIO'] = data['PRICE_DIFF'] / data['LAST_CLOSE']
-data['LIMIT_UP'] = data['PRICE_DIFF_RATIO'] > 0.095
-data['LIMIT_DOWN'] = data['PRICE_DIFF_RATIO'] < -0.095
-
-
-
-
-
-
-
-
-
-
-
-
+# 自動設定區 -------
+pd.set_option('display.max_columns', 30)
+ 
 
 
 
@@ -117,7 +75,6 @@ def master():
     主工作區
     '''
     
-    
     return ''
 
 
@@ -134,7 +91,6 @@ def check():
 
 if __name__ == '__main__':
     master()
-
 
 
 
