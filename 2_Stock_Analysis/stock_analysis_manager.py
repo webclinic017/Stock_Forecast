@@ -7,6 +7,7 @@ Created on Sat Nov 14 17:23:08 2020
 """
 
 
+
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -19,7 +20,7 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/2_Stock_Analysis'
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
@@ -37,6 +38,11 @@ for i in path_codebase:
 
 import codebase_yz as cbyz
 import arsenal as ar
+
+
+
+
+
 
 
 # 自動設定區 -------
@@ -66,17 +72,163 @@ def load_data():
     '''
     讀取資料及重新整理
     '''
+    
+    
+    
+    target = ar.stk_get_list(stock_type='tw', 
+                          stock_info=False, 
+                          update=False,
+                          local=True)    
+
+    target = target.iloc[0:100, :]
+    target = target['STOCK_SYMBOL'].tolist()
+    
+    data_raw = ar.stk_get_data(begin_date=None, end_date=None, 
+                   stock_type='tw', stock_symbol=target, 
+                   local=True)    
+    
+    return data_raw
+
+
+
+
+def get_hold_stock():
+    
+    
     return ''
 
 
 
-def master():
+def get_buy_signal(data, hold_stocks=None):
+    
+    loc_data = data.copy()
+    loc_data['SIGNAL_THRESHOLD'] = loc_data.groupby('STOCK_SYMBOL')['CLOSE'] \
+        .transform('max')
+
+    loc_data['SIGNAL_THRESHOLD'] = loc_data['SIGNAL_THRESHOLD'] * 0.95        
+        
+    loc_data['PREV_PRICE'] = loc_data \
+                            .groupby(['STOCK_SYMBOL'])['CLOSE'] \
+                            .shift(-1) \
+                            .reset_index(drop=True)        
+        
+     
+        
+    loc_data.loc[loc_data['PREV_PRICE'] > loc_data['SIGNAL_THRESHOLD'], 
+                 'SIGNAL'] = True
+    
+    loc_data = loc_data[loc_data['SIGNAL']==True] \
+            .reset_index(drop=True)
+    
+    return loc_data
+
+
+# ..............
+
+
+def get_sell_signal(data, hold_stocks=None):
+    
+    return ''
+
+
+def analyze_center(data):
+    '''
+    List all analysis here
+    '''    
+    
+    analyze_results = get_top_price(data)
+    
+    
+    
+    # Results format
+    # (1) Only stock passed test will show in the results
+    # STOCK_SYMBOL
+    # ANALYSIS_ID
+    
+    
+    
+    return analyze_results
+
+
+
+# %% Dev ---------
+    
+
+def get_top_price(data):
+    '''
+    Dev
+    '''
+    
+    loc_data = data.copy()
+    # loc_data = loc_data[['STOCK_SYMBOL', 'CLOSE']]
+    
+    top_price = data.groupby('STOCK_SYMBOL')['CLOSE'] \
+                .aggregate(max) \
+                .reset_index() \
+                .rename(columns={'CLOSE':'MAX_PRICE'})
+
+        
+    results_pre = loc_data.merge(top_price, 
+                         how='left', 
+                         on='STOCK_SYMBOL')
+    
+    
+    # Temp ---------
+    # Add a test here
+    cur_price = results_pre \
+        .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE'],
+                     ascending=[True, False]) \
+        .drop_duplicates(subset=['STOCK_SYMBOL'])
+        
+    cur_price = cur_price[['STOCK_SYMBOL', 'CLOSE']] \
+        .rename(columns={'CLOSE':'CUR_PRICE'})
+     
+    # Reorganize -------
+    # results = results_pre.merge(cur_price, 
+    #                                  how='left', 
+    #                                  on='STOCK_SYMBOL')
+        
+    results = top_price.merge(cur_price, 
+                         on='STOCK_SYMBOL')
+    
+    
+    results['PASS'] = results['CUR_PRICE'] > results['MAX_PRICE'] * 0.95
+    
+    results = results[results['PASS']==True] \
+        .reset_index(drop=True)
+        
+    results = results[['STOCK_SYMBOL']]
+    results['ANALYSIS_ID'] = 'TM01'
+
+
+    return results   
+
+
+
+# %% Master ------
+
+
+def master(today=None, hold_stocks=None):
     '''
     主工作區
     '''
     
-    return ''
-
+    stock_data = load_data()
+    
+    analyze_results = analyze_center(data=stock_data)
+    
+    
+    buy_signal = get_buy_signal(data=stock_data,
+                                hold_stocks=hold_stocks)
+    
+    sell_signal = get_sell_signal(data=analyze_results,
+                                  hold_stocks=hold_stocks)
+    
+    master_results = {'RESULTS':analyze_results,
+                      'BUY_SIGNAL':buy_signal,
+                      'SELL_SIGNAL':sell_signal}
+    
+    return master_results
 
 
 
@@ -91,6 +243,8 @@ def check():
 
 if __name__ == '__main__':
     master()
+
+
 
 
 

@@ -6,16 +6,6 @@ Created on Thu Jul 23 22:35:30 2020
 @author: Aron
 """
 
-import os, sys
-import re
-import requests
-import numpy as np
-import pandas as pd
-import datetime
-
-
-
-
 
 # Outline
 # (1) Data Collection
@@ -25,13 +15,28 @@ import datetime
 # (3) Backtest Manager
 # > Fee Manager
 # > Profit Manager
+# > Budget
+
+# Monitor System ( n days in the future)
+# Notification System
 
 
+# % 讀取套件 -------
+import pandas as pd
+import numpy as np
+import sys, time, os, gc
+import os, sys
 
+
+local = False
+local = True
+
+
+data_begin = 20180101
+data_end = 20200831
 
 
 # Path .....
-local = True
 
 if local == True:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
@@ -43,9 +48,11 @@ else:
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 path + '/0_Finance_Controller',
                  path + '/1_Data_Collection',
                  path + '/2_Stock_Analysis',
-                 path + '/3_Backtest']
+                 path + '/3_Backtest',
+                 path + '/4.Visualization']
 
 
 for i in path_codebase:    
@@ -56,26 +63,35 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 
+import finance_controller_master as fcm
 import data_collection_manager as dcm
 import stock_analysis_manager as sam
 import backtest_manager as btm
+# import visualization_manager as vsm
 
 
 
-
-for i in range(1, len(data)):
-    
-    data.loc[i, 'LAST_CLOSE'] = data.loc[i-1, 'Close']
-    print(i)
-
-data['PRICE_DIFF'] = data['Close'] - data['LAST_CLOSE']
-data['PRICE_DIFF_RATIO'] = data['PRICE_DIFF'] / data['LAST_CLOSE']
-data['LIMIT_UP'] = data['PRICE_DIFF_RATIO'] > 0.095
-data['LIMIT_DOWN'] = data['PRICE_DIFF_RATIO'] < -0.095
+# Finance Controller -------
+fcm_data = fcm.master()
+budget = fcm_data['BUDGET']
+hold_stocks = fcm_data['HOLD_STOCKS']
 
 
 
+# Stock Analysis -------
+signal = sam.master(today=20200701,
+                    hold_stocks=hold_stocks)
+signal_buy
+signal_sell # None if hold_stocks na
 
+
+# Backtest -------
+# from = 20180101
+# periods = 12
+# unit = 'w'
+backtest = btm.master(being_date=20190101,
+                      signal=signal,
+                      budget=budget)
 
 
 

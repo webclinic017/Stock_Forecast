@@ -19,7 +19,7 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/3_Backtest'
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
@@ -70,10 +70,23 @@ def load_data():
 
 
 
-def master():
+def get_stock_fee():
+    
+    
+    return ''
+
+
+
+def master(signal, budget=None, split_budget=False):
     '''
     主工作區
     '''
+    
+    fee = get_stock_fee()
+    
+    
+    
+    
     
     return ''
 

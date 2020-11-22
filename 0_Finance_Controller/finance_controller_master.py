@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Nov 14 17:22:57 2020
+Created on Sat Nov 14 17:56:20 2020
 
 @author: Aron
 """
@@ -19,7 +19,7 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/1_Data_Collection'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/0_Finance_Controller'
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
@@ -45,7 +45,7 @@ pd.set_option('display.max_columns', 30)
 
 
 
-def initialize(path):
+def initialize():
 
     # 新增工作資料夾
     global path_resource, path_function, path_temp, path_export
@@ -70,15 +70,30 @@ def load_data():
 
 
 
-
-
 def master():
     '''
     主工作區
     '''
     
-    return ''
-
+    initialize()
+    
+    hold_stocks = pd.DataFrame(data={'STOCK_SYMBOL':['0050', '0056'],
+                                'HOLD_VOLUME':[1500, 1200]})
+    
+    
+    # hold_stocks.to_csv(path_export + '/hold_stocks.csv',
+    #                    index=False)
+    
+    
+    # Dev
+    # hold_stocks = pd.read_csv(path_export + '/hold_stocks.csv')
+    
+    
+    # Dev
+    master_results = {'HOLD_STOCKS':hold_stocks,
+                      'BUDGET':20000}
+    
+    return master_results
 
 
 
