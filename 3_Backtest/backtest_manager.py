@@ -101,9 +101,21 @@ def master(signal, budget=None, split_budget=False):
 
     
     # Variables    
+    # (1) Fix missing date issues
+    begin_date = 20190401
     days = 60
+    periods = 15
+    times = 4
     volume = 1000
     
+    cbyz.get_time_seq(begin_date=begin_date,
+                      periods=periods,
+                      unit='d'
+                      
+                      )
+    
+    
+
     
 
     
@@ -253,6 +265,8 @@ def check():
 
 if __name__ == '__main__':
     master()
+
+
 
 
 
