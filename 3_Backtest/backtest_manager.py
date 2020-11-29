@@ -66,7 +66,22 @@ def load_data():
     '''
     讀取資料及重新整理
     '''
-    return ''
+    
+    
+    target = ar.stk_get_list(stock_type='tw', 
+                          stock_info=False, 
+                          update=False,
+                          local=True)    
+    # Dev
+    target = target.iloc[0:10, :]
+    target = target['STOCK_SYMBOL'].tolist()
+    
+    data_raw = ar.stk_get_data(begin_date=None, end_date=None, 
+                   stock_type='tw', stock_symbol=target, 
+                   local=True)    
+    
+    return data_raw
+
 
 
 
@@ -82,9 +97,143 @@ def master(signal, budget=None, split_budget=False):
     主工作區
     '''
     
-    fee = get_stock_fee()
+    # fee = get_stock_fee()
+
+    
+    # Variables    
+    days = 60
+    volume = 1000
     
     
+
+    
+    # ........    
+    bts_stock_data = load_data()
+    # bts_stock_data = bts_stock_data[bts_stock_data['STOCK_SYMBOL']=='0050']
+    bts_stock_data = bts_stock_data.drop(['HIGH', 'LOW'], axis=1)
+    
+    
+    bts_stock_data = bts_stock_data[bts_stock_data['WORK_DATE']>20190401] \
+                        .reset_index(drop=True)
+    
+    
+    bts_stock_data['FAIL'] = ''
+    
+    
+    unique_symbol = bts_stock_data[['STOCK_SYMBOL']] \
+                    .drop_duplicates() \
+                    .reset_index(drop=True)
+    
+    
+    
+    
+    backtest_results = pd.DataFrame()
+    
+    
+    
+    for j in range(0, 5):
+    # for j in range(0, len(unique_symbol)):
+        
+        cur_symbol = unique_symbol.loc[j, 'STOCK_SYMBOL']
+        
+        temp = bts_stock_data[bts_stock_data['STOCK_SYMBOL']==cur_symbol] \
+                .reset_index(drop=True)
+        
+        
+        for i in range(0, len(temp)):
+            
+            
+            # Replace with model.
+            if i == 0:
+                temp.loc[i, 'BUY_VOLUME'] = volume
+                temp.loc[i, 'TYPE'] = 'BUY'
+                buy_price = temp.loc[i, 'CLOSE']
+            
+        
+            # Optimize append
+            if temp.loc[i, 'CLOSE'] > buy_price * 1.05:
+                temp.loc[i, 'SELL'] = volume
+                temp.loc[i, 'TYPE'] = 'SELL'
+                backtest_results = backtest_results.append(temp)
+                break
+            
+            # Optimize append
+            if i >= days:
+                temp.loc[i, 'SELL'] = volume
+                temp.loc[i, 'FAIL'] = True
+                temp.loc[i, 'TYPE'] = 'SELL'
+                backtest_results = backtest_results.append(temp)
+                break
+            
+            print(i)
+            
+        print('symbole - ' + str(j) + '/' + str(len(unique_symbol)))
+        
+        
+    
+    # Organize results ------
+    
+    backtest_main_pre = backtest_results.copy()
+    backtest_main_pre = backtest_main_pre[
+                            (~backtest_main_pre['TYPE'].isna())
+                            ]
+    
+    backtest_main_pre['WORK_DATE'] = backtest_main_pre['WORK_DATE'] \
+                                        .apply(cbyz.ymd)
+    
+    
+    buy_info = backtest_main_pre[backtest_main_pre['TYPE']=='BUY']
+    sell_info = backtest_main_pre[backtest_main_pre['TYPE']=='SELL']
+    
+    
+    backtest_main = buy_info.merge(sell_info, how='outer', 
+                                      on='STOCK_SYMBOL')
+    
+    backtest_main = backtest_main \
+                        .drop(['TYPE_x', 'SELL_x', 'FAIL_x',
+                               'TYPE_y'], axis=1)
+    
+    
+    backtest_main = backtest_main \
+        .rename(columns={'WORK_DATE_x':'WORK_DATE_BUY',
+                         'CLOSE_x':'PRICE_BUY',
+                         'BUY_VOLUME_x':'VOLUME_BUY',
+                         'WORK_DATE_y':'WORK_DATE_SELL',
+                         'CLOSE_y':'PRICE_SELL',
+                         'BUY_VOLUME_y':'VOLUME_SELL',
+                         'SELL_y':'SELL',
+                         'FAIL_y':'FAIL'
+                         })
+    
+    # Calculate days ------
+    backtest_main['DAYS'] = backtest_main['WORK_DATE_SELL'] \
+                                - backtest_main['WORK_DATE_BUY']
+    
+    
+    backtest_main['DAYS'] = backtest_main['DAYS'].astype(str)
+    
+    backtest_main['DAYS'] = backtest_main['DAYS'] \
+                                .str.replace(' days', '')
+                                
+    backtest_main['DAYS'] = backtest_main['DAYS'].astype(int)
+    
+    
+    
+    # Calculate Profits ------
+    # Replace VOLUME_BUY with VOLUME_SELL
+    backtest_main['PROFIT'] = (backtest_main['PRICE_SELL'] \
+                               - backtest_main['PRICE_BUY']) \
+                                * backtest_main['VOLUME_BUY']
+    
+    
+    backtest_main['ROI'] = backtest_main['PROFIT'] \
+                                / (backtest_main['VOLUME_BUY'] \
+                                   * backtest_main['PRICE_BUY'])
+    
+    
+    
+        
+        
     
     
     

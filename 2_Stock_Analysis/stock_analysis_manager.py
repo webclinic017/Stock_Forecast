@@ -74,13 +74,12 @@ def load_data():
     '''
     
     
-    
     target = ar.stk_get_list(stock_type='tw', 
                           stock_info=False, 
                           update=False,
                           local=True)    
-
-    target = target.iloc[0:100, :]
+    # Dev
+    target = target.iloc[0:10, :]
     target = target['STOCK_SYMBOL'].tolist()
     
     data_raw = ar.stk_get_data(begin_date=None, end_date=None, 
@@ -159,6 +158,7 @@ def get_top_price(data):
     Dev
     '''
     
+    # data = stock_data.copy()
     loc_data = data.copy()
     # loc_data = loc_data[['STOCK_SYMBOL', 'CLOSE']]
     
@@ -183,52 +183,63 @@ def get_top_price(data):
     cur_price = cur_price[['STOCK_SYMBOL', 'CLOSE']] \
         .rename(columns={'CLOSE':'CUR_PRICE'})
      
-    # Reorganize -------
-    # results = results_pre.merge(cur_price, 
-    #                                  how='left', 
-    #                                  on='STOCK_SYMBOL')
-        
+    # Reorganize -------        
     results = top_price.merge(cur_price, 
                          on='STOCK_SYMBOL')
     
     
-    results['PASS'] = results['CUR_PRICE'] > results['MAX_PRICE'] * 0.95
+    results.loc[results['CUR_PRICE'] > results['MAX_PRICE'] * 0.95,
+                'BUY_SIGNAL'] = True
     
-    results = results[results['PASS']==True] \
+    
+    results.loc[results['CUR_PRICE'] < results['MAX_PRICE'] * 0.3,
+                'SELL_SIGNAL'] = True
+    
+    
+    
+    results = results[(~results['BUY_SIGNAL'].isna()) |
+                      (~results['SELL_SIGNAL'].isna())] \
         .reset_index(drop=True)
-        
-    results = results[['STOCK_SYMBOL']]
-    results['ANALYSIS_ID'] = 'TM01'
 
+        
+    results['ANALYSIS_ID'] = 'TM01'
+    results = results[['STOCK_SYMBOL', 'ANALYSIS_ID',
+                       'BUY_SIGNAL', 'SELL_SIGNAL']]
 
     return results   
 
 
 
 # %% Master ------
+    
 
-
-def master(today=None, hold_stocks=None):
+# 停損點
+def master(today=None, hold_stocks=None, roi=10, limit=90):
     '''
     主工作區
+    roi:     percent
+    limit:   days
     '''
     
+    global stock_data
     stock_data = load_data()
     
+    global analyze_results
     analyze_results = analyze_center(data=stock_data)
     
     
-    buy_signal = get_buy_signal(data=stock_data,
-                                hold_stocks=hold_stocks)
+    # v0
+    # buy_signal = get_buy_signal(data=stock_data,
+    #                             hold_stocks=hold_stocks)
     
-    sell_signal = get_sell_signal(data=analyze_results,
-                                  hold_stocks=hold_stocks)
+    # sell_signal = get_sell_signal(data=analyze_results,
+    #                               hold_stocks=hold_stocks)
     
-    master_results = {'RESULTS':analyze_results,
-                      'BUY_SIGNAL':buy_signal,
-                      'SELL_SIGNAL':sell_signal}
+    # master_results = {'RESULTS':analyze_results,
+    #                   'BUY_SIGNAL':buy_signal,
+    #                   'SELL_SIGNAL':sell_signal}
     
-    return master_results
+    return analyze_results
 
 
 
@@ -243,6 +254,7 @@ def check():
 
 if __name__ == '__main__':
     master()
+
 
 
 

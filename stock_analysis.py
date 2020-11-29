@@ -81,8 +81,6 @@ hold_stocks = fcm_data['HOLD_STOCKS']
 # Stock Analysis -------
 signal = sam.master(today=20200701,
                     hold_stocks=hold_stocks)
-signal_buy
-signal_sell # None if hold_stocks na
 
 
 # Backtest -------
@@ -95,61 +93,12 @@ backtest = btm.master(being_date=20190101,
 
 
 
+# Priority
+# Model review
 
 
 
 
-
-
-
-
-def initialize(path):
-
-    # 新增工作資料夾
-    global path_resource, path_function, path_temp, path_export
-    path_resource = path + '/Resource'
-    path_function = path + '/Function'
-    path_temp = path + '/Temp'
-    path_export = path + '/Export'
-    
-    
-    cbyz.create_folder(path=[path_resource, path_function, 
-                             path_temp, path_export])        
-    return ''
-
-
-
-
-def load_data():
-    '''
-    讀取資料及重新整理
-    '''
-    return ''
-
-
-
-def master():
-    '''
-    主工作區
-    '''
-    
-    
-    return ''
-
-
-
-
-def check():
-    '''
-    資料驗證
-    '''    
-    return ''
-
-
-
-
-if __name__ == '__main__':
-    master()
 
 
 
