@@ -92,7 +92,8 @@ def get_stock_fee():
 
 
 
-def master(signal, budget=None, split_budget=False):
+def master(begin_date, periods=5,
+           signal=None, budget=None, split_budget=False):
     '''
     主工作區
     '''
@@ -102,30 +103,47 @@ def master(signal, budget=None, split_budget=False):
     
     # Variables    
     # (1) Fix missing date issues
-    begin_date = 20190401
-    days = 60
-    periods = 15
-    times = 4
-    volume = 1000
     
-    cbyz.get_time_seq(begin_date=begin_date,
+    
+    time_seq = cbyz.get_time_seq(begin_date=begin_date,
                       periods=periods,
-                      unit='d'
-                      
-                      )
+                      unit='m', 
+                      simplify_date=True)
+   
     
     
+   # backtest_multiple()
+    backtest_results = pd.DataFrame()    
+    
+    for i in range(0, len(time_seq)):
+        
+        single = backtest_single(time_seq.loc[i, 'TIME_UNIT'],
+                                 days=60, volume=1000)
+        
+        backtest_results = backtest_results.append(single)
 
+        
+    backtest_results = backtest_results \
+                        .reset_index(drop=True)        
     
+    
+    return ''
 
+
+
+def backtest_single(begin_date, days=60, volume=None):
     
     # ........    
+    # Bug, add begin_date as arguments
     bts_stock_data = load_data()
+    
+    
     # bts_stock_data = bts_stock_data[bts_stock_data['STOCK_SYMBOL']=='0050']
     bts_stock_data = bts_stock_data.drop(['HIGH', 'LOW'], axis=1)
     
     
-    bts_stock_data = bts_stock_data[bts_stock_data['WORK_DATE']>20190401] \
+    bts_stock_data = bts_stock_data[
+        bts_stock_data['WORK_DATE']>=begin_date] \
                         .reset_index(drop=True)
     
     
@@ -243,14 +261,7 @@ def master(signal, budget=None, split_budget=False):
                                    * backtest_main['PRICE_BUY'])
     
     
-    
-        
-        
-    
-    
-    
-    return ''
-
+    return backtest_main
 
 
 
@@ -265,6 +276,15 @@ def check():
 
 if __name__ == '__main__':
     master()
+
+
+
+
+
+
+
+
+
 
 
 
