@@ -92,46 +92,9 @@ def get_stock_fee():
 
 
 
-def master(begin_date, periods=5,
-           signal=None, budget=None, split_budget=False):
-    '''
-    主工作區
-    '''
-    
-    # fee = get_stock_fee()
-
-    
-    # Variables    
-    # (1) Fix missing date issues
-    
-    
-    time_seq = cbyz.get_time_seq(begin_date=begin_date,
-                      periods=periods,
-                      unit='m', 
-                      simplify_date=True)
-   
-    
-    
-   # backtest_multiple()
-    backtest_results = pd.DataFrame()    
-    
-    for i in range(0, len(time_seq)):
-        
-        single = backtest_single(time_seq.loc[i, 'TIME_UNIT'],
-                                 days=60, volume=1000)
-        
-        backtest_results = backtest_results.append(single)
-
-        
-    backtest_results = backtest_results \
-                        .reset_index(drop=True)        
-    
-    
-    return ''
 
 
-
-def backtest_single(begin_date, days=60, volume=None):
+def backtest_single(begin_date, days=60, volume=None, budget=None):
     
     # ........    
     # Bug, add begin_date as arguments
@@ -262,6 +225,50 @@ def backtest_single(begin_date, days=60, volume=None):
     
     
     return backtest_main
+
+
+
+
+
+def master(begin_date, periods=5,
+           signal=None, budget=None, split_budget=False):
+    '''
+    主工作區
+    '''
+    
+    # fee = get_stock_fee()
+
+    
+    # Variables    
+    # (1) Fix missing date issues
+    
+    begin_date = 20190401
+    
+    
+    time_seq = cbyz.get_time_seq(begin_date=begin_date,
+                      periods=periods,
+                      unit='m', 
+                      simplify_date=True)
+   
+    
+    
+   # backtest_multiple()
+    backtest_results = pd.DataFrame()    
+    
+    for i in range(0, len(time_seq)):
+        
+        single = backtest_single(time_seq.loc[i, 'TIME_UNIT'],
+                                 days=60, volume=1000)
+        
+        backtest_results = backtest_results.append(single)
+
+        
+    backtest_results = backtest_results \
+                        .reset_index(drop=True)        
+    
+    
+    return ''
+
 
 
 
