@@ -68,7 +68,7 @@ def initialize(path):
 
 
 
-def load_data():
+def load_data(begin_date):
     '''
     讀取資料及重新整理
     '''
@@ -82,7 +82,7 @@ def load_data():
     target = target.iloc[0:10, :]
     target = target['STOCK_SYMBOL'].tolist()
     
-    data_raw = ar.stk_get_data(begin_date=None, end_date=None, 
+    data_raw = ar.stk_get_data(begin_date=begin_date, end_date=None, 
                    stock_type='tw', stock_symbol=target, 
                    local=True)    
     
@@ -142,16 +142,63 @@ def analyze_center(data):
     # Results format
     # (1) Only stock passed test will show in the results
     # STOCK_SYMBOL
-    # ANALYSIS_ID
+    # MODEL_ID, or MODEL_ID
     
     
     
     return analyze_results
 
 
+# .......
+    
+
+def dev_model(begin_date):
+    
+    # data = stock_data.copy()
+    loc_data = load_data(begin_date)
+    loc_data['LAST_NUM'] = loc_data['STOCK_SYMBOL'].str.slice(start=-1)
+    loc_data['LAST_NUM'] = loc_data['LAST_NUM'].astype(int)
+    
+    
+    # 
+    loc_data['CLOSE_STR'] = loc_data['CLOSE'].astype(str)
+    loc_data['CLOSE_STR'] = loc_data['CLOSE_STR'].str.slice(start=-1)
+    loc_data['CLOSE_STR'] = loc_data['CLOSE_STR'].astype(int)
+    
+    
+    # 
+    loc_data['SIGNAL_DAY'] = loc_data['WORK_DATE'].apply(cbyz.ymd).dt.weekday
+    loc_data['SIGNAL_DAY'] = loc_data['SIGNAL_DAY'].astype(int)
+
+
+    # Signal
+    loc_data.loc[loc_data['LAST_NUM']==loc_data['SIGNAL_DAY'],
+                 'BUY_SIGNAL'] = True
+    
+    loc_data.loc[loc_data['CLOSE_STR']==loc_data['SIGNAL_DAY'],
+                 'SELL_SIGNAL'] = True    
+    
+    
+    loc_data = cbyz.df_na_to(loc_data, 
+                             cols=['BUY_SIGNAL', 'SELL_SIGNAL'],
+                             value=False)
+    
+    loc_data['MODEL_ID'] = 'DEV'
+    
+    
+    loc_data = loc_data[['STOCK_SYMBOL', 'MODEL_ID',
+                       'BUY_SIGNAL', 'SELL_SIGNAL']]         
+
+    return loc_data
+
+
 
 # %% Dev ---------
     
+
+
+
+
 
 def get_top_price(data):
     '''
@@ -202,8 +249,8 @@ def get_top_price(data):
         .reset_index(drop=True)
 
         
-    results['ANALYSIS_ID'] = 'TM01'
-    results = results[['STOCK_SYMBOL', 'ANALYSIS_ID',
+    results['MODEL_ID'] = 'TM01'
+    results = results[['STOCK_SYMBOL', 'MODEL_ID',
                        'BUY_SIGNAL', 'SELL_SIGNAL']]
 
     return results   
@@ -213,7 +260,7 @@ def get_top_price(data):
 # %% Master ------
     
 
-# 停損點
+# 增加 停損點
 def master(today=None, hold_stocks=None, roi=10, limit=90):
     '''
     主工作區

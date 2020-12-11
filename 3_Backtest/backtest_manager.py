@@ -20,14 +20,17 @@ local = True
 # Path .....
 if local == True:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/3_Backtest'
+    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
+    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
 
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ']
+                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 master_path + '/2_Stock_Analysis',]
 
 
 for i in path_codebase:    
