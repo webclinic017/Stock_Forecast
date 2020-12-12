@@ -68,22 +68,72 @@ def initialize(path):
 
 
 
-def load_data(begin_date):
+data_begin = 20200301
+
+
+data_begin=None
+data_end=None
+data_period=30
+forcast_end=None
+forcast_period=None
+
+
+
+
+# 基本面
+# 技術面
+# 籌碼面：最難，但影響最大
+# 消息面：Twitter
+
+
+# > MIT資產管理課程，他舉了一個擺鐘的例子，當把很多本來有誤差的擺鐘放在一起，過一段時間後全部同會同步。
+# > 當金融市場越來越有效率的時候，獲利的機會就越來越少
+# > 大家越來越懂的時候，大家做的市場會越來越一樣
+# 他們做加密貨幣，因為歷史太短了，大家都沒有充份的資料；基本面也有影響，但影響不像其他金融市場沒那麼大
+# 因此，他認為要做加密貨幣的量化交易，現在是黃金時間，這個黃金時期可能還會持續一段時間。
+
+# > 因為Crypto現在有很多交易所，且交易所的量大小都不一樣，所以當掛一樣的價錢的，量小的交易所
+# 可能就買不到，整體而言的資料會更雜亂。
+# Crypto相對傳統金融市場比較沒有效率，但因為沒有效率，所以才有機會。
+
+# 量化交易的規模越大，難度也會越高，會有滑價等問題。100塊賺10塊，和100億賺10億的差別。
+# 這可能也是我進場的機會。
+# > 文藝復興最後也有這個問題，因為錢太多了，所以他們的行為本身就會影響市場。
+# > 做交易的人，只要資料夠大，他就是用自己的籌碼在影響市場。所以過了某條線之後，有錢人越來越有錢。
+
+
+# 很多人問說，如果你這麼厲害，為什麼不要自己賺就好，他之所以會出來開公司，也是為了用銀行的錢
+# 進行1億賺1千萬的交易，而不是小打小鬧，用1萬賺1千塊
+
+# 寶博兩支產品都有放，21:20
+
+
+
+
+# EP61
+# 比特幣從一開始到現在有3個循環，每一次的循環都一模一樣，只是最高多了幾十倍
+#　2.定期買入比特幣，每天買入60元台幣
+
+
+def load_data(begin_date, end_date=None, period=None, 
+              stock_symbol=None):
     '''
     讀取資料及重新整理
     '''
     
     
-    target = ar.stk_get_list(stock_type='tw', 
-                          stock_info=False, 
-                          update=False,
-                          local=True)    
-    # Dev
-    target = target.iloc[0:10, :]
-    target = target['STOCK_SYMBOL'].tolist()
+    if stock_symbol==None:
+        target = ar.stk_get_list(stock_type='tw', 
+                              stock_info=False, 
+                              update=False,
+                              local=True)    
+        # Dev
+        target = target.iloc[0:10, :]
+        stock_symbol = target['STOCK_SYMBOL'].tolist()
     
-    data_raw = ar.stk_get_data(begin_date=begin_date, end_date=None, 
-                   stock_type='tw', stock_symbol=target, 
+    
+    data_raw = ar.stk_get_data(begin_date=begin_date, end_date=end_date, 
+                   stock_type='tw', stock_symbol=stock_symbol, 
                    local=True)    
     
     return data_raw
@@ -152,10 +202,27 @@ def analyze_center(data):
 # .......
     
 
-def dev_model(begin_date):
+def dev_model(data_end, data_begin=None, data_period=60,
+              forecast_end=None, forecast_period=30,
+              stock_symbol=None,
+              remove_none=True):
+    '''
+    remove_none    : boolean. Remove row without any positive signal.
+    '''
     
-    # data = stock_data.copy()
-    loc_data = load_data(begin_date)
+    
+    periods = ar.date_get_period(data_begin=data_begin, 
+                                 data_end=data_end, 
+                                 data_period=data_period,
+                                 forcast_end=forecast_end, 
+                                 forcast_period=forecast_period)
+    
+    
+    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+                         end_date=periods['DATA_END'],
+                         stock_symbol=stock_symbol)
+    
+    
     loc_data['LAST_NUM'] = loc_data['STOCK_SYMBOL'].str.slice(start=-1)
     loc_data['LAST_NUM'] = loc_data['LAST_NUM'].astype(int)
     
@@ -186,10 +253,23 @@ def dev_model(begin_date):
     loc_data['MODEL_ID'] = 'DEV'
     
     
-    loc_data = loc_data[['STOCK_SYMBOL', 'MODEL_ID',
-                       'BUY_SIGNAL', 'SELL_SIGNAL']]         
+    # Remove row without any positive signal.
+    if remove_none == True:
+        loc_data = loc_data[(loc_data['BUY_SIGNAL']==True) |
+                            (loc_data['SELL_SIGNAL']==True)] \
+            .reset_index(drop=True)
+    
+    loc_data = loc_data[['STOCK_SYMBOL', 'MODEL_ID', 'WORK_DATE',
+                       'BUY_SIGNAL', 'SELL_SIGNAL']]   
+
+
+    # Worklist
+    # 1.Forecast the trend in the next N days.
+    # 2.If forecasted ROI reach goal, then buy_signal will be true.      
 
     return loc_data
+
+
 
 
 

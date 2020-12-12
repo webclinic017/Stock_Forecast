@@ -40,7 +40,7 @@ for i in path_codebase:
 
 import codebase_yz as cbyz
 import arsenal as ar
-
+import stock_analysis_manager as sam
 
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
@@ -65,7 +65,7 @@ def initialize(path):
 
 
 
-def load_data():
+def load_data(begin_date, end_date=end_date):
     '''
     讀取資料及重新整理
     '''
@@ -79,9 +79,10 @@ def load_data():
     target = target.iloc[0:10, :]
     target = target['STOCK_SYMBOL'].tolist()
     
-    data_raw = ar.stk_get_data(begin_date=None, end_date=None, 
-                   stock_type='tw', stock_symbol=target, 
-                   local=True)    
+    data_raw = ar.stk_get_data(begin_date=begin_date, 
+                               end_date=end_date, 
+                               stock_type='tw', stock_symbol=target,
+                               local=True)    
     
     return data_raw
 
@@ -94,26 +95,31 @@ def get_stock_fee():
     return ''
 
 
-
+# ..........
+    
+begin_date = 20190301
+days=60
+volume=None
+budget=None
 
 
 def backtest_single(begin_date, days=60, volume=None, budget=None):
     
+   
     # ........    
-    # Bug, add begin_date as arguments
-    bts_stock_data = load_data()
+    # Bug, 股市休盤space issues
+    end_date = cbyz.date_cal(begin_date, amount=days, unit='d')
     
+    bts_stock_data = load_data(begin_date=begin_date,
+                               end_date=end_date)
     
-    # bts_stock_data = bts_stock_data[bts_stock_data['STOCK_SYMBOL']=='0050']
     bts_stock_data = bts_stock_data.drop(['HIGH', 'LOW'], axis=1)
     
     
-    bts_stock_data = bts_stock_data[
-        bts_stock_data['WORK_DATE']>=begin_date] \
-                        .reset_index(drop=True)
-    
-    
     bts_stock_data['FAIL'] = ''
+    volume = 1000
+    
+    roi_goal = 1.05
     
     
     unique_symbol = bts_stock_data[['STOCK_SYMBOL']] \
@@ -121,12 +127,10 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
                     .reset_index(drop=True)
     
     
-    
-    
     backtest_results = pd.DataFrame()
     
     
-    
+    # Iterate by symbol ......
     for j in range(0, 5):
     # for j in range(0, len(unique_symbol)):
         
@@ -134,41 +138,84 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
         
         temp = bts_stock_data[bts_stock_data['STOCK_SYMBOL']==cur_symbol] \
                 .reset_index(drop=True)
+
         
+        # Consider buy and sell multiplie times, but only one currently.
+        buy_lock = False
+        sell_lock = False
+
         
         for i in range(0, len(temp)):
             
             
+            today = temp.loc[i, 'WORK_DATE']
+            model_end = cbyz.date_cal(today, amount=days, unit='d')
+            
+
+            # Model results .......
+            # (1) Update, should deal with multiple signal issues.
+            #     Currently, only consider the first signal.
+            model_results_raw = sam.dev_model(data_begin=today,
+                                          data_end=model_end,
+                                          stock_symbol=cur_symbol,
+                                          remove_none=False)
+            
+            
+            cur_price = temp.loc[i, 'CLOSE']
+            
+            buy_signal_today = model_results_raw[
+                model_results_raw['WORK_DATE']==today]
+
+
+
+            # buy_signal = model_results_raw[
+            #     model_results_raw['BUY_SIGNAL']==True]
+
+
+            # sell_signal = model_results_raw[
+            #     model_results_raw['SELL_SIGNAL']==True]
+            
+            
             # Replace with model.
-            if i == 0:
+            if buy_lock == False and \
+                buy_signal_today.loc[0, 'BUY_SIGNAL'] == True:
+                
                 temp.loc[i, 'BUY_VOLUME'] = volume
                 temp.loc[i, 'TYPE'] = 'BUY'
                 buy_price = temp.loc[i, 'CLOSE']
+                buy_lock = True
+                continue
             
         
             # Optimize append
-            if temp.loc[i, 'CLOSE'] > buy_price * 1.05:
-                temp.loc[i, 'SELL'] = volume
+            roi = cur_price / buy_price
+            if buy_lock == True and sell_lock == False \
+                and roi >= roi_goal:
+                    
+                temp.loc[i, 'SELL_VOLUME'] = volume
                 temp.loc[i, 'TYPE'] = 'SELL'
                 backtest_results = backtest_results.append(temp)
                 break
+
             
             # Optimize append
             if i >= days:
-                temp.loc[i, 'SELL'] = volume
+                temp.loc[i, 'SELL_VOLUME'] = volume
                 temp.loc[i, 'FAIL'] = True
                 temp.loc[i, 'TYPE'] = 'SELL'
                 backtest_results = backtest_results.append(temp)
                 break
             
-            print(i)
-            
+            print(str(i) + '_' + str(model_begin) + '_' + str(today))
+           
         print('symbole - ' + str(j) + '/' + str(len(unique_symbol)))
-        
+    
+    
+    # Remove na ------    
+    backtest_results = backtest_results[~backtest_results['TYPE'].isna()]
         
     
     # Organize results ------
-    
     backtest_main_pre = backtest_results.copy()
     backtest_main_pre = backtest_main_pre[
                             (~backtest_main_pre['TYPE'].isna())
