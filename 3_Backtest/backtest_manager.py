@@ -65,7 +65,7 @@ def initialize(path):
 
 
 
-def load_data(begin_date, end_date=end_date):
+def load_data(begin_date, end_date=None):
     '''
     讀取資料及重新整理
     '''
@@ -167,7 +167,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
                 model_results_raw['WORK_DATE']==today]
 
 
-
+            # Remove temporaily
             # buy_signal = model_results_raw[
             #     model_results_raw['BUY_SIGNAL']==True]
 
@@ -180,7 +180,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
             if buy_lock == False and \
                 buy_signal_today.loc[0, 'BUY_SIGNAL'] == True:
                 
-                temp.loc[i, 'BUY_VOLUME'] = volume
+                temp.loc[i, 'TRADE_VOLUME'] = volume
                 temp.loc[i, 'TYPE'] = 'BUY'
                 buy_price = temp.loc[i, 'CLOSE']
                 buy_lock = True
@@ -192,7 +192,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
             if buy_lock == True and sell_lock == False \
                 and roi >= roi_goal:
                     
-                temp.loc[i, 'SELL_VOLUME'] = volume
+                temp.loc[i, 'TRADE_VOLUME'] = -volume
                 temp.loc[i, 'TYPE'] = 'SELL'
                 backtest_results = backtest_results.append(temp)
                 break
@@ -206,7 +206,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
                 backtest_results = backtest_results.append(temp)
                 break
             
-            print(str(i) + '_' + str(model_begin) + '_' + str(today))
+            print(str(i) + '_' + str(today) + '_' + str(model_end))
            
         print('symbole - ' + str(j) + '/' + str(len(unique_symbol)))
     
@@ -217,12 +217,29 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
     
     # Organize results ------
     backtest_main_pre = backtest_results.copy()
-    backtest_main_pre = backtest_main_pre[
-                            (~backtest_main_pre['TYPE'].isna())
-                            ]
     
     backtest_main_pre['WORK_DATE'] = backtest_main_pre['WORK_DATE'] \
                                         .apply(cbyz.ymd)
+
+    
+    backtest_main_pre['AMOUNT'] = -1 * backtest_main_pre['CLOSE'] \
+        * backtest_main_pre['TRADE_VOLUME']
+            
+    
+    
+    summary = backtest_main_pre \
+                .groupby(['STOCK_SYMBOL', 'TYPE']) \
+                .aggregate({'AMOUNT':'sum'}) \
+                    .reset_index()
+                    
+
+    summary_pivot = pd.pivot_table(summary,
+                             index='STOCK_SYMBOL',
+                             columns='TYPE',
+                             values='AMOUNT') 
+    
+    
+    cbyz.df_flatten_columns(summary_pivot)
     
     
     buy_info = backtest_main_pre[backtest_main_pre['TYPE']=='BUY']
