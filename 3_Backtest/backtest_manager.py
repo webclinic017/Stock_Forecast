@@ -97,17 +97,19 @@ def get_stock_fee():
 
 # ..........
     
-begin_date = 20190301
-days=60
-volume=None
-budget=None
+
+# begin_date = 20190301
+# days=60
+# volume=None
+# budget=None
 
 
-def backtest_single(begin_date, days=60, volume=None, budget=None):
+def backtest_single(begin_date, days=60, volume=None, budget=None,
+                    roi_goal = 0.02):
     
    
     # ........    
-    # Bug, 股市休盤space issues
+    # begin_date = cbyz.ymd(begin_date)
     end_date = cbyz.date_cal(begin_date, amount=days, unit='d')
     
     bts_stock_data = load_data(begin_date=begin_date,
@@ -119,7 +121,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
     bts_stock_data['FAIL'] = ''
     volume = 1000
     
-    roi_goal = 1.05
+    
     
     
     unique_symbol = bts_stock_data[['STOCK_SYMBOL']] \
@@ -129,6 +131,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
     
     backtest_results = pd.DataFrame()
     
+
     
     # Iterate by symbol ......
     for j in range(0, 5):
@@ -138,7 +141,8 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
         
         temp = bts_stock_data[bts_stock_data['STOCK_SYMBOL']==cur_symbol] \
                 .reset_index(drop=True)
-
+                
+          
         
         # Consider buy and sell multiplie times, but only one currently.
         buy_lock = False
@@ -187,15 +191,18 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
                 continue
             
         
-            # Optimize append
-            roi = cur_price / buy_price
-            if buy_lock == True and sell_lock == False \
-                and roi >= roi_goal:
+            # Optimize append            
+            if buy_lock == True and sell_lock == False:
+                
+                roi = (cur_price - buy_price) / buy_price
+                
+                if roi >= roi_goal:
+                    temp.loc[i, 'TRADE_VOLUME'] = -volume
+                    temp.loc[i, 'TYPE'] = 'SELL'
+                    backtest_results = backtest_results.append(temp)
                     
-                temp.loc[i, 'TRADE_VOLUME'] = -volume
-                temp.loc[i, 'TYPE'] = 'SELL'
-                backtest_results = backtest_results.append(temp)
-                break
+                    print(str(i) + '_' + str(today) + '_' + str(model_end))
+                    break
 
             
             # Optimize append
@@ -206,13 +213,26 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
                 backtest_results = backtest_results.append(temp)
                 break
             
-            print(str(i) + '_' + str(today) + '_' + str(model_end))
+            # print(str(i) + '_' + str(today) + '_' + str(model_end))
            
         print('symbole - ' + str(j) + '/' + str(len(unique_symbol)))
     
+
+    
+    if len(backtest_results) == 0:
+        print('backtest_single return 0 row.')
+        return pd.DataFrame()
+    
     
     # Remove na ------    
-    backtest_results = backtest_results[~backtest_results['TYPE'].isna()]
+    backtest_results = backtest_results[
+        ~backtest_results['TYPE'].isna()] \
+                    .reset_index(drop=True)
+                
+                
+    if len(backtest_results) == 0:
+        print('backtest_single return 0 row.')
+        return pd.DataFrame()
         
     
     # Organize results ------
@@ -223,78 +243,87 @@ def backtest_single(begin_date, days=60, volume=None, budget=None):
 
     
     backtest_main_pre['AMOUNT'] = -1 * backtest_main_pre['CLOSE'] \
-        * backtest_main_pre['TRADE_VOLUME']
-            
+        * backtest_main_pre['TRADE_VOLUME']       
     
     
-    summary = backtest_main_pre \
-                .groupby(['STOCK_SYMBOL', 'TYPE']) \
-                .aggregate({'AMOUNT':'sum'}) \
-                    .reset_index()
-                    
+    # summary = backtest_main_pre \
+    #             .groupby(['STOCK_SYMBOL', 'TYPE']) \
+    #             .aggregate({'AMOUNT':'sum'}) \
+    #                 .reset_index()
 
-    summary_pivot = pd.pivot_table(summary,
-                             index='STOCK_SYMBOL',
-                             columns='TYPE',
-                             values='AMOUNT') 
+
+    # summary_pivot = pd.pivot_table(summary,
+    #                          index='STOCK_SYMBOL',
+    #                          columns='TYPE',
+    #                          values='AMOUNT') 
+    
+    # Update
+    # summary_pivot = cbyz.df_flatten_columns(summary_pivot)
+    # summary_pivot = ar.df_flatten_columns(summary_pivot)
+
+    
+    # buy_info = backtest_main_pre[backtest_main_pre['TYPE']=='BUY']
+    # sell_info = backtest_main_pre[backtest_main_pre['TYPE']=='SELL']
     
     
-    cbyz.df_flatten_columns(summary_pivot)
+    # backtest_main = buy_info.merge(sell_info, how='outer', 
+    #                                   on='STOCK_SYMBOL')
+    
+    # backtest_main = backtest_main \
+    #                     .drop(['TYPE_x', 'SELL_x', 'FAIL_x',
+    #                            'TYPE_y'], axis=1)
     
     
-    buy_info = backtest_main_pre[backtest_main_pre['TYPE']=='BUY']
-    sell_info = backtest_main_pre[backtest_main_pre['TYPE']=='SELL']
+    # backtest_main = backtest_main \
+    #     .rename(columns={'WORK_DATE_x':'WORK_DATE_BUY',
+    #                      'CLOSE_x':'PRICE_BUY',
+    #                      'BUY_VOLUME_x':'VOLUME_BUY',
+    #                      'WORK_DATE_y':'WORK_DATE_SELL',
+    #                      'CLOSE_y':'PRICE_SELL',
+    #                      'BUY_VOLUME_y':'VOLUME_SELL',
+    #                      'SELL_y':'SELL',
+    #                      'FAIL_y':'FAIL'
+    #                      })
+    
+    # # Calculate days ------
+    # backtest_main['DAYS'] = backtest_main['WORK_DATE_SELL'] \
+    #                             - backtest_main['WORK_DATE_BUY']
     
     
-    backtest_main = buy_info.merge(sell_info, how='outer', 
-                                      on='STOCK_SYMBOL')
+    # backtest_main['DAYS'] = backtest_main['DAYS'].astype(str)
     
-    backtest_main = backtest_main \
-                        .drop(['TYPE_x', 'SELL_x', 'FAIL_x',
-                               'TYPE_y'], axis=1)
-    
-    
-    backtest_main = backtest_main \
-        .rename(columns={'WORK_DATE_x':'WORK_DATE_BUY',
-                         'CLOSE_x':'PRICE_BUY',
-                         'BUY_VOLUME_x':'VOLUME_BUY',
-                         'WORK_DATE_y':'WORK_DATE_SELL',
-                         'CLOSE_y':'PRICE_SELL',
-                         'BUY_VOLUME_y':'VOLUME_SELL',
-                         'SELL_y':'SELL',
-                         'FAIL_y':'FAIL'
-                         })
-    
-    # Calculate days ------
-    backtest_main['DAYS'] = backtest_main['WORK_DATE_SELL'] \
-                                - backtest_main['WORK_DATE_BUY']
-    
-    
-    backtest_main['DAYS'] = backtest_main['DAYS'].astype(str)
-    
-    backtest_main['DAYS'] = backtest_main['DAYS'] \
-                                .str.replace(' days', '')
+    # backtest_main['DAYS'] = backtest_main['DAYS'] \
+    #                             .str.replace(' days', '')
                                 
-    backtest_main['DAYS'] = backtest_main['DAYS'].astype(int)
+    # backtest_main['DAYS'] = backtest_main['DAYS'].astype(int)
     
     
     
-    # Calculate Profits ------
-    # Replace VOLUME_BUY with VOLUME_SELL
-    backtest_main['PROFIT'] = (backtest_main['PRICE_SELL'] \
-                               - backtest_main['PRICE_BUY']) \
-                                * backtest_main['VOLUME_BUY']
+    # # Calculate Profits ------
+    # # Replace VOLUME_BUY with VOLUME_SELL
+    # backtest_main['PROFIT'] = (backtest_main['PRICE_SELL'] \
+    #                            - backtest_main['PRICE_BUY']) \
+    #                             * backtest_main['VOLUME_BUY']
     
     
-    backtest_main['ROI'] = backtest_main['PROFIT'] \
-                                / (backtest_main['VOLUME_BUY'] \
-                                   * backtest_main['PRICE_BUY'])
+    # backtest_main['ROI'] = backtest_main['PROFIT'] \
+    #                             / (backtest_main['VOLUME_BUY'] \
+    #                                * backtest_main['PRICE_BUY'])
     
     
-    return backtest_main
+    # results = {'RESULTS':backtest_results,
+    #            'SUMMARY':summary_pivot}
+    
+    # return results
+    return backtest_results
 
 
 
+
+periods=5
+signal=None
+budget=None
+split_budget=False
 
 
 def master(begin_date, periods=5,
@@ -324,7 +353,7 @@ def master(begin_date, periods=5,
     
     for i in range(0, len(time_seq)):
         
-        single = backtest_single(time_seq.loc[i, 'TIME_UNIT'],
+        single = backtest_single(begin_date=time_seq.loc[i, 'WORK_DATE'],
                                  days=60, volume=1000)
         
         backtest_results = backtest_results.append(single)
@@ -350,12 +379,6 @@ def check():
 
 if __name__ == '__main__':
     master()
-
-
-
-
-
-
 
 
 
