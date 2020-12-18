@@ -180,29 +180,82 @@ def get_sell_signal(data, hold_stocks=None):
     return ''
 
 
-def analyze_center(data):
+# .............
+    
+
+def model_dev1(data_end, data_begin=None, data_period=60,
+              forecast_end=None, forecast_period=30,
+              stock_symbol=None,
+              remove_none=True):
     '''
-    List all analysis here
-    '''    
-    
-    analyze_results = get_top_price(data)
+    remove_none    : boolean. Remove row without any positive signal.
+    '''
     
     
+    periods = ar.date_get_period(data_begin=data_begin, 
+                                 data_end=data_end, 
+                                 data_period=data_period,
+                                 forcast_end=forecast_end, 
+                                 forcast_period=forecast_period)
     
-    # Results format
-    # (1) Only stock passed test will show in the results
-    # STOCK_SYMBOL
-    # MODEL_ID, or MODEL_ID
+    
+    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+                         end_date=periods['DATA_END'],
+                         stock_symbol=stock_symbol)
     
     
+    loc_data['LAST_NUM'] = loc_data['STOCK_SYMBOL'].str.slice(start=-1)
+    loc_data['LAST_NUM'] = loc_data['LAST_NUM'].astype(int)
     
-    return analyze_results
+    
+    # 
+    loc_data['CLOSE_STR'] = loc_data['CLOSE'].astype(str)
+    loc_data['CLOSE_STR'] = loc_data['CLOSE_STR'].str.slice(start=-1)
+    loc_data['CLOSE_STR'] = loc_data['CLOSE_STR'].astype(int)
+    
+    
+    # 
+    loc_data['SIGNAL_DAY'] = loc_data['WORK_DATE'].apply(cbyz.ymd).dt.weekday
+    loc_data['SIGNAL_DAY'] = loc_data['SIGNAL_DAY'].astype(int)
 
 
-# .......
+    # Signal
+    loc_data.loc[loc_data['LAST_NUM']==loc_data['SIGNAL_DAY'],
+                 'BUY_SIGNAL'] = True
+    
+    loc_data.loc[loc_data['CLOSE_STR']==loc_data['SIGNAL_DAY'],
+                 'SELL_SIGNAL'] = True    
+    
+    
+    loc_data = cbyz.df_na_to(loc_data, 
+                             cols=['BUY_SIGNAL', 'SELL_SIGNAL'],
+                             value=False)
+    
+    loc_data['MODEL_ID'] = 'DEV'
+    
+    
+    # Remove row without any positive signal.
+    if remove_none == True:
+        loc_data = loc_data[(loc_data['BUY_SIGNAL']==True) |
+                            (loc_data['SELL_SIGNAL']==True)] \
+            .reset_index(drop=True)
+    
+    loc_data = loc_data[['STOCK_SYMBOL', 'MODEL_ID', 'WORK_DATE',
+                       'BUY_SIGNAL', 'SELL_SIGNAL']]   
+
+
+    # Worklist
+    # 1.Forecast the trend in the next N days.
+    # 2.If forecasted ROI reach goal, then buy_signal will be true.      
+
+    return loc_data
+
+
+
+# ...............
     
 
-def dev_model(data_end, data_begin=None, data_period=60,
+def model_dev2(data_end, data_begin=None, data_period=60,
               forecast_end=None, forecast_period=30,
               stock_symbol=None,
               remove_none=True):
@@ -272,12 +325,61 @@ def dev_model(data_end, data_begin=None, data_period=60,
 
 
 
+# ...............
+
+
+def model_dev3(**args):
+    
+    print('model_dev3')
+    
+    return 'model_dev3'
+
+# ..............
+
+
+def get_model_list(status=[0,1]):
+    '''
+    List all analysis here
+    '''    
+
+    # (1) List manually
+    # (2) List by model historic performance
+    # (3) List by function pattern
+    
+    # function_list = [model_dev1, model_dev2, model_dev3]
+    function_list = [model_dev1, model_dev2]
+    
+    
+    return function_list
+
+
+
+
+# ...............
+
+
+def analyze_center(data):
+    '''
+    List all analysis here
+    '''    
+    
+    analyze_results = get_top_price(data)
+    
+
+    # Results format
+    # (1) Only stock passed test will show in the results
+    # STOCK_SYMBOL
+    # MODEL_ID, or MODEL_ID
+    
+    return analyze_results
+
+
+
+
+
 
 # %% Dev ---------
     
-
-
-
 
 
 def get_top_price(data):

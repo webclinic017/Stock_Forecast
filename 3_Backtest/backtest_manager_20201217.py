@@ -102,7 +102,7 @@ def get_stock_fee():
 # days=60
 # volume=None
 # budget=None
-# roi_goal = 0.02
+
 
 def backtest_single(begin_date, days=60, volume=None, budget=None,
                     roi_goal = 0.02):
@@ -122,7 +122,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None,
     volume = 1000
     
     
-
+    
     
     unique_symbol = bts_stock_data[['STOCK_SYMBOL']] \
                     .drop_duplicates() \
@@ -131,100 +131,91 @@ def backtest_single(begin_date, days=60, volume=None, budget=None,
     
     backtest_results = pd.DataFrame()
     
-    model_list = sam.get_model_list()
+
     
     # Iterate by symbol ......
-    for k in range(0, 5):
+    for j in range(0, 5):
     # for j in range(0, len(unique_symbol)):
         
-        cur_symbol = unique_symbol.loc[k, 'STOCK_SYMBOL']
+        cur_symbol = unique_symbol.loc[j, 'STOCK_SYMBOL']
         
-        temp = bts_stock_data[
-            bts_stock_data['STOCK_SYMBOL']==cur_symbol] \
+        temp = bts_stock_data[bts_stock_data['STOCK_SYMBOL']==cur_symbol] \
                 .reset_index(drop=True)
                 
           
+        
         # Consider buy and sell multiplie times, but only one currently.
+        buy_lock = False
+        sell_lock = False
 
-        for j in range(0, len(model_list)):
+        
+        for i in range(0, len(temp)):
+            
+            
+            today = temp.loc[i, 'WORK_DATE']
+            model_end = cbyz.date_cal(today, amount=days, unit='d')
+            
 
-            buy_lock = False
-            sell_lock = False
+            # Model results .......
+            # (1) Update, should deal with multiple signal issues.
+            #     Currently, only consider the first signal.
+            model_results_raw = sam.dev_model(data_begin=today,
+                                          data_end=model_end,
+                                          stock_symbol=cur_symbol,
+                                          remove_none=False)
             
-            cur_model = model_list[j]
             
-            for i in range(0, len(temp)):
-                
-                today = temp.loc[i, 'WORK_DATE']
-                model_end = cbyz.date_cal(today, amount=days, unit='d')
-                
-    
-                # Model results .......
-                # (1) Update, should deal with multiple signal issues.
-                #     Currently, only consider the first signal.
-                
-                model_results_raw = cur_model(data_begin=today,
-                                              data_end=model_end,
-                                              stock_symbol=cur_symbol,
-                                              remove_none=False)                
-                
-                
-                
-                cur_price = temp.loc[i, 'CLOSE']
-                
-                buy_signal_today = model_results_raw[
-                    model_results_raw['WORK_DATE']==today]
-    
-    
-                # Remove temporaily
-                # buy_signal = model_results_raw[
-                #     model_results_raw['BUY_SIGNAL']==True]
-    
-    
-                # sell_signal = model_results_raw[
-                #     model_results_raw['SELL_SIGNAL']==True]
-                
-                
-                # Replace with model.
-                if buy_lock == False and \
-                    buy_signal_today.loc[0, 'BUY_SIGNAL'] == True:
-                    
-                    temp.loc[i, 'TRADE_VOLUME'] = volume
-                    temp.loc[i, 'MODEL'] = cur_model.__name__
-                    temp.loc[i, 'TYPE'] = 'BUY'
-                    buy_price = temp.loc[i, 'CLOSE']
-                    buy_lock = True
-                    continue
-                
+            cur_price = temp.loc[i, 'CLOSE']
             
-                # Optimize append            
-                if buy_lock == True and sell_lock == False:
-                    
-                    roi = (cur_price - buy_price) / buy_price
-                    
-                    if roi >= roi_goal:
-                        temp.loc[i, 'TRADE_VOLUME'] = -volume
-                        temp.loc[i, 'MODEL'] = cur_model.__name__
-                        temp.loc[i, 'TYPE'] = 'SELL'
-                        backtest_results = backtest_results.append(temp)
-                        
-                        print(str(j) + '_' + str(today) + '_' + str(model_end))
-                        break
-    
+            buy_signal_today = model_results_raw[
+                model_results_raw['WORK_DATE']==today]
+
+
+            # Remove temporaily
+            # buy_signal = model_results_raw[
+            #     model_results_raw['BUY_SIGNAL']==True]
+
+
+            # sell_signal = model_results_raw[
+            #     model_results_raw['SELL_SIGNAL']==True]
+            
+            
+            # Replace with model.
+            if buy_lock == False and \
+                buy_signal_today.loc[0, 'BUY_SIGNAL'] == True:
                 
-                # Optimize append
-                if i >= days:
-                    temp.loc[i, 'SELL_VOLUME'] = volume
-                    temp.loc[i, 'FAIL'] = True
+                temp.loc[i, 'TRADE_VOLUME'] = volume
+                temp.loc[i, 'TYPE'] = 'BUY'
+                buy_price = temp.loc[i, 'CLOSE']
+                buy_lock = True
+                continue
+            
+        
+            # Optimize append            
+            if buy_lock == True and sell_lock == False:
+                
+                roi = (cur_price - buy_price) / buy_price
+                
+                if roi >= roi_goal:
+                    temp.loc[i, 'TRADE_VOLUME'] = -volume
                     temp.loc[i, 'TYPE'] = 'SELL'
                     backtest_results = backtest_results.append(temp)
+                    
+                    print(str(i) + '_' + str(today) + '_' + str(model_end))
                     break
+
             
+            # Optimize append
+            if i >= days:
+                temp.loc[i, 'SELL_VOLUME'] = volume
+                temp.loc[i, 'FAIL'] = True
+                temp.loc[i, 'TYPE'] = 'SELL'
+                backtest_results = backtest_results.append(temp)
+                break
+            
+            # print(str(i) + '_' + str(today) + '_' + str(model_end))
            
-                print('symbol - ' + str(i) + '/' \
-                      + str(j) + '/' \
-                      + str(k) + '/' \
-                      + str(len(unique_symbol)))
+        print('symbole - ' + str(j) + '/' + str(len(unique_symbol)))
     
 
     
@@ -355,7 +346,7 @@ def master(begin_date, periods=5,
                       unit='m', 
                       simplify_date=True)
    
-
+    
     
    # backtest_multiple()
     backtest_results = pd.DataFrame()    
@@ -388,6 +379,9 @@ def check():
 
 if __name__ == '__main__':
     master()
+
+
+
 
 
 
