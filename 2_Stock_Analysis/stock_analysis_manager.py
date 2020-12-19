@@ -68,14 +68,6 @@ def initialize(path):
 
 
 
-data_begin = 20200301
-
-
-data_begin=None
-data_end=None
-data_period=30
-forcast_end=None
-forcast_period=None
 
 
 
@@ -195,8 +187,8 @@ def model_dev1(data_end, data_begin=None, data_period=60,
     periods = ar.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
-                                 forcast_end=forecast_end, 
-                                 forcast_period=forecast_period)
+                                 forecast_end=forecast_end, 
+                                 forecast_period=forecast_period)
     
     
     loc_data = load_data(begin_date=periods['DATA_BEGIN'],
@@ -227,7 +219,7 @@ def model_dev1(data_end, data_begin=None, data_period=60,
                  'SELL_SIGNAL'] = True    
     
     
-    loc_data = cbyz.df_na_to(loc_data, 
+    loc_data = cbyz.df_conv_na(loc_data, 
                              cols=['BUY_SIGNAL', 'SELL_SIGNAL'],
                              value=False)
     
@@ -267,8 +259,8 @@ def model_dev2(data_end, data_begin=None, data_period=60,
     periods = ar.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
-                                 forcast_end=forecast_end, 
-                                 forcast_period=forecast_period)
+                                 forecast_end=forecast_end, 
+                                 forecast_period=forecast_period)
     
     
     loc_data = load_data(begin_date=periods['DATA_BEGIN'],
@@ -299,7 +291,7 @@ def model_dev2(data_end, data_begin=None, data_period=60,
                  'SELL_SIGNAL'] = True    
     
     
-    loc_data = cbyz.df_na_to(loc_data, 
+    loc_data = cbyz.df_conv_na(loc_data, 
                              cols=['BUY_SIGNAL', 'SELL_SIGNAL'],
                              value=False)
     
@@ -378,8 +370,54 @@ def analyze_center(data):
 
 
 
-# %% Dev ---------
+# %% Master ------
     
+
+# Update, 增加 停損點
+def master(today=None, hold_stocks=None, roi=10, limit=90):
+    '''
+    主工作區
+    roi:     percent
+    limit:   days
+    '''
+    
+    global stock_data
+    stock_data = load_data()
+    
+    global analyze_results
+    analyze_results = analyze_center(data=stock_data)
+    
+    
+    # v0
+    # buy_signal = get_buy_signal(data=stock_data,
+    #                             hold_stocks=hold_stocks)
+    
+    # sell_signal = get_sell_signal(data=analyze_results,
+    #                               hold_stocks=hold_stocks)
+    
+    # master_results = {'RESULTS':analyze_results,
+    #                   'BUY_SIGNAL':buy_signal,
+    #                   'SELL_SIGNAL':sell_signal}
+    
+    return analyze_results
+
+
+
+def check():
+    '''
+    資料驗證
+    '''    
+    return ''
+
+
+
+
+if __name__ == '__main__':
+    master()
+
+
+
+# %% Dev ---------
 
 
 def get_top_price(data):
@@ -439,50 +477,104 @@ def get_top_price(data):
 
 
 
-# %% Master ------
-    
-
-# 增加 停損點
-def master(today=None, hold_stocks=None, roi=10, limit=90):
-    '''
-    主工作區
-    roi:     percent
-    limit:   days
-    '''
-    
-    global stock_data
-    stock_data = load_data()
-    
-    global analyze_results
-    analyze_results = analyze_center(data=stock_data)
-    
-    
-    # v0
-    # buy_signal = get_buy_signal(data=stock_data,
-    #                             hold_stocks=hold_stocks)
-    
-    # sell_signal = get_sell_signal(data=analyze_results,
-    #                               hold_stocks=hold_stocks)
-    
-    # master_results = {'RESULTS':analyze_results,
-    #                   'BUY_SIGNAL':buy_signal,
-    #                   'SELL_SIGNAL':sell_signal}
-    
-    return analyze_results
 
 
+def model_1(data_end, data_begin=None, data_period=150,
+              forecast_end=None, forecast_period=30,
+              stock_symbol=None,
+              remove_none=True):
+    
+    from sklearn.linear_model import LinearRegression
+    
+    periods = ar.date_get_period(data_begin=data_begin, 
+                                 data_end=data_end, 
+                                 data_period=data_period,
+                                 forecast_end=forecast_end, 
+                                 forecast_period=forecast_period)
+    
+    
+    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+                         end_date=periods['DATA_END'],
+                         stock_symbol=stock_symbol)    
+    
+    
+    loc_data['PRICE_PRE'] = loc_data['CLOSE'] \
+                            .shift(forecast_period)
+    
+    loc_data = loc_data[~loc_data['PRICE_PRE'].isna()]
 
-def check():
-    '''
-    資料驗證
-    '''    
+    
+    # Predict data
+    forecast_data = loc_data \
+                    .iloc[-forecast_period:-1, :]['CLOSE'] \
+                    .to_numpy()
+                    
+    forecast_data = forecast_data.reshape(-1,1)              
+    
+    # Model .........
+    # Update, doesn't need reshape with multiple features.
+    x = loc_data['PRICE_PRE'].to_numpy()
+    x = x.reshape(-1,1)
+    
+    y = loc_data['CLOSE'].to_numpy()
+    
+    reg = LinearRegression().fit(x, y)
+    
+    reg.score(x, y)
+    reg.coef_
+    reg.intercept_
+    
+    forecast_data = reg.predict(forecast_data)    
+
+    
+    # Update
+    results = pd.DataFrame(data={'CLOSE':forecast_data})
+    results['STOCK_SYMBOL'] = stock_symbol[0]
+
+
+
     return ''
 
 
 
 
-if __name__ == '__main__':
-    master()
+def model_template(data_end, data_begin=None, data_period=150,
+              forecast_end=None, forecast_period=30,
+              stock_symbol=None,
+              remove_none=True):
+    
+    from sklearn.linear_model import LinearRegression
+    
+    periods = ar.date_get_period(data_begin=data_begin, 
+                                 data_end=data_end, 
+                                 data_period=data_period,
+                                 forecast_end=forecast_end, 
+                                 forecast_period=forecast_period)
+    
+    
+    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+                         end_date=periods['DATA_END'],
+                         stock_symbol=stock_symbol)    
+    
+    # Model .........
+
+
+
+    return ''
+
+
+
+
+data_begin = 20200301
+
+# data_begin=None
+data_end=None
+data_period=30
+forecast_end=None
+forecast_period=30
+
+stock_symbol=['0050']
+
 
 
 

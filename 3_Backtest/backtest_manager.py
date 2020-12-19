@@ -261,39 +261,7 @@ def backtest_single(begin_date, days=60, volume=None, budget=None,
     #                 .reset_index()
 
 
-    # summary_pivot = pd.pivot_table(summary,
-    #                          index='STOCK_SYMBOL',
-    #                          columns='TYPE',
-    #                          values='AMOUNT') 
-    
-    # Update
-    # summary_pivot = cbyz.df_flatten_columns(summary_pivot)
-    # summary_pivot = ar.df_flatten_columns(summary_pivot)
-
-    
-    # buy_info = backtest_main_pre[backtest_main_pre['TYPE']=='BUY']
-    # sell_info = backtest_main_pre[backtest_main_pre['TYPE']=='SELL']
-    
-    
-    # backtest_main = buy_info.merge(sell_info, how='outer', 
-    #                                   on='STOCK_SYMBOL')
-    
-    # backtest_main = backtest_main \
-    #                     .drop(['TYPE_x', 'SELL_x', 'FAIL_x',
-    #                            'TYPE_y'], axis=1)
-    
-    
-    # backtest_main = backtest_main \
-    #     .rename(columns={'WORK_DATE_x':'WORK_DATE_BUY',
-    #                      'CLOSE_x':'PRICE_BUY',
-    #                      'BUY_VOLUME_x':'VOLUME_BUY',
-    #                      'WORK_DATE_y':'WORK_DATE_SELL',
-    #                      'CLOSE_y':'PRICE_SELL',
-    #                      'BUY_VOLUME_y':'VOLUME_SELL',
-    #                      'SELL_y':'SELL',
-    #                      'FAIL_y':'FAIL'
-    #                      })
-    
+  
     # # Calculate days ------
     # backtest_main['DAYS'] = backtest_main['WORK_DATE_SELL'] \
     #                             - backtest_main['WORK_DATE_BUY']
@@ -328,7 +296,6 @@ def backtest_single(begin_date, days=60, volume=None, budget=None,
 
 
 
-
 periods=5
 signal=None
 budget=None
@@ -346,7 +313,6 @@ def master(begin_date, periods=5,
     
     # Variables    
     # (1) Fix missing date issues
-    
     begin_date = 20190401
     
     
@@ -356,7 +322,6 @@ def master(begin_date, periods=5,
                       simplify_date=True)
    
 
-    
    # backtest_multiple()
     backtest_results = pd.DataFrame()    
     
