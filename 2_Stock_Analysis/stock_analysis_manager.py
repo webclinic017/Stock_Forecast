@@ -339,7 +339,7 @@ def get_model_list(status=[0,1]):
     # (3) List by function pattern
     
     # function_list = [model_dev1, model_dev2, model_dev3]
-    function_list = [model_dev1, model_dev2]
+    function_list = [model_1]
     
     
     return function_list
@@ -479,10 +479,11 @@ def get_top_price(data):
 
 
 
-def model_1(data_end, data_begin=None, data_period=150,
-              forecast_end=None, forecast_period=30,
+def model_1(data=None, data_end=None, data_begin=None, 
+            data_period=150, forecast_end=None, forecast_period=30,
               stock_symbol=None,
               remove_none=True):
+
     
     from sklearn.linear_model import LinearRegression
     
@@ -498,42 +499,90 @@ def model_1(data_end, data_begin=None, data_period=150,
                          stock_symbol=stock_symbol)    
     
     
-    loc_data['PRICE_PRE'] = loc_data['CLOSE'] \
+    loc_data['PRICE_PRE'] = loc_data \
+        .groupby('STOCK_SYMBOL')['CLOSE'] \
                             .shift(forecast_period)
     
-    loc_data = loc_data[~loc_data['PRICE_PRE'].isna()]
-
-    
-    # Predict data
-    forecast_data = loc_data \
-                    .iloc[-forecast_period:-1, :]['CLOSE'] \
-                    .to_numpy()
-                    
-    forecast_data = forecast_data.reshape(-1,1)              
-    
-    # Model .........
-    # Update, doesn't need reshape with multiple features.
-    x = loc_data['PRICE_PRE'].to_numpy()
-    x = x.reshape(-1,1)
-    
-    y = loc_data['CLOSE'].to_numpy()
-    
-    reg = LinearRegression().fit(x, y)
-    
-    reg.score(x, y)
-    reg.coef_
-    reg.intercept_
-    
-    forecast_data = reg.predict(forecast_data)    
-
-    
-    # Update
-    results = pd.DataFrame(data={'CLOSE':forecast_data})
-    results['STOCK_SYMBOL'] = stock_symbol[0]
+    model_data = loc_data[~loc_data['PRICE_PRE'].isna()]
 
 
+    # real_price = loc_data[loc_data['WORK_DATE']==periods['DATA_END']]
+    
+    
+    # Predict data ......
+    forecast_data_pre = ar.df_add_rank(loc_data,
+                                       group_key='STOCK_SYMBOL',
+                                       value='WORK_DATE',
+                                       reverse=True)
+        
+    forecast_data = forecast_data_pre[(forecast_data_pre['RANK']>=0) \
+                                  & (forecast_data_pre['RANK']<forecast_period)]
+    
+    # Date
+    forecast_date = cbyz.get_time_seq(begin_date=periods['FORECAST_BEGIN'],
+                                    periods=forecast_period,
+                                         unit='d',
+                                         simplify_date=True)
+        
+    forecast_date = forecast_date['WORK_DATE'].tolist()
+        
+    # Model ........
+    model_info = pd.DataFrame()
+    forecast_results = pd.DataFrame()
+    
+    for i in range(0, len(stock_symbol)):
+        
+        cur_symbol = stock_symbol[i]
+        # print(i)
+    
+        # Model .........
+        # Update, doesn't need reshape with multiple features.
+        x = model_data['PRICE_PRE'].to_numpy()
+        x = x.reshape(-1,1)
+        
+        y = model_data['CLOSE'].to_numpy()
+        
+        reg = LinearRegression().fit(x, y)
+        
+        reg.score(x, y)
+        reg.coef_
+        reg.intercept_
+    
+    
+        # Forecast ......
+        temp_forecast = forecast_data[
+            forecast_data['STOCK_SYMBOL']==cur_symbol]
+        
+        temp_forecast = temp_forecast['CLOSE'].to_numpy()
+        
+        # Bug,只有一個feature時才需要reshape
+        temp_forecast = temp_forecast.reshape(-1,1)              
+        
+        temp_results = reg.predict(temp_forecast)    
+        
+        
+        # print(stock_symbol[i])
+        # print(forecast_date)
+        # print(temp_results)
+        
+        # ...
+        temp_df = pd.DataFrame(data={'WORK_DATE':forecast_date,
+                                     'CLOSE':temp_results})
+        temp_df['STOCK_SYMBOL'] = cur_symbol
+        
+        forecast_results = forecast_results.append(temp_df)
+        
+    
+    # Rearrage
+    # (1) real_price for backtest function record buy_price
+    cols = ['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']        
+    forecast_results = forecast_results[cols]
 
-    return ''
+    return_dict = {'MODEL_INFO':model_info,
+                   # 'REAL_PRICE':real_price,
+                   'RESULTS':forecast_results}
+
+    return return_dict
 
 
 
@@ -573,7 +622,14 @@ data_period=30
 forecast_end=None
 forecast_period=30
 
-stock_symbol=['0050']
+stock_symbol=['0050', '0056']
+
+
+
+
+
+
+
 
 
 
