@@ -7,6 +7,10 @@ Created on Sat Nov 14 17:23:09 2020
 """
 
 
+# Worklist
+# 1.Add price increse but model didn't catch
+
+
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -111,7 +115,6 @@ def backtest_single(begin_date, stock_symbol=['0050', '0056'],
                     forecast_period=30, backtest_times=5,
                     roi_goal=0.015):
     
-    
     # .......
     time_seq = cbyz.get_time_seq(begin_date=begin_date,
                                  periods=backtest_times,
@@ -180,14 +183,14 @@ def backtest_single(begin_date, stock_symbol=['0050', '0056'],
                                     / temp_results['BUY_PRICE']
 
 
-            temp_results['REACH_GOAL'] = temp_results['ROI'] >= roi_goal
-
-            
-            temp_results = temp_results[temp_results['REACH_GOAL']==True] \
+            temp_results = temp_results[temp_results['ROI'] >= roi_goal] \
                 .drop_duplicates(subset='STOCK_SYMBOL')
             
             
             temp_results['MODEL'] = cur_model.__name__
+            temp_results['FORECAST_BEGIN'] = begin_date
+            temp_results['FORECAST_END'] = end_date
+            temp_results['BACKTEST_ID'] = j
             
             backtest_results = backtest_results.append(temp_results)
             
@@ -199,217 +202,89 @@ def backtest_single(begin_date, stock_symbol=['0050', '0056'],
     
     # Organize results ------
     backtest_main_pre = backtest_results.copy()
-    
-    backtest_main_pre['WORK_DATE'] = backtest_main_pre['WORK_DATE'] \
-                                        .apply(cbyz.ymd)
-
-    
-    backtest_main_pre['AMOUNT'] = -1 * backtest_main_pre['CLOSE'] \
-        * backtest_main_pre['TRADE_VOLUME']       
-    
-    
-    # summary = backtest_main_pre \
-    #             .groupby(['STOCK_SYMBOL', 'TYPE']) \
-    #             .aggregate({'AMOUNT':'sum'}) \
-    #                 .reset_index()
-
-    
-    # # Calculate Profits ------
-    # # Replace VOLUME_BUY with VOLUME_SELL
-    # backtest_main['PROFIT'] = (backtest_main['PRICE_SELL'] \
-    #                            - backtest_main['PRICE_BUY']) \
-    #                             * backtest_main['VOLUME_BUY']
-    
-    
-    # backtest_main['ROI'] = backtest_main['PROFIT'] \
-    #                             / (backtest_main['VOLUME_BUY'] \
-    #                                * backtest_main['PRICE_BUY'])
-    
-    
-    # results = {'RESULTS':backtest_results,
-    #            'SUMMARY':summary_pivot}
-    
-    # return results
-    return backtest_results
 
 
+    backtest_main_pre = backtest_main_pre \
+        .rename(columns={'WORK_DATE':'BUY_DATE',
+                         'CLOSE':'FORECAST_CLOSE'})
 
-
-def backtest_single_v0(begin_date, days=60, volume=None, budget=None,
-                    roi_goal = 0.02):
-    
-   
-    # ........    
-    # begin_date = cbyz.ymd(begin_date)
-    end_date = cbyz.date_cal(begin_date, amount=days, unit='d')
-    
-    bts_stock_data = load_data(begin_date=begin_date,
-                               end_date=end_date)
-    
-    bts_stock_data = bts_stock_data.drop(['HIGH', 'LOW'], axis=1)
-    
-    
-    bts_stock_data['FAIL'] = ''
-    volume = 1000
-    
+    backtest_main_pre['AMOUNT'] = -1 * backtest_main_pre['FORECAST_CLOSE'] \
+        * volume
     
 
     
-    unique_symbol = bts_stock_data[['STOCK_SYMBOL']] \
-                    .drop_duplicates() \
+    # Add Historical Data......
+    hist_data_info = backtest_main_pre[['STOCK_SYMBOL', 'FORECAST_BEGIN',
+                                   'FORECAST_END', 'FORECAST_CLOSE']] \
                     .reset_index(drop=True)
+
     
+    hist_data_period = hist_data_info[['FORECAST_BEGIN', 'FORECAST_END']] \
+                        .drop_duplicates() \
+                        .reset_index(drop=True)
     
-    backtest_results = pd.DataFrame()
-    
-    model_list = sam.get_model_list()
-    
-    # Iterate by symbol ......
-    for k in range(0, 5):
-    # for j in range(0, len(unique_symbol)):
+    hist_data_pre = pd.DataFrame()
         
-        cur_symbol = unique_symbol.loc[k, 'STOCK_SYMBOL']
+    for i in range(0, len(hist_data_period)):
+
+        temp_begin = hist_data_period.loc[i, 'FORECAST_BEGIN']
+        temp_end = hist_data_period.loc[i, 'FORECAST_END']       
         
-        temp = bts_stock_data[
-            bts_stock_data['STOCK_SYMBOL']==cur_symbol] \
-                .reset_index(drop=True)
-                
-          
-        # Consider buy and sell multiplie times, but only one currently.
+        # Symbol ...
+        temp_symbol = hist_data_info[
+            (hist_data_info['FORECAST_BEGIN']==temp_begin) \
+            & (hist_data_info['FORECAST_END']==temp_end)]
 
-        for j in range(0, len(model_list)):
+        temp_symbol = temp_symbol['STOCK_SYMBOL'].tolist()  
+            
+            
+        new_data = ar.stk_get_data(begin_date=temp_begin, 
+                                   end_date=temp_end, 
+                                   stock_type='tw', 
+                                   stock_symbol=temp_symbol, 
+                                   local=local)           
+        
+        new_data['FORECAST_BEGIN'] = temp_begin
+        new_data['FORECAST_END'] = temp_end
+        
+        hist_data_pre = hist_data_pre.append(new_data)
 
-            buy_lock = False
-            sell_lock = False
-            
-            cur_model = model_list[j]
-            
-            for i in range(0, len(temp)):
-                
-                today = temp.loc[i, 'WORK_DATE']
-                model_end = cbyz.date_cal(today, amount=days, unit='d')
-                
-    
-                # Model results .......
-                # (1) Update, should deal with multiple signal issues.
-                #     Currently, only consider the first signal.
-                
-                model_results_raw = cur_model(data_begin=today,
-                                              data_end=model_end,
-                                              stock_symbol=cur_symbol,
-                                              remove_none=False)                
-                
-                
-                
-                cur_price = temp.loc[i, 'CLOSE']
-                
-                buy_signal_today = model_results_raw[
-                    model_results_raw['WORK_DATE']==today]
-    
-    
-                # Remove temporaily
-                # buy_signal = model_results_raw[
-                #     model_results_raw['BUY_SIGNAL']==True]
-    
-    
-                # sell_signal = model_results_raw[
-                #     model_results_raw['SELL_SIGNAL']==True]
-                
-                
-                # Replace with model.
-                if buy_lock == False and \
-                    buy_signal_today.loc[0, 'BUY_SIGNAL'] == True:
-                    
-                    temp.loc[i, 'TRADE_VOLUME'] = volume
-                    temp.loc[i, 'MODEL'] = cur_model.__name__
-                    temp.loc[i, 'TYPE'] = 'BUY'
-                    buy_price = temp.loc[i, 'CLOSE']
-                    buy_lock = True
-                    continue
-                
-            
-                # Optimize append            
-                if buy_lock == True and sell_lock == False:
-                    
-                    roi = (cur_price - buy_price) / buy_price
-                    
-                    if roi >= roi_goal:
-                        temp.loc[i, 'TRADE_VOLUME'] = -volume
-                        temp.loc[i, 'MODEL'] = cur_model.__name__
-                        temp.loc[i, 'TYPE'] = 'SELL'
-                        backtest_results = backtest_results.append(temp)
-                        
-                        print(str(j) + '_' + str(today) + '_' + str(model_end))
-                        break
-    
-                
-                # Optimize append
-                if i >= days:
-                    temp.loc[i, 'SELL_VOLUME'] = volume
-                    temp.loc[i, 'FAIL'] = True
-                    temp.loc[i, 'TYPE'] = 'SELL'
-                    backtest_results = backtest_results.append(temp)
-                    break
-            
-           
-                print('symbol - ' + str(i) + '/' \
-                      + str(j) + '/' \
-                      + str(k) + '/' \
-                      + str(len(unique_symbol)))
-    
 
-    
-    if len(backtest_results) == 0:
-        print('backtest_single return 0 row.')
-        return pd.DataFrame()
-    
-    
-    # Remove na ------    
-    backtest_results = backtest_results[
-        ~backtest_results['TYPE'].isna()] \
+    hist_data_pre = hist_data_pre.drop(['HIGH', 'LOW'], axis=1) \
                     .reset_index(drop=True)
-                
-                
-    if len(backtest_results) == 0:
-        print('backtest_single return 0 row.')
-        return pd.DataFrame()
+
+    hist_data_pre = cbyz.df_ymd(hist_data_pre, cols='WORK_DATE')
+
+        
+    # Combine data ......
+    hist_data = hist_data_pre.merge(hist_data_info,
+                                how='left',
+                                on=['FORECAST_BEGIN', 'FORECAST_END', 
+                                    'STOCK_SYMBOL']) 
+        
+    hist_data = hist_data[hist_data['FORECAST_CLOSE'] <= hist_data['CLOSE']] \
+        .drop_duplicates(subset=['FORECAST_BEGIN', 'FORECAST_END', 
+                                    'STOCK_SYMBOL']) \
+        .reset_index(drop=True)
+    
+      
+    # Join forecast and historical data ......
+    backtest_main = backtest_main_pre \
+                    .merge(hist_data,
+                           how='left',
+                           on=['STOCK_SYMBOL', 'FORECAST_BEGIN',
+                               'FORECAST_END', 'FORECAST_CLOSE'])
         
     
-    # Organize results ------
-    backtest_main_pre = backtest_results.copy()
+    backtest_main.loc[~backtest_main['CLOSE'].isna(), 'SUCCESS'] = True 
+    backtest_main.loc[backtest_main['CLOSE'].isna(), 'SUCCESS'] = False     
+        
+        
+    backtest_main = cbyz.df_ymd(backtest_main, 
+                                cols=['BUY_DATE', 'FORECAST_BEGIN',
+                                      'FORECAST_END'])
     
-    backtest_main_pre['WORK_DATE'] = backtest_main_pre['WORK_DATE'] \
-                                        .apply(cbyz.ymd)
-
-    
-    backtest_main_pre['AMOUNT'] = -1 * backtest_main_pre['CLOSE'] \
-        * backtest_main_pre['TRADE_VOLUME']       
-    
-    
-    # summary = backtest_main_pre \
-    #             .groupby(['STOCK_SYMBOL', 'TYPE']) \
-    #             .aggregate({'AMOUNT':'sum'}) \
-    #                 .reset_index()
-
-    
-    # # Calculate Profits ------
-    # # Replace VOLUME_BUY with VOLUME_SELL
-    # backtest_main['PROFIT'] = (backtest_main['PRICE_SELL'] \
-    #                            - backtest_main['PRICE_BUY']) \
-    #                             * backtest_main['VOLUME_BUY']
-    
-    
-    # backtest_main['ROI'] = backtest_main['PROFIT'] \
-    #                             / (backtest_main['VOLUME_BUY'] \
-    #                                * backtest_main['PRICE_BUY'])
-    
-    
-    # results = {'RESULTS':backtest_results,
-    #            'SUMMARY':summary_pivot}
-    
-    # return results
-    return backtest_results
-
+    return backtest_main
 
 
 
@@ -426,7 +301,7 @@ def master(begin_date, periods=5,
     
     # Variables    
     # (1) Fix missing date issues
-    begin_date = 20190401
+    # begin_date = 20190401
     
     
     time_seq = cbyz.get_time_seq(begin_date=begin_date,
@@ -434,8 +309,8 @@ def master(begin_date, periods=5,
                       unit='m', 
                       simplify_date=True)
    
-
-   # backtest_multiple()
+    # Backtest ----------
+    global backtest_results
     backtest_results = pd.DataFrame()    
     
     for i in range(0, len(time_seq)):
@@ -448,12 +323,13 @@ def master(begin_date, periods=5,
 
         
     backtest_results = backtest_results \
-                        .reset_index(drop=True)        
+                        .reset_index(drop=True)
     
     
-    return ''
+    return backtest_results
 
 
+# ..............
 
 
 def check():
@@ -464,18 +340,22 @@ def check():
 
 
 
-
 if __name__ == '__main__':
-    master()
+    results = master(begin_date=20190401)
 
 
 
-periods=5
-signal=None
-budget=None
-split_budget=False
-days=60
-volume=1000
-roi_goal = 0.02
-stock_symbol=['0050', '0056']
+# periods=5
+# signal=None
+# budget=None
+# split_budget=False
+# days=60
+# roi_goal = 0.02
+# stock_symbol=['0050', '0056']
+# model_data_period=60
 
+
+# volume=1000
+# forecast_period=30
+# backtest_times=5
+# roi_goal=0.015

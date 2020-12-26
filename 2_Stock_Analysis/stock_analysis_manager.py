@@ -6,6 +6,9 @@ Created on Sat Nov 14 17:23:08 2020
 @author: Aron
 """
 
+# Worklist
+# 1. Some models only work for some stock symbol.
+# > Clustering
 
 
 # % 讀取套件 -------
@@ -184,7 +187,7 @@ def model_dev1(data_end, data_begin=None, data_period=60,
     '''
     
     
-    periods = ar.date_get_period(data_begin=data_begin, 
+    periods = cbyz.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
                                  forecast_end=forecast_end, 
@@ -256,7 +259,7 @@ def model_dev2(data_end, data_begin=None, data_period=60,
     '''
     
     
-    periods = ar.date_get_period(data_begin=data_begin, 
+    periods = cbyz.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
                                  forecast_end=forecast_end, 
@@ -374,7 +377,7 @@ def analyze_center(data):
     
 
 # Update, 增加 停損點
-def master(today=None, hold_stocks=None, roi=10, limit=90):
+def master(begin_data=20190401, today=None, hold_stocks=None, roi=10, limit=90):
     '''
     主工作區
     roi:     percent
@@ -382,7 +385,7 @@ def master(today=None, hold_stocks=None, roi=10, limit=90):
     '''
     
     global stock_data
-    stock_data = load_data()
+    stock_data = load_data(begin_data=begin_data)
     
     global analyze_results
     analyze_results = analyze_center(data=stock_data)
@@ -483,11 +486,12 @@ def model_1(data=None, data_end=None, data_begin=None,
             data_period=150, forecast_end=None, forecast_period=30,
               stock_symbol=None,
               remove_none=True):
-
-    
+    '''
+    Linear regression
+    '''
     from sklearn.linear_model import LinearRegression
     
-    periods = ar.date_get_period(data_begin=data_begin, 
+    periods = cbyz.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
                                  forecast_end=forecast_end, 
@@ -510,7 +514,7 @@ def model_1(data=None, data_end=None, data_begin=None,
     
     
     # Predict data ......
-    forecast_data_pre = ar.df_add_rank(loc_data,
+    forecast_data_pre = cbyz.df_add_rank(loc_data,
                                        group_key='STOCK_SYMBOL',
                                        value='WORK_DATE',
                                        reverse=True)
@@ -573,13 +577,11 @@ def model_1(data=None, data_end=None, data_begin=None,
         forecast_results = forecast_results.append(temp_df)
         
     
-    # Rearrage
-    # (1) real_price for backtest function record buy_price
+    # Reorganize ------
     cols = ['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']        
     forecast_results = forecast_results[cols]
 
     return_dict = {'MODEL_INFO':model_info,
-                   # 'REAL_PRICE':real_price,
                    'RESULTS':forecast_results}
 
     return return_dict
@@ -594,7 +596,7 @@ def model_template(data_end, data_begin=None, data_period=150,
     
     from sklearn.linear_model import LinearRegression
     
-    periods = ar.date_get_period(data_begin=data_begin, 
+    periods = cbyz.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
                                  forecast_end=forecast_end, 
@@ -608,21 +610,30 @@ def model_template(data_end, data_begin=None, data_period=150,
     # Model .........
 
 
+    # Reorganize ------
+    model_info = pd.DataFrame()
+    forecast_results = pd.DataFrame()
+    
+    cols = ['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']        
+    forecast_results = forecast_results[cols]
 
-    return ''
+    return_dict = {'MODEL_INFO':model_info,
+                   'RESULTS':forecast_results}
+
+    return return_dict
 
 
 
 
-data_begin = 20200301
+# data_begin = 20200301
 
-# data_begin=None
-data_end=None
-data_period=30
-forecast_end=None
-forecast_period=30
+# # data_begin=None
+# data_end=None
+# data_period=30
+# forecast_end=None
+# forecast_period=30
 
-stock_symbol=['0050', '0056']
+# stock_symbol=['0050', '0056']
 
 
 
