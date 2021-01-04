@@ -110,14 +110,14 @@ def get_stock_fee():
 # days=60
 # volume=None
 # budget=None
-# roi_base = 0.02
+# roi_goal = 0.02
     
 
 
 def backtest_single(begin_date, stock_symbol=['0050', '0056'],
                     model_data_period=60, volume=1000, budget=None, 
                     forecast_period=30, backtest_times=5,
-                    roi_base=0.015):
+                    roi_goal=0.015):
     
     # .......
     time_seq = cbyz.get_time_seq(begin_date=begin_date,
@@ -187,7 +187,7 @@ def backtest_single(begin_date, stock_symbol=['0050', '0056'],
                                     / temp_results['BUY_PRICE']
 
 
-            temp_results = temp_results[temp_results['ROI'] >= roi_base] \
+            temp_results = temp_results[temp_results['ROI'] >= roi_goal] \
                 .drop_duplicates(subset='STOCK_SYMBOL')
             
             
@@ -354,7 +354,7 @@ if __name__ == '__main__':
 # budget=None
 # split_budget=False
 # days=60
-# roi_base = 0.02
+# roi_goal = 0.02
 # stock_symbol=['0050', '0056']
 # model_data_period=60
 
@@ -362,11 +362,4 @@ if __name__ == '__main__':
 # volume=1000
 # forecast_period=30
 # backtest_times=5
-# roi_base=0.015
-    
-    
-# begin_date = 20190301
-# days=60
-# volume=None
-# budget=None
-# roi_base = 0.02    
+# roi_goal=0.015
