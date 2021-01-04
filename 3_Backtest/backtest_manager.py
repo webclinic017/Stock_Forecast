@@ -10,6 +10,10 @@ Created on Sat Nov 14 17:23:09 2020
 # Worklist
 # 1.Add price increse but model didn't catch
 
+# ROI不該用固定值，而應該用停損點的概念下去看。
+# 當購買後的最高價 - 購買價，價差點跌破8成的時候就售出。
+
+
 
 # % 讀取套件 -------
 import pandas as pd
