@@ -9,8 +9,9 @@ Created on Sat Nov 14 17:23:09 2020
 
 # Worklist
 # 1.Add price increse but model didn't catch
-# 2.Retrieve one symbol historical data to ensure calendar
 
+# ROI不該用固定值，而應該用停損點的概念下去看。
+# 當購買後的最高價 - 購買價，價差點跌破8成的時候就售出。
 
 
 
@@ -72,7 +73,7 @@ def initialize(path):
 
 
 
-def btm_load_data(begin_date, end_date=None):
+def load_data(begin_date, end_date=None):
     '''
     讀取資料及重新整理
     '''
@@ -105,7 +106,7 @@ def get_stock_fee():
 # ..........
     
 
-# begin_date = 20180701
+# begin_date = 20190301
 # days=60
 # volume=None
 # budget=None
@@ -113,58 +114,51 @@ def get_stock_fee():
     
 
 
-def forecast_single(begin_date, stock_symbol=['0050', '0056'],
-                    model_data_period=90, volume=1000, budget=None, 
-                    forecast_period=15, backtest_times=5,
+def backtest_single(begin_date, stock_symbol=['0050', '0056'],
+                    model_data_period=60, volume=1000, budget=None, 
+                    forecast_period=30, backtest_times=5,
                     roi_base=0.03, stop_loss=0.8):
     
     
+    
     # .......
-    
-    
-    BUGGGG, 這支function有問題，導致每次出來的結果都一樣
-    loc_time_seq = cbyz.get_time_seq(begin_date=begin_date,
+    time_seq = cbyz.get_time_seq(begin_date=begin_date,
                                  periods=backtest_times,
-                                 unit='d',
+                                 unit='m',
                                  simplify_date=True)
     
-    loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
+    time_seq = time_seq['WORK_DATE'].tolist()
 
     
     # Work area ----------
+    bt_buy_signal = pd.DataFrame()
     model_list = sam.get_model_list()
-    buy_signal = pd.DataFrame()
     
     
     # Date .........
-    for i in range(0, len(loc_time_seq)):
+    for i in range(0, len(time_seq)):
         
-        loop_begin_date = loc_time_seq[i]
-        loop_end_date = cbyz.date_cal(loop_begin_date, 
+        begin_date = time_seq[i]
+        end_date = cbyz.date_cal(begin_date, 
                                  amount=model_data_period, 
                                  unit='d')
         
         # ......
         # Bug, end_date可能沒有開盤，導致buy_price為空值
-        real_data = btm_load_data(begin_date=loop_begin_date,
-                              end_date=loop_end_date)
+        real_data = load_data(begin_date=begin_date,
+                                    end_date=end_date)
         
         real_data = real_data.drop(['HIGH', 'LOW'], axis=1)        
         
     
         # Buy Price
         # Bug, 檢查這一段邏輯有沒有錯
-        buy_price = real_data[real_data['WORK_DATE']==loop_begin_date] \
+        buy_price = real_data[real_data['WORK_DATE']==begin_date] \
             .rename(columns={'CLOSE':'BUY_PRICE'}) 
             
         buy_price = buy_price[['STOCK_SYMBOL', 'BUY_PRICE']] \
                     .reset_index(drop=True)
     
-    
-        if len(buy_price) == 0:
-            
-            print(str(loc_time_seq[i]) + ' without data.')
-            continue
     
         # Model ......
         for j in range(0, len(model_list)):
@@ -176,9 +170,9 @@ def forecast_single(begin_date, stock_symbol=['0050', '0056'],
             #     Currently, only consider the first signal.
             # (2) Add data
             
-            # global model_results_raw
-            model_results_raw = cur_model(data_begin=loop_begin_date,
-                                          data_end=loop_end_date,
+            global model_results_raw
+            model_results_raw = cur_model(data_begin=begin_date,
+                                          data_end=end_date,
                                           stock_symbol=stock_symbol,
                                           forecast_period=forecast_period,
                                           remove_none=False)                
@@ -202,15 +196,14 @@ def forecast_single(begin_date, stock_symbol=['0050', '0056'],
             
             
             temp_results['MODEL'] = cur_model.__name__
-            temp_results['FORECAST_BEGIN'] = loop_begin_date
-            temp_results['FORECAST_END'] = loop_end_date
+            temp_results['FORECAST_BEGIN'] = begin_date
+            temp_results['FORECAST_END'] = end_date
             temp_results['BACKTEST_ID'] = i
             
-            buy_signal = buy_signal.append(temp_results)
-            
+            bt_buy_signal = bt_buy_signal.append(temp_results)
             
     
-    if len(buy_signal) == 0:
+    if len(bt_buy_signal) == 0:
         print('bt_buy_signal return 0 row.')
         return pd.DataFrame()
     
@@ -218,17 +211,17 @@ def forecast_single(begin_date, stock_symbol=['0050', '0056'],
     # Add dynamic ROI -------
     # dynamic_roi = backtest_results_pre.copy()
     
-    forecast_roi_pre = cbyz.df_add_rank(buy_signal, 
+    bt_roi_pre = cbyz.df_add_rank(bt_buy_signal, 
                                value='WORK_DATE',
                                group_key=['STOCK_SYMBOL', 'BACKTEST_ID'])
             
 
-    forecast_roi = pd.DataFrame()
+    bt_roi = pd.DataFrame()
     
     
-    for i in range(0, len(loc_time_seq)):
+    for i in range(0, len(time_seq)):
     
-        df_lv1 = forecast_roi_pre[forecast_roi_pre['BACKTEST_ID']==i]
+        df_lv1 = bt_roi_pre[bt_roi_pre['BACKTEST_ID']==i]
         
         unique_symbol = df_lv1['STOCK_SYMBOL'].unique()
         
@@ -250,54 +243,48 @@ def forecast_single(begin_date, stock_symbol=['0050', '0056'],
                     df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k-1, 'MAX_PRICE']
                             
             
-            forecast_roi = forecast_roi.append(df_lv2)
+            bt_roi = bt_roi.append(df_lv2)
 
     
-    # ............
-    global forecast_results
-    forecast_results = forecast_roi.copy()
-    forecast_results.loc[forecast_results['MAX_PRICE'] * stop_loss
-                         >= forecast_results['CLOSE'], 'SELL_SIGNAL'] = True
     
-    forecast_results = cbyz.df_conv_na(forecast_results,
+    bt_results = bt_roi.copy()
+    bt_results.loc[bt_results['MAX_PRICE'] * stop_loss
+                         >= bt_results['CLOSE'], 'SELL_SIGNAL'] = True
+    
+    bt_results = cbyz.df_conv_na(bt_results,
                                 cols='SELL_SIGNAL',
                                 value=False)
  
-    forecast_results['GRP_SELL_SIGNAL'] = forecast_results \
+    bt_results['GRP_SELL_SIGNAL'] = bt_results \
         .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['SELL_SIGNAL'] \
         .transform(max)
     
     
     
-    forecast_results.loc[(forecast_results['GRP_SELL_SIGNAL']==True) \
-                   & (forecast_results['SELL_SIGNAL']==False), 
-                   'REMOVE'] = True
+    bt_results.loc[(bt_results['GRP_SELL_SIGNAL']==True) \
+                   & (bt_results['SELL_SIGNAL']==False), 'REMOVE'] = True
     
     
     # Remove for GRP_SELL_SIGNAL == NA ......
     # 移除在period內完全沒碰到停損點的還沒判斷        
-    forecast_results['MAX_RANK'] = forecast_results \
+    bt_results['MAX_RANK'] = bt_results \
                     .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['RANK'] \
                     .transform(max)
 
-    forecast_results.loc[(forecast_results['GRP_SELL_SIGNAL']==False) \
-                   & (forecast_results['RANK']<forecast_results['MAX_RANK']),
+    bt_results.loc[(bt_results['GRP_SELL_SIGNAL']==False) \
+                   & (bt_results['RANK']<bt_results['MAX_RANK']),
                    'REMOVE'] = True
       
     
-    forecast_results = forecast_results[forecast_results['REMOVE'].isna()] \
+    bt_results = bt_results[bt_results['REMOVE'].isna()] \
                 .drop(['REMOVE', 'MAX_RANK'], axis=1) \
                 .reset_index(drop=True)
-
-    
-    return forecast_results
-
-
-
-
-def add_historical_data():
     
 
+
+
+
+    
         
     # Organize results ------
     backtest_main_pre = backtest_results.copy()
@@ -381,9 +368,9 @@ def add_historical_data():
         
     backtest_main = cbyz.df_ymd(backtest_main, 
                                 cols=['BUY_DATE', 'FORECAST_BEGIN',
-                                      'FORECAST_END'])    
-    return ''
-
+                                      'FORECAST_END'])
+    
+    return backtest_main
 
 
 
@@ -403,30 +390,26 @@ def master(begin_date, periods=5,
     # begin_date = 20190401
     
     
-    # time_seq = cbyz.get_time_seq(begin_date=begin_date,
-    #                   periods=periods,
-    #                   unit='m', 
-    #                   simplify_date=True)
+    time_seq = cbyz.get_time_seq(begin_date=begin_date,
+                      periods=periods,
+                      unit='m', 
+                      simplify_date=True)
    
-    # # Backtest ----------
-    # global backtest_results
-    # backtest_results = pd.DataFrame()    
+    # Backtest ----------
+    global backtest_results
+    backtest_results = pd.DataFrame()    
     
-    # for i in range(0, len(time_seq)):
+    for i in range(0, len(time_seq)):
         
-    #     single = forecast_single(begin_date=time_seq.loc[i, 'WORK_DATE'],
-    #                               model_data_period=60, volume=1000, budget=None, 
-    #                               forecast_period=30, backtest_times=5)
+        single = backtest_single(begin_date=time_seq.loc[i, 'WORK_DATE'],
+                                 model_data_period=60, volume=1000, budget=None, 
+                                 forecast_period=30, backtest_times=5)
         
-    #     backtest_results = backtest_results.append(single)
+        backtest_results = backtest_results.append(single)
 
         
-    # backtest_results = backtest_results \
-    #                     .reset_index(drop=True)
-                        
-    backtest_results = forecast_single(begin_date=begin_date,
-                                  model_data_period=90, volume=1000, budget=None, 
-                                  forecast_period=15, backtest_times=5)                        
+    backtest_results = backtest_results \
+                        .reset_index(drop=True)
     
     
     return backtest_results
@@ -464,7 +447,7 @@ if __name__ == '__main__':
 # roi_base=0.015
     
     
-# begin_date = 20190102
+# begin_date = 20190301
 # days=60
 # volume=None
 # budget=None

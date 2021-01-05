@@ -110,7 +110,7 @@ def initialize(path):
 #　2.定期買入比特幣，每天買入60元台幣
 
 
-def load_data(begin_date, end_date=None, period=None, 
+def sam_load_data(begin_date, end_date=None, period=None, 
               stock_symbol=None):
     '''
     讀取資料及重新整理
@@ -194,7 +194,7 @@ def model_dev1(data_end, data_begin=None, data_period=60,
                                  forecast_period=forecast_period)
     
     
-    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
                          end_date=periods['DATA_END'],
                          stock_symbol=stock_symbol)
     
@@ -266,7 +266,7 @@ def model_dev2(data_end, data_begin=None, data_period=60,
                                  forecast_period=forecast_period)
     
     
-    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
                          end_date=periods['DATA_END'],
                          stock_symbol=stock_symbol)
     
@@ -385,7 +385,7 @@ def master(begin_data=20190401, today=None, hold_stocks=None, roi=10, limit=90):
     '''
     
     global stock_data
-    stock_data = load_data(begin_data=begin_data)
+    stock_data = sam_load_data(begin_data=begin_data)
     
     global analyze_results
     analyze_results = analyze_center(data=stock_data)
@@ -483,8 +483,8 @@ def get_top_price(data):
 
 
 def model_1(data=None, data_end=None, data_begin=None, 
-            data_period=150, forecast_end=None, forecast_period=30,
-              stock_symbol=None,
+            data_period=150, forecast_end=None, forecast_period=15,
+            stock_symbol=['0050', '0056'],
               remove_none=True):
     '''
     Linear regression
@@ -498,11 +498,12 @@ def model_1(data=None, data_end=None, data_begin=None,
                                  forecast_period=forecast_period)
     
     
-    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
                          end_date=periods['DATA_END'],
                          stock_symbol=stock_symbol)    
     
     
+    # Bug, forecast_period的長度和data_period太接近時會出錯
     loc_data['PRICE_PRE'] = loc_data \
         .groupby('STOCK_SYMBOL')['CLOSE'] \
                             .shift(forecast_period)
@@ -510,9 +511,6 @@ def model_1(data=None, data_end=None, data_begin=None,
     model_data = loc_data[~loc_data['PRICE_PRE'].isna()]
 
 
-    # real_price = loc_data[loc_data['WORK_DATE']==periods['DATA_END']]
-    
-    
     # Predict data ......
     forecast_data_pre = cbyz.df_add_rank(loc_data,
                                        group_key='STOCK_SYMBOL',
@@ -603,7 +601,7 @@ def model_template(data_end, data_begin=None, data_period=150,
                                  forecast_period=forecast_period)
     
     
-    loc_data = load_data(begin_date=periods['DATA_BEGIN'],
+    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
                          end_date=periods['DATA_END'],
                          stock_symbol=stock_symbol)    
     
