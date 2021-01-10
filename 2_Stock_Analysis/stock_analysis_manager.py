@@ -353,20 +353,20 @@ def get_model_list(status=[0,1]):
 # ...............
 
 
-def analyze_center(data):
-    '''
-    List all analysis here
-    '''    
+# def analyze_center(data):
+#     '''
+#     List all analysis here
+#     '''    
     
-    analyze_results = get_top_price(data)
+#     analyze_results = get_top_price(data)
     
 
-    # Results format
-    # (1) Only stock passed test will show in the results
-    # STOCK_SYMBOL
-    # MODEL_ID, or MODEL_ID
+#     # Results format
+#     # (1) Only stock passed test will show in the results
+#     # STOCK_SYMBOL
+#     # MODEL_ID, or MODEL_ID
     
-    return analyze_results
+#     return analyze_results
 
 
 
@@ -377,7 +377,7 @@ def analyze_center(data):
     
 
 # Update, 增加 停損點
-def master(begin_data=20190401, today=None, hold_stocks=None, roi=10, limit=90):
+def master(begin_date=20190401, today=None, hold_stocks=None, roi=10, limit=90):
     '''
     主工作區
     roi:     percent
@@ -385,10 +385,10 @@ def master(begin_data=20190401, today=None, hold_stocks=None, roi=10, limit=90):
     '''
     
     global stock_data
-    stock_data = sam_load_data(begin_data=begin_data)
+    stock_data = sam_load_data(begin_date=begin_date)
     
-    global analyze_results
-    analyze_results = analyze_center(data=stock_data)
+    # global analyze_results
+    # analyze_results = analyze_center(data=stock_data)
     
     
     # v0
@@ -402,7 +402,7 @@ def master(begin_data=20190401, today=None, hold_stocks=None, roi=10, limit=90):
     #                   'BUY_SIGNAL':buy_signal,
     #                   'SELL_SIGNAL':sell_signal}
     
-    return analyze_results
+    return ''
 
 
 
@@ -512,7 +512,7 @@ def model_1(data=None, data_end=None, data_begin=None,
 
 
     # Predict data ......
-    forecast_data_pre = cbyz.df_add_rank(loc_data,
+    forecast_data_pre = cbyz.df_add_rank(df=loc_data,
                                        group_key='STOCK_SYMBOL',
                                        value='WORK_DATE',
                                        reverse=True)
@@ -521,10 +521,9 @@ def model_1(data=None, data_end=None, data_begin=None,
                                   & (forecast_data_pre['RANK']<forecast_period)]
     
     # Date
-    forecast_date = cbyz.get_time_seq(begin_date=periods['FORECAST_BEGIN'],
-                                    periods=forecast_period,
-                                         unit='d',
-                                         simplify_date=True)
+    forecast_date = cbyz.time_get_seq(begin_date=periods['FORECAST_BEGIN'],
+                                      periods=forecast_period,
+                                      unit='d', simplify_date=True)
         
     forecast_date = forecast_date['WORK_DATE'].tolist()
         
@@ -539,8 +538,9 @@ def model_1(data=None, data_end=None, data_begin=None,
     
         # Model .........
         # Update, doesn't need reshape with multiple features.
-        x = model_data['PRICE_PRE'].to_numpy()
-        x = x.reshape(-1,1)
+        
+        
+        x = cbyz.ml_conv_to_nparray(model_data['PRICE_PRE'])
         
         y = model_data['CLOSE'].to_numpy()
         
@@ -555,11 +555,8 @@ def model_1(data=None, data_end=None, data_begin=None,
         temp_forecast = forecast_data[
             forecast_data['STOCK_SYMBOL']==cur_symbol]
         
-        temp_forecast = temp_forecast['CLOSE'].to_numpy()
         
-        # Bug,只有一個feature時才需要reshape
-        temp_forecast = temp_forecast.reshape(-1,1)              
-        
+        temp_forecast = cbyz.ml_conv_to_nparray(temp_forecast['CLOSE'])       
         temp_results = reg.predict(temp_forecast)    
         
         
