@@ -44,7 +44,7 @@ def initialize():
     path_export = path + '/Export'
     
     
-    cbyz.create_folder(path=[path_resource, path_function, 
+    cbyz.os_create_folder(path=[path_resource, path_function, 
                              path_temp, path_export])        
     return ''
 

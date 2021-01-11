@@ -49,6 +49,9 @@ import codebase_yz as cbyz
 import arsenal as ar
 import stock_analysis_manager as sam
 
+
+
+
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
  
@@ -437,9 +440,9 @@ def master(begin_date, periods=5, stock_symbol=None,
    
     # forecast_results
     btm_forecast(begin_date=begin_date,
-                model_data_period=120, volume=1000, 
-                budget=None, forecast_period=30, 
-                backtest_times=5)                        
+                 model_data_period=120, volume=1000, 
+                 budget=None, forecast_period=30, 
+                 backtest_times=5)                        
     
     
     # backtest_main
