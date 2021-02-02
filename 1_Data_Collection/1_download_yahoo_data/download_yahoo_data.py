@@ -60,7 +60,7 @@ def init(path):
     path_export = path + '/Export'
     
     
-    cbyz.create_folder(path=[path_resource, path_function, 
+    cbyz.os_create_folder(path=[path_resource, path_function, 
                              path_temp, path_export])
 
 
@@ -71,7 +71,7 @@ def load_data():
     '''
    
     # Get stock list
-    stock_list = ar.stock_get_list(stock_type=stock_type)
+    stock_list = ar.stk_get_list(stock_type=stock_type)
     
     
     begin_time = datetime.now()   
@@ -171,6 +171,12 @@ def check():
     return ''
 
 
+0050.TW
+
+
+stock_list.to_csv(path_export + '/tw_stock_list.csv',
+                  index=False,
+                  encoding='utf-8')
 
 # US Stock --------
     

@@ -31,13 +31,15 @@ if local == True:
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
-    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+    master_path = '/home/aronhack/stock_forecast'
+    
 
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 master_path + '/2_Stock_Analysis',]
+                 master_path + '/2_Stock_Analysis',
+                 master_path + '/Function']
 
 
 for i in path_codebase:    
@@ -74,7 +76,7 @@ def initialize(path):
 
 
 
-
+# ..............
 
 
 def btm_get_stock_symbol(stock_symbol=None, top=10):
@@ -84,17 +86,22 @@ def btm_get_stock_symbol(stock_symbol=None, top=10):
     if stock_symbol == None:
     
         target_symbol = ar.stk_get_list(stock_type='tw', 
-                              stock_info=False, 
-                              update=False,
-                              local=True)    
+                                        stock_info=False, 
+                                        update=False,
+                                        local=local)    
         
         if top > 0:
             target_symbol = target_symbol.iloc[0:top, :]
             
         target_symbol = target_symbol['STOCK_SYMBOL'].tolist()
         
+    else:
+        target_symbol = stock_symbol
         
-    return ''
+    return target_symbol
+
+
+# ..............
 
 
 def btm_load_data(begin_date, end_date=None):
@@ -105,7 +112,7 @@ def btm_load_data(begin_date, end_date=None):
     data_raw = ar.stk_get_data(begin_date=begin_date, 
                                end_date=end_date, 
                                stock_type='tw', stock_symbol=target_symbol,
-                               local=True)    
+                               local=local)    
     
     return data_raw
 
@@ -129,7 +136,7 @@ def get_stock_fee():
     
 
 
-def btm_forecast(begin_date, model_data_period=85, volume=1000, budget=None, 
+def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None, 
                     forecast_period=15, backtest_times=5,
                     roi_base=0.03, stop_loss=0.8):
     
@@ -154,7 +161,6 @@ def btm_forecast(begin_date, model_data_period=85, volume=1000, budget=None,
     for i in range(0, len(loc_time_seq)):
     
 
-        
         date_period = cbyz.date_get_period(data_begin=loc_time_seq[i], 
                                            data_end=None, 
                                            data_period=model_data_period,
@@ -190,6 +196,7 @@ def btm_forecast(begin_date, model_data_period=85, volume=1000, budget=None,
             
             print(str(loc_time_seq[i]) + ' without data.')
             continue
+
     
         # Model ......
         for j in range(0, len(model_list)):
@@ -434,15 +441,16 @@ def master(begin_date, periods=5, stock_symbol=None,
     
     # target_symbol
     # (1) Bug, top=150時會出錯
+    stock_symbol = ['0050', '0056']
     btm_get_stock_symbol(stock_symbol=stock_symbol,
                          top=100) 
 
    
     # forecast_results
-    btm_forecast(begin_date=begin_date,
+    btm_predict(begin_date=begin_date,
                  model_data_period=120, volume=1000, 
                  budget=None, forecast_period=30, 
-                 backtest_times=5)                        
+                 backtest_times=5)
     
     
     # backtest_main
@@ -488,8 +496,5 @@ if __name__ == '__main__':
 # volume=None
 # budget=None
 # roi_base = 0.02    
-    
-    
-    
     
     

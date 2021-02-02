@@ -9,6 +9,7 @@ Created on Sat Nov 14 17:23:08 2020
 # Worklist
 # 1. Some models only work for some stock symbol.
 # > Clustering
+# 2. Add crypto
 
 
 # % 讀取套件 -------
@@ -236,6 +237,111 @@ def model_1(data=None, data_end=None, data_begin=None,
 
 
 # ................
+    
+
+def model_2(data=None, data_end=None, data_begin=None, 
+            data_period=150, forecast_end=None, forecast_period=15,
+            stock_symbol=['0050', '0056'],
+              remove_none=True):
+    '''
+    XGBoost
+    https://www.datacamp.com/community/tutorials/xgboost-in-python
+    '''
+    
+    import xgboost as xgb    
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import mean_squared_error
+    
+
+    periods = cbyz.date_get_period(data_begin=data_begin, 
+                                 data_end=data_end, 
+                                 data_period=data_period,
+                                 forecast_end=forecast_end, 
+                                 forecast_period=forecast_period)
+    
+
+    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
+                             end_date=periods['DATA_END'],
+                             stock_symbol=stock_symbol)    
+
+
+    # Bug, forecast_period的長度和data_period太接近時會出錯
+    loc_data['PRICE_PRE'] = loc_data \
+        .groupby('STOCK_SYMBOL')['CLOSE'] \
+                            .shift(forecast_period)
+    
+    model_data = loc_data[~loc_data['PRICE_PRE'].isna()]    
+    
+    
+    results = pd.DataFrame()
+    features = pd.DataFrame()
+    mse = pd.DataFrame()
+    
+    
+    for i in range(len(stock_symbol)):
+        
+        
+        temp_data = model_data[
+            model_data['STOCK_SYMBOL']==stock_symbol[i]] \
+            .reset_index(drop=True)
+
+        X = temp_data[['PRICE_PRE']]
+        y = temp_data['CLOSE']      
+        
+    
+        X_train, X_test, y_train, y_test = train_test_split(X, y)
+        
+        regressor = xgb.XGBRegressor(
+            n_estimators=100,
+            reg_lambda=1,
+            gamma=0,
+            max_depth=3
+        )
+        
+
+        regressor.fit(X_train, y_train)
+        
+        # Feature Importance ......
+        new_features = pd.DataFrame(regressor.feature_importances_.reshape(1, -1), 
+                                    columns=['IMPORTANCE'])    
+        
+        new_features['STOCK_SYMBOL'] = stock_symbol[i]
+        features = features.append(new_features)
+
+
+        # Prediction ......
+        y_pred = regressor.predict(X_test)
+        
+        new_results = pd.DataFrame({'CLOSE':y_pred})
+        new_results['STOCK_SYMBOL'] = stock_symbol[i]
+        results = results.append(new_results)
+        
+        
+        # MSE(或RMSE？) ......
+        new_mse = pd.DataFrame({'STOCK_SYMBOL':[stock_symbol[i]],
+                                'MSE':[mean_squared_error(y_test, y_pred)]})
+        
+        mse = mse.append(new_mse)
+        
+
+
+    results = results[['STOCK_SYMBOL', 'CLOSE']] \
+                .reset_index(drop=True)
+                
+    features = features[['STOCK_SYMBOL', 'IMPORTANCE']] \
+                .reset_index(drop=True)
+                
+    mse = mse.reset_index(drop=True)
+
+    return_dict = {'RESULTS':results,
+                   'FEATURES':features,
+                   'MSE':mse} 
+
+    return return_dict
+
+
+
+# ................
 
 
 def get_model_list(status=[0,1]):
@@ -248,7 +354,7 @@ def get_model_list(status=[0,1]):
     # (3) List by function pattern
     
     # function_list = [model_dev1, model_dev2, model_dev3]
-    function_list = [model_1]
+    function_list = [model_1, model_2]
     
     
     return function_list
@@ -332,67 +438,6 @@ if __name__ == '__main__':
 # %% Dev ---------
 
 
-def get_top_price(data):
-    '''
-    Dev
-    '''
-    
-    # data = stock_data.copy()
-    loc_data = data.copy()
-    # loc_data = loc_data[['STOCK_SYMBOL', 'CLOSE']]
-    
-    top_price = data.groupby('STOCK_SYMBOL')['CLOSE'] \
-                .aggregate(max) \
-                .reset_index() \
-                .rename(columns={'CLOSE':'MAX_PRICE'})
-
-        
-    results_pre = loc_data.merge(top_price, 
-                         how='left', 
-                         on='STOCK_SYMBOL')
-    
-    
-    # Temp ---------
-    # Add a test here
-    cur_price = results_pre \
-        .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE'],
-                     ascending=[True, False]) \
-        .drop_duplicates(subset=['STOCK_SYMBOL'])
-        
-    cur_price = cur_price[['STOCK_SYMBOL', 'CLOSE']] \
-        .rename(columns={'CLOSE':'CUR_PRICE'})
-     
-    # Reorganize -------        
-    results = top_price.merge(cur_price, 
-                         on='STOCK_SYMBOL')
-    
-    
-    results.loc[results['CUR_PRICE'] > results['MAX_PRICE'] * 0.95,
-                'BUY_SIGNAL'] = True
-    
-    
-    results.loc[results['CUR_PRICE'] < results['MAX_PRICE'] * 0.3,
-                'SELL_SIGNAL'] = True
-    
-    
-    
-    results = results[(~results['BUY_SIGNAL'].isna()) |
-                      (~results['SELL_SIGNAL'].isna())] \
-        .reset_index(drop=True)
-
-        
-    results['MODEL_ID'] = 'TM01'
-    results = results[['STOCK_SYMBOL', 'MODEL_ID',
-                       'BUY_SIGNAL', 'SELL_SIGNAL']]
-
-    return results   
-
-
-
-
-
-
-
 def model_template(data_end, data_begin=None, data_period=150,
               forecast_end=None, forecast_period=30,
               stock_symbol=None,
@@ -441,12 +486,21 @@ def model_template(data_end, data_begin=None, data_period=150,
 
 
 
-
-
-
-
 # periods = cbyz.date_get_period(data_begin=20191201, 
 #                              data_end=None, 
 #                              data_period=20191231,
 #                              forecast_end=None, 
 #                              forecast_period=10)
+    
+
+# data_begin=20191201
+# data_end=20191231
+# data_period=None
+# forecast_end=None
+# forecast_period=10
+# stock_symbol=['0050', '0056']
+
+
+
+
+
