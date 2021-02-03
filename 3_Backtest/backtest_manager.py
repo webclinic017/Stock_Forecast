@@ -137,12 +137,11 @@ def get_stock_fee():
 
 
 def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None, 
-                    forecast_period=15, backtest_times=5,
-                    roi_base=0.03, stop_loss=0.8):
+                forecast_period=15, backtest_times=5,
+                roi_base=0.03, stop_loss=0.8):
     
     
     # .......
-    
     
     loc_time_seq = cbyz.time_get_seq(begin_date=begin_date,
                                      periods=backtest_times,
@@ -424,7 +423,7 @@ def btm_add_hist_data():
 
 
 
-def master(begin_date, periods=5, stock_symbol=None,
+def master(begin_date=20190401, periods=5, stock_symbol=None,
            signal=None, budget=None, split_budget=False):
     '''
     主工作區
@@ -439,17 +438,22 @@ def master(begin_date, periods=5, stock_symbol=None,
     # begin_date = 20190401
     
     
+    
+    
     # target_symbol
     # (1) Bug, top=150時會出錯
-    stock_symbol = ['0050', '0056']
+    # stock_symbol = ['0050', '0056']
+    stock_symbol = ['2301', '2474', '1714', '2385']
+    
+    
     btm_get_stock_symbol(stock_symbol=stock_symbol,
                          top=100) 
 
    
     # forecast_results
     btm_predict(begin_date=begin_date,
-                 model_data_period=120, volume=1000, 
-                 budget=None, forecast_period=30, 
+                 model_data_period=180, volume=1000, 
+                 budget=None, forecast_period=14, 
                  backtest_times=5)
     
     

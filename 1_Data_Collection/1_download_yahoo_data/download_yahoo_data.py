@@ -37,7 +37,7 @@ import codebase_yz as cbyz
 
 
 stock_type = 'tw'
-stock_type = 'us'
+# stock_type = 'us'
 
 local = False
 local = True
@@ -65,13 +65,19 @@ def init(path):
 
 
 
-def load_data():
+def load_data(stock_list=None):
     '''
     讀取資料及重新整理
     '''
    
     # Get stock list
-    stock_list = ar.stk_get_list(stock_type=stock_type)
+    
+    
+    if stock_list == None:
+        stock_list = ar.stk_get_list(stock_type=stock_type)
+    else:
+        stock_list = pd.DataFrame({'STOCK_SYMBOL':[2474, 1714, 2385]})
+        stock_list['STOCK_SYMBOL'] = stock_list['STOCK_SYMBOL'].astype(str)
     
     
     begin_time = datetime.now()   
@@ -79,8 +85,8 @@ def load_data():
     # Get historical data
     hist_data_raw = pd.DataFrame()
     
-    for i in range(0, 10):
-    # for i in range(0, len(stock_list)):
+    # for i in range(0, 10):
+    for i in range(0, len(stock_list)):
     # for i in range(190, 200):
     
         # Get data
@@ -96,9 +102,9 @@ def load_data():
         
         if len(df) > 0:
             hist_data_raw = hist_data_raw.append(df, sort=False)
-        # historical_data_raw = pd.concat([, df])
+
+
         time.sleep(0.8)
-        
         print(i)
     
     
@@ -112,34 +118,34 @@ def load_data():
     
     
     # Rename
-    hist_data.rename(columns={'Date':'WORK_DATE',
-                                'Open':'OPEN',
-                                'High':'HIGH',
-                                'Low':'LOW',
-                                'Close':'CLOSE',
-                                'Volume':'VOLUME'
-                                    }, 
-                           inplace=True)
+    hist_data = hist_data \
+                .rename(columns={'Date':'WORK_DATE',
+                                 'Open':'OPEN',
+                                 'High':'HIGH',
+                                 'Low':'LOW',
+                                 'Close':'CLOSE',
+                                 'Volume':'VOLUME'})
     
     
     # Filter columns
     cols = ['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
             'HIGH', 'LOW', 'CLOSE', 'VOLUME']
+    
     hist_data = hist_data[cols]
+    
     
     
     # Upload
     if stock_type == 'tw':
         ar.db_upload(data=hist_data, 
-                     table_name='stock_data',
+                     table_name='stock_data_tw',
                      local=local)
         
     elif stock_type == 'us':
         ar.db_upload(data=hist_data, 
                      table_name='stock_data_us',
                      local=local)
-    
-    
+
     
     # Export
     global path_export
@@ -171,152 +177,50 @@ def check():
     return ''
 
 
-0050.TW
+def get_us_stock_data():
 
-
-stock_list.to_csv(path_export + '/tw_stock_list.csv',
-                  index=False,
-                  encoding='utf-8')
-
-# US Stock --------
-    
-
-results = pd.DataFrame()
-
-for i in us_stock:
-    
-    data = yf.Ticker(i)
-    df = data.history(period="max")
-    df['STOCK_SYMBOL'] = i
-
-    results = results.append(df)
         
+    # US Stock --------
+    
+    results = pd.DataFrame()
+    
+    for i in us_stock:
+        
+        data = yf.Ticker(i)
+        df = data.history(period="max")
+        df['STOCK_SYMBOL'] = i
+    
+        results = results.append(df)
+            
+    
+    results.reset_index(level=0, inplace=True)
+    
+    
+    # Rename
+    results.rename(columns={'Date':'WORK_DATE',
+                                'Open':'OPEN',
+                                'High':'HIGH',
+                                'Low':'LOW',
+                                'Close':'CLOSE',
+                                'Volume':'VOLUME'
+                                    }, 
+                           inplace=True)
+    
+    # Filter columns
+    cols = ['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
+            'HIGH', 'LOW', 'CLOSE', 'VOLUME']
+    results = results[cols]
+    
+    
+    Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
+    
+    # results['WORK_DATE'] = results['WORK_DATE'].apply(cbyz.ymd)
+    results['WORK_DATE'] = results['WORK_DATE'].astype('str')
+    
+    ar.db_upload(results,
+                 'stock_data_us')
 
-results.reset_index(level=0, inplace=True)
-
-
-# Rename
-results.rename(columns={'Date':'WORK_DATE',
-                            'Open':'OPEN',
-                            'High':'HIGH',
-                            'Low':'LOW',
-                            'Close':'CLOSE',
-                            'Volume':'VOLUME'
-                                }, 
-                       inplace=True)
-
-# Filter columns
-cols = ['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
-        'HIGH', 'LOW', 'CLOSE', 'VOLUME']
-results = results[cols]
-
-
-
-Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
-
-# results['WORK_DATE'] = results['WORK_DATE'].apply(cbyz.ymd)
-results['WORK_DATE'] = results['WORK_DATE'].astype('str')
-
-ar.db_upload(results,
-             'stock_data_us')
-
-
-
-
-
-# -------------------------
-
-
-
-
-part1 = historical_data.iloc[0:1000000, ]
-part2 = historical_data.iloc[1000000 * 1 : 1000000 * 2, ]
-part3 = historical_data.iloc[950000 * 2 : 950000 * 3, ]
-part4 = historical_data.iloc[1000000 * 2 : , ]
-
-
-# part1.to_hdf(path + '/Resource/yahoo_finance_data_20200626_p2.h5', key='s')
-# part2.to_hdf(path + '/Resource/yahoo_finance_data_20200626_p3.h5', key='s')
-# part3.to_hdf(path + '/Resource/yahoo_finance_data_20200625_part3.h5', key='s')
-# part4.to_hdf(path + '/Resource/yahoo_finance_data_20200626_p4.h5', key='s')
+    
+    return ''
 
 
-
-part1['WORK_DATE'] = part1['WORK_DATE'].dt.date
-data_list = part1.values.tolist()
-
-# Insert
-query = "INSERT INTO stock_data (WORK_DATE, STOCK_SYMBOL, OPEN, HIGH, LOW, CLOSE, VOLUME) VALUES(%s,%s,%s,%s,%s,%s,%s);"
-cursor.executemany(query, data_list)
-# db.commit()
-
-
-
-
-# %% Method 2 ------
-data = yf.download("0050.TW", start="2020-06-25", end="2020-07-12")
-stock_id = "0050.TW"
-
-# -------------------------
-
-
-msft = yf.Ticker("MSFT")
-msft = yf.Ticker("0051.TW")
-
-
-# get stock info
-msft.info
-
-# get historical market data
-hist = msft.history(period="max")
-
-# show actions (dividends, splits)
-msft.actions
-
-# show dividends
-msft.dividends
-
-# show splits
-msft.splits
-
-# show financials
-msft.financials
-msft.quarterly_financials
-
-# show major holders
-stock.major_holders
-
-# show institutional holders
-stock.institutional_holders
-
-# show balance heet
-msft.balance_sheet
-msft.quarterly_balance_sheet
-
-# show cashflow
-msft.cashflow
-msft.quarterly_cashflow
-
-# show earnings
-msft.earnings
-msft.quarterly_earnings
-
-# show sustainability
-msft.sustainability
-
-# show analysts recommendations
-msft.recommendations
-
-# show next event (earnings, etc)
-msft.calendar
-
-# show ISIN code - *experimental*
-# ISIN = International Securities Identification Number
-msft.isin
-
-# show options expirations
-msft.options
-
-# get option chain for specific expiration
-opt = msft.option_chain('YYYY-MM-DD')
-# data available via: opt.calls, opt.puts
