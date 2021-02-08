@@ -28,17 +28,19 @@ import sys, time, os, gc
 local = False
 local = True
 
+stock_type = 'tw'
+
 # Path .....
 if local == True:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/2_Stock_Analysis'
 else:
-    path = '/home/aronhack/stock_forecast/2_Stock_Analysis'
+    path = '/home/aronhack/stock_predict/2_Stock_Analysis'
 
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/aronhack/stock_forecast/Function']
+                 r'/home/aronhack/stock_predict/Function']
 
 
 for i in path_codebase:    
@@ -74,7 +76,7 @@ def initialize(path):
 
 
 
-def sam_load_data(begin_date, end_date=None, period=None, 
+def sam_load_data(data_begin, data_end=None, period=None, 
               stock_symbol=None):
     '''
     讀取資料及重新整理
@@ -91,9 +93,9 @@ def sam_load_data(begin_date, end_date=None, period=None,
         stock_symbol = target['STOCK_SYMBOL'].tolist()
     
     
-    data_raw = ar.stk_get_data(begin_date=begin_date, end_date=end_date, 
-                   stock_type='tw', stock_symbol=stock_symbol, 
-                   local=local)    
+    data_raw = ar.stk_get_data(data_begin=data_begin, data_end=data_end, 
+                               stock_type='tw', stock_symbol=stock_symbol, 
+                               local=local)    
     
     return data_raw
 
@@ -143,54 +145,84 @@ def get_sell_signal(data, hold_stocks=None):
     
 
 
-def model_1(data=None, data_end=None, data_begin=None, 
-            data_period=150, forecast_end=None, forecast_period=15,
-            stock_symbol=['0050', '0056'],
-              remove_none=True):
+
+
+def get_model_data(data_end=None, data_begin=None, 
+                   data_period=150, predict_end=None, predict_period=15,
+                   stock_symbol=[]):
+    
+
+    test_data = ar.stk_test_data_period(data_begin=data_begin, 
+                                 data_end=data_end, 
+                                 data_period=data_period,
+                                 predict_end=predict_end, 
+                                 predict_period=predict_period,
+                                 stock_type='tw',
+                                 local=local)
+    
+    
+    periods = cbyz.date_get_period(data_begin=test_data['DATA_BEGIN'], 
+                                   data_end=test_data['DATE_END'], 
+                                   data_period=None,
+                                   predict_end=test_data['PREDICT_BEGIN'], 
+                                   predict_period=test_data['PREDICT_END'])
+    
+    
+    loc_data = sam_load_data(data_begin=periods['DATA_BEGIN'],
+                             data_end=periods['DATA_END'],
+                             stock_symbol=stock_symbol)    
+    
+    
+    # Bug, predict_period的長度和data_period太接近時會出錯
+    loc_data['PRICE_PRE'] = loc_data \
+                            .groupby('STOCK_SYMBOL')['CLOSE'] \
+                            .shift(predict_period)
+    
+
+    model_data = loc_data[~loc_data['PRICE_PRE'].isna()]
+
+
+    # Predict data ......
+    predict_data_pre = cbyz.df_add_rank(df=loc_data,
+                                       group_key='STOCK_SYMBOL',
+                                       value='WORK_DATE',
+                                       reverse=True)
+        
+    predict_data = predict_data_pre[(predict_data_pre['RANK']>=0) \
+                                  & (predict_data_pre['RANK']<predict_period)]
+    
+    # Date
+    predict_date = cbyz.time_get_seq(begin_date=periods['PREDICT_BEGIN'],
+                                      periods=predict_period,
+                                      unit='d', simplify_date=True)
+        
+    predict_date = predict_date['WORK_DATE'].tolist()
+    
+    
+    export_dict = {'MODEL_DATA':model_data,
+                   'PRECIDT_DATA':predict_data,
+                   'PRECIDT_DATE':predict_date}
+    
+    return export_dict
+
+
+
+
+
+
+
+
+def model_1(model_data, predict_data, remove_none=True):
     '''
     Linear regression
     '''
     from sklearn.linear_model import LinearRegression
     
-    periods = cbyz.date_get_period(data_begin=data_begin, 
-                                 data_end=data_end, 
-                                 data_period=data_period,
-                                 forecast_end=forecast_end, 
-                                 forecast_period=forecast_period)
-    
-    
-    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
-                         end_date=periods['DATA_END'],
-                         stock_symbol=stock_symbol)    
-    
-    
-    # Bug, forecast_period的長度和data_period太接近時會出錯
-    loc_data['PRICE_PRE'] = loc_data \
-        .groupby('STOCK_SYMBOL')['CLOSE'] \
-                            .shift(forecast_period)
-    
-    model_data = loc_data[~loc_data['PRICE_PRE'].isna()]
-
-
-    # Predict data ......
-    forecast_data_pre = cbyz.df_add_rank(df=loc_data,
-                                       group_key='STOCK_SYMBOL',
-                                       value='WORK_DATE',
-                                       reverse=True)
-        
-    forecast_data = forecast_data_pre[(forecast_data_pre['RANK']>=0) \
-                                  & (forecast_data_pre['RANK']<forecast_period)]
-    
-    # Date
-    forecast_date = cbyz.time_get_seq(begin_date=periods['FORECAST_BEGIN'],
-                                      periods=forecast_period,
-                                      unit='d', simplify_date=True)
-        
-    forecast_date = forecast_date['WORK_DATE'].tolist()
+ 
         
     # Model ........
     model_info = pd.DataFrame()
-    forecast_results = pd.DataFrame()
+    predict_results = pd.DataFrame()
     
     for i in range(0, len(stock_symbol)):
         
@@ -212,33 +244,33 @@ def model_1(data=None, data_end=None, data_begin=None,
         reg.intercept_
     
     
-        # Forecast ......
-        temp_forecast = forecast_data[
-            forecast_data['STOCK_SYMBOL']==cur_symbol]
+        # predict ......
+        temp_predict = predict_data[
+            predict_data['STOCK_SYMBOL']==cur_symbol]
         
         
-        temp_forecast = cbyz.ml_conv_to_nparray(temp_forecast['CLOSE'])       
-        temp_results = reg.predict(temp_forecast)    
+        temp_predict = cbyz.ml_conv_to_nparray(temp_predict['CLOSE'])       
+        temp_results = reg.predict(temp_predict)    
         
         
         # print(stock_symbol[i])
-        # print(forecast_date)
+        # print(predict_date)
         # print(temp_results)
         
         # ...
-        temp_df = pd.DataFrame(data={'WORK_DATE':forecast_date,
+        temp_df = pd.DataFrame(data={'WORK_DATE':predict_date,
                                      'CLOSE':temp_results})
         temp_df['STOCK_SYMBOL'] = cur_symbol
         
-        forecast_results = forecast_results.append(temp_df)
+        predict_results = predict_results.append(temp_df)
         
     
     # Reorganize ------
     cols = ['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']        
-    forecast_results = forecast_results[cols]
+    predict_results = predict_results[cols]
 
     return_dict = {'MODEL_INFO':model_info,
-                   'RESULTS':forecast_results}
+                   'RESULTS':predict_results}
 
     return return_dict
 
@@ -247,7 +279,7 @@ def model_1(data=None, data_end=None, data_begin=None,
     
 
 def model_2(data=None, data_end=None, data_begin=None, 
-            data_period=150, forecast_end=None, forecast_period=15,
+            data_period=150, predict_end=None, predict_period=15,
             stock_symbol=['0050', '0056'],
               remove_none=True):
     '''
@@ -263,8 +295,8 @@ def model_2(data=None, data_end=None, data_begin=None,
     periods = cbyz.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
-                                 forecast_end=forecast_end, 
-                                 forecast_period=forecast_period)
+                                 predict_end=predict_end, 
+                                 predict_period=predict_period)
     
 
     loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
@@ -272,15 +304,15 @@ def model_2(data=None, data_end=None, data_begin=None,
                              stock_symbol=stock_symbol)    
 
 
-    # Bug, forecast_period的長度和data_period太接近時會出錯
+    # Bug, predict_period的長度和data_period太接近時會出錯
     # Update, build PRICE_PRE as function
     loc_data['PRICE_PRE'] = loc_data \
         .groupby('STOCK_SYMBOL')['CLOSE'] \
-                            .shift(forecast_period)
+                            .shift(predict_period)
                             
     loc_data['VOLUME_PRE'] = loc_data \
         .groupby('STOCK_SYMBOL')['VOLUME'] \
-                            .shift(forecast_period)                            
+                            .shift(predict_period)                            
     
     model_data = loc_data[~loc_data['PRICE_PRE'].isna()]    
     
@@ -400,7 +432,10 @@ def get_model_list(status=[0,1]):
 
 # %% Master ------
 
-def master(begin_date=20190401, today=None, hold_stocks=None, limit=90):
+def master(data_begin=None, data_end=None, 
+           data_period=150, predict_end=None, 
+           predict_period=15,
+           stock_symbol=None, today=None, hold_stocks=None, limit=90):
     '''
     主工作區
     roi:     percent
@@ -408,7 +443,7 @@ def master(begin_date=20190401, today=None, hold_stocks=None, limit=90):
     '''
     
     global stock_data
-    stock_data = sam_load_data(begin_date=begin_date)
+    stock_data = sam_load_data(data_begin=data_begin)
     
     
     stock_symbol = ['2301', '2474', '1714', '2385']
@@ -416,6 +451,19 @@ def master(begin_date=20190401, today=None, hold_stocks=None, limit=90):
     # 2474可成
     # 1714和桐
     # 2385群光
+    
+    
+    
+        
+    data_raw = get_model_data(data_end=data_end, data_begin=data_begin, 
+                              data_period=data_period, 
+                              predict_end=predict_end, 
+                              predict_period=predict_period,
+                              stock_symbol=stock_symbol)
+    
+    model_data = data_raw['MODEL_DATA']
+    predict_data = data_raw['PRECIDT_DATA']
+    predict_date = data_raw['PRECIDT_DATE']
     
     # global analyze_results
     # analyze_results = analyze_center(data=stock_data)
@@ -434,17 +482,14 @@ def master(begin_date=20190401, today=None, hold_stocks=None, limit=90):
     
     
     global model1_results
-    model1_results = model_1(data=None, data_end=None, data_begin=begin_date, 
-                             data_period=150, forecast_end=None, 
-                             forecast_period=15,
-                             stock_symbol=stock_symbol,
+    model1_results = model_1(model_data=model_data, predict_data=predict_data,
                              remove_none=True)
     
     
     global model2_results
     model2_results = model_2(data=None, data_end=None, data_begin=begin_date, 
-                             data_period=150, forecast_end=None, 
-                             forecast_period=15,
+                             data_period=150, predict_end=None, 
+                             predict_period=15,
                              stock_symbol=stock_symbol,
                              remove_none=True)    
     
@@ -470,7 +515,7 @@ if __name__ == '__main__':
 
 
 def model_template(data_end, data_begin=None, data_period=150,
-              forecast_end=None, forecast_period=30,
+              predict_end=None, predict_period=30,
               stock_symbol=None,
               remove_none=True):
     
@@ -479,8 +524,8 @@ def model_template(data_end, data_begin=None, data_period=150,
     periods = cbyz.date_get_period(data_begin=data_begin, 
                                  data_end=data_end, 
                                  data_period=data_period,
-                                 forecast_end=forecast_end, 
-                                 forecast_period=forecast_period)
+                                 predict_end=predict_end, 
+                                 predict_period=predict_period)
     
     
     loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
@@ -492,13 +537,13 @@ def model_template(data_end, data_begin=None, data_period=150,
 
     # Reorganize ------
     model_info = pd.DataFrame()
-    forecast_results = pd.DataFrame()
+    predict_results = pd.DataFrame()
     
     cols = ['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']        
-    forecast_results = forecast_results[cols]
+    predict_results = predict_results[cols]
 
     return_dict = {'MODEL_INFO':model_info,
-                   'RESULTS':forecast_results}
+                   'RESULTS':predict_results}
 
     return return_dict
 
@@ -510,8 +555,8 @@ def model_template(data_end, data_begin=None, data_period=150,
 # # data_begin=None
 # data_end=None
 # data_period=30
-# forecast_end=None
-# forecast_period=30
+# predict_end=None
+# predict_period=30
 
 # stock_symbol=['0050', '0056']
 
@@ -520,16 +565,18 @@ def model_template(data_end, data_begin=None, data_period=150,
 # periods = cbyz.date_get_period(data_begin=20191201, 
 #                              data_end=None, 
 #                              data_period=20191231,
-#                              forecast_end=None, 
-#                              forecast_period=10)
+#                              predict_end=None, 
+#                              predict_period=10)
     
 
-# data_begin=20191201
-# data_end=20191231
-# data_period=None
-# forecast_end=None
-# forecast_period=10
-# stock_symbol=['0050', '0056']
+data_begin=20191201
+data_end=20191231
+data_period=None
+predict_end=None
+predict_period=10
+stock_symbol=['2301', '2474', '1714', '2385']
+
+
 
 
 begin_date=20191201
