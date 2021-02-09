@@ -109,8 +109,8 @@ def btm_load_data(begin_date, end_date=None):
     讀取資料及重新整理
     '''   
     
-    data_raw = ar.stk_get_data(begin_date=begin_date, 
-                               end_date=end_date, 
+    data_raw = ar.stk_get_data(data_begin=begin_date, 
+                               data_end=end_date, 
                                stock_type='tw', stock_symbol=target_symbol,
                                local=local)    
     
@@ -137,7 +137,7 @@ def get_stock_fee():
 
 
 def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None, 
-                forecast_period=15, backtest_times=5,
+                predict_period=15, backtest_times=5,
                 roi_base=0.03, stop_loss=0.8):
     
     
@@ -163,14 +163,14 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
         date_period = cbyz.date_get_period(data_begin=loc_time_seq[i], 
                                            data_end=None, 
                                            data_period=model_data_period,
-                                           forecast_end=None, 
-                                           forecast_period=forecast_period)        
+                                           predict_end=None, 
+                                           predict_period=predict_period)        
         
 
         data_begin = date_period['DATA_BEGIN']
         data_end = date_period['DATA_END']
-        forecast_begin = date_period['FORECAST_BEGIN']
-        forecast_end = date_period['FORECAST_END']
+        predict_begin = date_period['PREDICT_BEGIN']
+        predict_end = date_period['PREDICT_END']
 
         
         # ......
@@ -211,7 +211,7 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
             model_results_raw = cur_model(data_begin=data_begin,
                                           data_end=data_end,
                                           stock_symbol=target_symbol,
-                                          forecast_period=forecast_period,
+                                          predict_period=predict_period,
                                           remove_none=False)                
             
             
@@ -233,8 +233,8 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
             
             
             temp_results['MODEL'] = cur_model.__name__
-            temp_results['FORECAST_BEGIN'] = forecast_begin
-            temp_results['FORECAST_END'] = forecast_end
+            temp_results['PREDICT_BEGIN'] = predict_begin
+            temp_results['PREDICT_END'] = predict_end
             temp_results['BACKTEST_ID'] = i
             
             buy_signal = buy_signal.append(temp_results)
@@ -263,7 +263,6 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
     for i in range(0, len(loc_time_seq)):
     
         df_lv1 = forecast_roi_pre[forecast_roi_pre['BACKTEST_ID']==i]
-        
         unique_symbol = df_lv1['STOCK_SYMBOL'].unique()
         
         
@@ -283,9 +282,7 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
                 else:
                     df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k-1, 'MAX_PRICE']
                             
-            
             forecast_roi = forecast_roi.append(df_lv2)
-
     
     # ............
     global forecast_results
@@ -340,12 +337,12 @@ def btm_add_hist_data():
                     .rename(columns={'WORK_DATE':'BUY_DATE'})
 
     # Add Historical Data......
-    hist_data_info = loc_forecast[['STOCK_SYMBOL', 'FORECAST_BEGIN',
-                                   'FORECAST_END', 'FORECAST_CLOSE']] \
+    hist_data_info = loc_forecast[['STOCK_SYMBOL', 'PREDICT_BEGIN',
+                                   'PREDICT_END', 'FORECAST_CLOSE']] \
                     .reset_index(drop=True)
 
     
-    hist_data_period = hist_data_info[['FORECAST_BEGIN', 'FORECAST_END']] \
+    hist_data_period = hist_data_info[['PREDICT_BEGIN', 'PREDICT_END']] \
                         .drop_duplicates() \
                         .reset_index(drop=True)
     
@@ -354,13 +351,13 @@ def btm_add_hist_data():
         
     for i in range(0, len(hist_data_period)):
 
-        temp_begin = hist_data_period.loc[i, 'FORECAST_BEGIN']
-        temp_end = hist_data_period.loc[i, 'FORECAST_END']       
+        temp_begin = hist_data_period.loc[i, 'PREDICT_BEGIN']
+        temp_end = hist_data_period.loc[i, 'PREDICT_END']       
         
         # Symbol ...
         temp_symbol = hist_data_info[
-            (hist_data_info['FORECAST_BEGIN']==temp_begin) \
-            & (hist_data_info['FORECAST_END']==temp_end)]
+            (hist_data_info['PREDICT_BEGIN']==temp_begin) \
+            & (hist_data_info['PREDICT_END']==temp_end)]
 
         temp_symbol = temp_symbol['STOCK_SYMBOL'].tolist()  
             
@@ -371,8 +368,8 @@ def btm_add_hist_data():
                                    stock_symbol=temp_symbol, 
                                    local=local)           
         
-        new_data['FORECAST_BEGIN'] = temp_begin
-        new_data['FORECAST_END'] = temp_end
+        new_data['PREDICT_BEGIN'] = temp_begin
+        new_data['PREDICT_END'] = temp_end
         
         hist_data_pre = hist_data_pre.append(new_data)
 
@@ -386,13 +383,13 @@ def btm_add_hist_data():
     # Combine data ......
     hist_data_full = hist_data_pre.merge(hist_data_info,
                                          how='left',
-                                         on=['FORECAST_BEGIN', 'FORECAST_END', 
+                                         on=['PREDICT_BEGIN', 'PREDICT_END', 
                                              'STOCK_SYMBOL']) 
 
         
     hist_data = hist_data_full[hist_data_full['FORECAST_CLOSE'] \
                           <= hist_data_full['CLOSE']] \
-                .drop_duplicates(subset=['FORECAST_BEGIN', 'FORECAST_END', 
+                .drop_duplicates(subset=['PREDICT_BEGIN', 'PREDICT_END', 
                                          'STOCK_SYMBOL']) \
                 .reset_index(drop=True)
             
@@ -404,8 +401,8 @@ def btm_add_hist_data():
     backtest_main = loc_forecast \
                     .merge(hist_data,
                            how='left',
-                           on=['STOCK_SYMBOL', 'FORECAST_BEGIN',
-                               'FORECAST_END', 'FORECAST_CLOSE'])
+                           on=['STOCK_SYMBOL', 'PREDICT_BEGIN',
+                               'PREDICT_END', 'FORECAST_CLOSE'])
         
     
     backtest_main.loc[~backtest_main['CLOSE'].isna(), 'SUCCESS'] = True 
@@ -413,8 +410,8 @@ def btm_add_hist_data():
         
         
     backtest_main = cbyz.df_ymd(backtest_main, 
-                                cols=['BUY_DATE', 'FORECAST_BEGIN',
-                                      'FORECAST_END'])    
+                                cols=['BUY_DATE', 'PREDICT_BEGIN',
+                                      'PREDICT_END'])    
     
     
     return ''
@@ -453,7 +450,7 @@ def master(begin_date=20190401, periods=5, stock_symbol=None,
     # forecast_results
     btm_predict(begin_date=begin_date,
                  model_data_period=180, volume=1000, 
-                 budget=None, forecast_period=14, 
+                 budget=None, predict_period=14, 
                  backtest_times=5)
     
     
@@ -490,7 +487,7 @@ if __name__ == '__main__':
 
 
 # volume=1000
-# forecast_period=30
+# predict_period=30
 # backtest_times=5
 # roi_base=0.015
     

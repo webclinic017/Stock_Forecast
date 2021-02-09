@@ -76,7 +76,7 @@ def load_data(stock_list=None):
     if stock_list == None:
         stock_list = ar.stk_get_list(stock_type=stock_type)
     else:
-        stock_list = pd.DataFrame({'STOCK_SYMBOL':[2474, 1714, 2385]})
+        stock_list = pd.DataFrame({'STOCK_SYMBOL':['2301', '2474', '1714', '2385']})
         stock_list['STOCK_SYMBOL'] = stock_list['STOCK_SYMBOL'].astype(str)
     
     

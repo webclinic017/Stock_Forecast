@@ -23,6 +23,8 @@ Created on Sat Nov 14 17:23:08 2020
 import pandas as pd
 import numpy as np
 import sys, time, os, gc
+from sklearn.model_selection import train_test_split    
+from sklearn.metrics import mean_squared_error
 
 
 local = False
@@ -167,23 +169,54 @@ def get_model_data(data_end=None, data_begin=None,
                                    predict_end=test_data['PREDICT_BEGIN'], 
                                    predict_period=test_data['PREDICT_END'])
     
+    # Date ......
+    predict_date = cbyz.time_get_seq(begin_date=periods['PREDICT_BEGIN'],
+                                      periods=predict_period,
+                                      unit='d', simplify_date=True)
+        
+    predict_date = predict_date[['WORK_DATE']]
     
+    
+    # Predict DataFrame ......
+    stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
+    predict_df_pre = cbyz.df_cross_join(stock_symbol_df, predict_date)
+    predict_df_pre['PREDICT'] = True
+    
+    # Load Data ......
     loc_data = sam_load_data(data_begin=periods['DATA_BEGIN'],
                              data_end=periods['DATA_END'],
                              stock_symbol=stock_symbol)    
     
     
-    # Bug, predict_period的長度和data_period太接近時會出錯
-    loc_data['PRICE_PRE'] = loc_data \
-                            .groupby('STOCK_SYMBOL')['CLOSE'] \
-                            .shift(predict_period)
+    loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+        .reset_index(drop=True)
     
+    # Add predict Data ......
+    loc_predict_df = loc_data.merge(predict_df_pre, how='outer',
+                                    on=['STOCK_SYMBOL', 'WORK_DATE'])
+    
+    loc_predict_df = loc_predict_df \
+                        .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+                        .reset_index(drop=True)
+    
+    
+    loc_data_shift = cbyz.df_add_shift_data(df=loc_predict_df, 
+                                            cols=['CLOSE', 'VOLUME'], 
+                                            shift=predict_period,
+                                            group_key=['STOCK_SYMBOL'],
+                                            suffix='_PRE', remove_na=False)
+            
+    # Bug, predict_period的長度和data_period太接近時會出錯
+    # Update, add as function   
+    model_x = loc_data_shift['SHIFT_COLS']
+    model_y = ['CLOSE']
 
-    model_data = loc_data[~loc_data['PRICE_PRE'].isna()]
+    
+    loc_model_data = loc_data_shift['DF'].dropna(subset=model_x)
 
 
     # Predict data ......
-    predict_data_pre = cbyz.df_add_rank(df=loc_data,
+    predict_data_pre = cbyz.df_add_rank(df=loc_model_data,
                                        group_key='STOCK_SYMBOL',
                                        value='WORK_DATE',
                                        reverse=True)
@@ -191,17 +224,12 @@ def get_model_data(data_end=None, data_begin=None,
     predict_data = predict_data_pre[(predict_data_pre['RANK']>=0) \
                                   & (predict_data_pre['RANK']<predict_period)]
     
-    # Date
-    predict_date = cbyz.time_get_seq(begin_date=periods['PREDICT_BEGIN'],
-                                      periods=predict_period,
-                                      unit='d', simplify_date=True)
-        
-    predict_date = predict_date['WORK_DATE'].tolist()
-    
-    
-    export_dict = {'MODEL_DATA':model_data,
+
+    export_dict = {'MODEL_DATA':loc_model_data,
                    'PRECIDT_DATA':predict_data,
-                   'PRECIDT_DATE':predict_date}
+                   'PRECIDT_DATE':predict_date,
+                   'MODEL_X':model_x,
+                   'MODEL_Y':model_y}
     
     return export_dict
 
@@ -210,67 +238,68 @@ def get_model_data(data_end=None, data_begin=None,
 
 
 
-
-
-def model_1(model_data, predict_data, remove_none=True):
+def model_1(model_data, predict_data, predict_date, model_x, model_y,
+            remove_none=True):
     '''
     Linear regression
     '''
+    
     from sklearn.linear_model import LinearRegression
     
- 
         
     # Model ........
     model_info = pd.DataFrame()
-    predict_results = pd.DataFrame()
+    results = pd.DataFrame()
     
     for i in range(0, len(stock_symbol)):
         
         cur_symbol = stock_symbol[i]
-        # print(i)
+        
+        temp_data = model_data[
+            model_data['STOCK_SYMBOL']==cur_symbol] \
+            .reset_index(drop=True)
+
+
+        temp_predict_data = temp_data[temp_data['PREDICT']==True]
+        predict_x = temp_predict_data[model_x]
+        
+        
+        temp_data = temp_data[temp_data['PREDICT'].isna()]
+
+        x = temp_data[model_x]
+        y = temp_data[model_y]      
+        
     
-        # Model .........
-        # Update, doesn't need reshape with multiple features.
-        
-        
-        x = cbyz.ml_conv_to_nparray(model_data['PRICE_PRE'])
-        
-        y = model_data['CLOSE'].to_numpy()
+        x_train, x_test, y_train, y_test = train_test_split(x, y)
         
         reg = LinearRegression().fit(x, y)
-        
         reg.score(x, y)
         reg.coef_
         reg.intercept_
     
     
-        # predict ......
-        temp_predict = predict_data[
-            predict_data['STOCK_SYMBOL']==cur_symbol]
+        # predict ......      
+        preds_test = reg.predict(x_test)  
+        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
         
         
-        temp_predict = cbyz.ml_conv_to_nparray(temp_predict['CLOSE'])       
-        temp_results = reg.predict(temp_predict)    
+        preds = reg.predict(predict_x)            
         
-        
-        # print(stock_symbol[i])
-        # print(predict_date)
-        # print(temp_results)
-        
+
         # ...
-        temp_df = pd.DataFrame(data={'WORK_DATE':predict_date,
-                                     'CLOSE':temp_results})
-        temp_df['STOCK_SYMBOL'] = cur_symbol
+        new_results = predict_date.copy()
+        new_results['CLOSE'] = preds
+        new_results['STOCK_SYMBOL'] = cur_symbol
+        results = results.append(new_results)        
         
-        predict_results = predict_results.append(temp_df)
-        
+
     
     # Reorganize ------
-    cols = ['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']        
-    predict_results = predict_results[cols]
+    results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
+                .reset_index(drop=True)
 
     return_dict = {'MODEL_INFO':model_info,
-                   'RESULTS':predict_results}
+                   'RESULTS':results}
 
     return return_dict
 
@@ -278,65 +307,42 @@ def model_1(model_data, predict_data, remove_none=True):
 # ................
     
 
-def model_2(data=None, data_end=None, data_begin=None, 
-            data_period=150, predict_end=None, predict_period=15,
-            stock_symbol=['0050', '0056'],
-              remove_none=True):
+def model_2(model_data, predict_data, predict_date, model_x, model_y, 
+            remove_none=True):
     '''
     XGBoost
     https://www.datacamp.com/community/tutorials/xgboost-in-python
     '''
     
     import xgboost as xgb    
-    from sklearn.model_selection import train_test_split
-    from sklearn.metrics import mean_squared_error
-    
+   
 
-    periods = cbyz.date_get_period(data_begin=data_begin, 
-                                 data_end=data_end, 
-                                 data_period=data_period,
-                                 predict_end=predict_end, 
-                                 predict_period=predict_period)
-    
-
-    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
-                             end_date=periods['DATA_END'],
-                             stock_symbol=stock_symbol)    
-
-
-    # Bug, predict_period的長度和data_period太接近時會出錯
-    # Update, build PRICE_PRE as function
-    loc_data['PRICE_PRE'] = loc_data \
-        .groupby('STOCK_SYMBOL')['CLOSE'] \
-                            .shift(predict_period)
-                            
-    loc_data['VOLUME_PRE'] = loc_data \
-        .groupby('STOCK_SYMBOL')['VOLUME'] \
-                            .shift(predict_period)                            
-    
-    model_data = loc_data[~loc_data['PRICE_PRE'].isna()]    
-    
-    
     # ......
     results = pd.DataFrame()
     features = pd.DataFrame()
-    mse = pd.DataFrame()
+    rmse = pd.DataFrame()
     
     
     for i in range(len(stock_symbol)):
         
+        cur_symbol = stock_symbol[i]
         
         temp_data = model_data[
-            model_data['STOCK_SYMBOL']==stock_symbol[i]] \
+            model_data['STOCK_SYMBOL']==cur_symbol] \
             .reset_index(drop=True)
 
 
-        # Update, set x as variables
-        X = temp_data[['PRICE_PRE', 'VOLUME_PRE']]
-        y = temp_data['CLOSE']      
+        temp_predict_data = temp_data[temp_data['PREDICT']==True]
+        predict_x = temp_predict_data[model_x]
+        
+        
+        temp_data = temp_data[temp_data['PREDICT'].isna()]
+
+        x = temp_data[model_x]
+        y = temp_data[model_y]      
         
     
-        X_train, X_test, y_train, y_test = train_test_split(X, y)
+        x_train, x_test, y_train, y_test = train_test_split(x, y)
         
         regressor = xgb.XGBRegressor(
             n_estimators=100,
@@ -346,45 +352,51 @@ def model_2(data=None, data_end=None, data_begin=None,
         )
         
 
-        regressor.fit(X_train, y_train)
+        regressor.fit(x_train, y_train)
         
         # Feature Importance ......
-        importance_dict = {'FEATURES':list(X.columns),
+        importance_dict = {'FEATURES':list(x.columns),
                            'IMPORTANCE':regressor.feature_importances_}
         
         new_features = pd.DataFrame(importance_dict)    
-        new_features['STOCK_SYMBOL'] = stock_symbol[i]
+        new_features['STOCK_SYMBOL'] = cur_symbol
         
         features = features.append(new_features)
 
 
+        # Test Group ......
+        preds_test = regressor.predict(x_test)
+        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
+
+
         # Prediction ......
-        y_pred = regressor.predict(X_test)
+        preds = regressor.predict(predict_x)
         
-        new_results = pd.DataFrame({'CLOSE':y_pred})
-        new_results['STOCK_SYMBOL'] = stock_symbol[i]
+        new_results = predict_date.copy()
+        new_results['CLOSE'] = preds
+        new_results['STOCK_SYMBOL'] = cur_symbol
         results = results.append(new_results)
         
         
-        # MSE(或RMSE？) ......
-        new_mse = pd.DataFrame({'STOCK_SYMBOL':[stock_symbol[i]],
-                                'MSE':[mean_squared_error(y_test, y_pred)]})
+        # RMSE ......
+        new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
+                                'RMSE':[new_rmse]})
         
-        mse = mse.append(new_mse)
+        rmse = rmse.append(new_rmse_df)
         
 
 
-    results = results[['STOCK_SYMBOL', 'CLOSE']] \
+    results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
                 .reset_index(drop=True)
                 
     features = features[['STOCK_SYMBOL', 'FEATURES', 'IMPORTANCE']] \
                 .reset_index(drop=True)
                 
-    mse = mse.reset_index(drop=True)
+    rmse = rmse.reset_index(drop=True)
 
     return_dict = {'RESULTS':results,
                    'FEATURES':features,
-                   'MSE':mse} 
+                   'RMSE':rmse} 
 
     return return_dict
 
@@ -453,17 +465,20 @@ def master(data_begin=None, data_end=None,
     # 2385群光
     
     
-    
-        
     data_raw = get_model_data(data_end=data_end, data_begin=data_begin, 
                               data_period=data_period, 
                               predict_end=predict_end, 
                               predict_period=predict_period,
                               stock_symbol=stock_symbol)
     
+    # Update, set to global variables?
     model_data = data_raw['MODEL_DATA']
     predict_data = data_raw['PRECIDT_DATA']
     predict_date = data_raw['PRECIDT_DATE']
+    model_x = data_raw['MODEL_X']
+    model_y = data_raw['MODEL_Y']    
+    
+    
     
     # global analyze_results
     # analyze_results = analyze_center(data=stock_data)
@@ -483,17 +498,31 @@ def master(data_begin=None, data_end=None,
     
     global model1_results
     model1_results = model_1(model_data=model_data, predict_data=predict_data,
+                             predict_date=predict_date,
+                             model_x=model_x, model_y=model_y,
                              remove_none=True)
     
     
     global model2_results
-    model2_results = model_2(data=None, data_end=None, data_begin=begin_date, 
-                             data_period=150, predict_end=None, 
-                             predict_period=15,
-                             stock_symbol=stock_symbol,
+    model2_results = model_2(model_data=model_data, predict_data=predict_data,
+                             predict_date=predict_date,
+                             model_x=model_x, model_y=model_y,
                              remove_none=True)    
     
+    
     return ''
+
+
+
+data_begin=20171001
+data_end=20191231
+data_period=None
+predict_end=None
+predict_period=30
+stock_symbol=['2301', '2474', '1714', '2385']
+
+
+
 
 
 
@@ -569,18 +598,9 @@ def model_template(data_end, data_begin=None, data_period=150,
 #                              predict_period=10)
     
 
-data_begin=20191201
-data_end=20191231
-data_period=None
-predict_end=None
-predict_period=10
-stock_symbol=['2301', '2474', '1714', '2385']
 
 
 
-
-begin_date=20191201
-end_date=20191231
 
 
 def select_stock():
