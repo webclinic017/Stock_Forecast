@@ -154,6 +154,13 @@ def get_model_data(data_begin=None, data_end=None,
                    stock_symbol=[]):
     
     
+    today = cbyz.get_time_serial()
+    
+    if today < data_end:
+        msg = "sam.get_model_data - " + str(data_end) + ' exceed today.'
+        print(msg)
+        return msg
+    
     # 為了避免執行df_add_shift_data，data_begin變成NA而被刪除，先將data_begin往前推
     # N天，且為了避免遇到假日，再往前推20天。
     data_begin_new = cbyz.date_cal(data_begin, amount=-predict_period-20,
@@ -638,6 +645,7 @@ def select_stock():
 # 00:28 Lien 連祥宇 我剛剛想了一下 目前有個小問題。公式可能需要設一下時間差。台股一天漲幅最大10啪 如果漲停 按你的公式 他會回跌2趴的時候出場。可是如果只有漲2趴 回跌0.4趴的時候你的公式就會出場賣出 可是一般同日買賣 0.4啪算是很平常的小波動。又如當日2啪跌到1啪 是很正常的波動範圍 可是2啪跌到1啪已經是回檔5成了
 # 00:29 Lien 連祥宇 所以我在想是否兩最高價之間需要設立時間差？ 如每日計算一次之類的（我個人覺得每日還算太頻繁）否著你會過度交易 一天進出買賣100次之類的 手續費會直接讓你賠大錢
 # 00:31 Lien 連祥宇 先睡了 做夢時b波有助於思考
+
 
 
 

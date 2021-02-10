@@ -138,7 +138,7 @@ def get_stock_fee():
 
 def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None, 
                 predict_period=15, backtest_times=5,
-                roi_base=0.03, stop_loss=0.8):
+                roi_base=0.03, stop_loss=0.9):
     
 
 
@@ -163,6 +163,7 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
     # Work area ----------
     model_list = sam.get_model_list()
     buy_signal = pd.DataFrame()
+    error_msg = []
     
     
     # Date .........
@@ -182,7 +183,7 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
         predict_end = date_period['PREDICT_END']
 
         
-        
+        # Update, transfer this model out side of loop.
         data_raw = sam.get_model_data(data_begin=data_begin,
                                       data_end=data_end,
                                       data_period=None, 
@@ -190,13 +191,17 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
                                       predict_period=predict_period,
                                       stock_symbol=target_symbol)
         
+        if isinstance(data_raw, str) :
+            error_msg.append(data_raw)
+            continue
+        
+        
         # Update, set to global variables?
         model_data = data_raw['MODEL_DATA']
         predict_data = data_raw['PRECIDT_DATA']
         predict_date = data_raw['PRECIDT_DATE']
         model_x = data_raw['MODEL_X']
         model_y = data_raw['MODEL_Y']            
-
 
 
         # Buy Price ......
@@ -606,7 +611,7 @@ if __name__ == '__main__':
 # roi_base=0.015
     
     
-# begin_date = 20190102
+# begin_date = 20170102
 # days=60
 # volume=None
 # budget=None
