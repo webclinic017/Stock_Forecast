@@ -149,12 +149,18 @@ def get_sell_signal(data, hold_stocks=None):
 
 
 
-def get_model_data(data_end=None, data_begin=None, 
+def get_model_data(data_begin=None, data_end=None,
                    data_period=150, predict_end=None, predict_period=15,
                    stock_symbol=[]):
     
+    
+    # 為了避免執行df_add_shift_data，data_begin變成NA而被刪除，先將data_begin往前推
+    # N天，且為了避免遇到假日，再往前推20天。
+    data_begin_new = cbyz.date_cal(data_begin, amount=-predict_period-20,
+                               unit='d')
 
-    test_data = ar.stk_test_data_period(data_begin=data_begin, 
+
+    test_data = ar.stk_test_data_period(data_begin=data_begin_new, 
                                  data_end=data_end, 
                                  data_period=data_period,
                                  predict_end=predict_end, 
@@ -182,6 +188,7 @@ def get_model_data(data_end=None, data_begin=None,
     predict_df_pre = cbyz.df_cross_join(stock_symbol_df, predict_date)
     predict_df_pre['PREDICT'] = True
     
+    
     # Load Data ......
     loc_data = sam_load_data(data_begin=periods['DATA_BEGIN'],
                              data_end=periods['DATA_END'],
@@ -205,6 +212,7 @@ def get_model_data(data_end=None, data_begin=None,
                                             shift=predict_period,
                                             group_key=['STOCK_SYMBOL'],
                                             suffix='_PRE', remove_na=False)
+    
             
     # Bug, predict_period的長度和data_period太接近時會出錯
     # Update, add as function   
@@ -212,7 +220,10 @@ def get_model_data(data_end=None, data_begin=None,
     model_y = ['CLOSE']
 
     
+    # Model Data
     loc_model_data = loc_data_shift['DF'].dropna(subset=model_x)
+    loc_model_data = loc_model_data[loc_model_data['WORK_DATE']>=data_begin] \
+                        .reset_index(drop=True)
 
 
     # Predict data ......
@@ -465,7 +476,8 @@ def master(data_begin=None, data_end=None,
     # 2385群光
     
     
-    data_raw = get_model_data(data_end=data_end, data_begin=data_begin, 
+    data_raw = get_model_data(data_begin=data_begin,
+                              data_end=data_end,
                               data_period=data_period, 
                               predict_end=predict_end, 
                               predict_period=predict_period,

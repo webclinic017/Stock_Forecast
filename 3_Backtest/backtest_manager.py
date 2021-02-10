@@ -140,6 +140,8 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
                 predict_period=15, backtest_times=5,
                 roi_base=0.03, stop_loss=0.8):
     
+
+
     
     # .......
     
@@ -149,6 +151,13 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
                                      simplify_date=True)
     
     loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
+
+
+    # ......
+    
+    
+
+
 
     
     # Work area ----------
@@ -173,17 +182,32 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
         predict_end = date_period['PREDICT_END']
 
         
-        # ......
-        # Bug, end_date可能沒有開盤，導致buy_price為空值
-        real_data = btm_load_data(begin_date=data_begin,
-                                  end_date=data_end)
         
-        real_data = real_data.drop(['HIGH', 'LOW'], axis=1)        
+        data_raw = sam.get_model_data(data_begin=data_begin,
+                                      data_end=data_end,
+                                      data_period=None, 
+                                      predict_end=predict_end, 
+                                      predict_period=predict_period,
+                                      stock_symbol=target_symbol)
         
-    
-        # Buy Price
+        # Update, set to global variables?
+        model_data = data_raw['MODEL_DATA']
+        predict_data = data_raw['PRECIDT_DATA']
+        predict_date = data_raw['PRECIDT_DATE']
+        model_x = data_raw['MODEL_X']
+        model_y = data_raw['MODEL_Y']            
+
+
+
+        # Buy Price ......
         # Bug, 檢查這一段邏輯有沒有錯
-        buy_price = real_data[real_data['WORK_DATE']==data_begin] \
+        
+        # Bug, end_date可能沒有開盤，導致buy_price為空值
+        # real_data = btm_load_data(begin_date=data_begin,
+        #                           end_date=data_end)
+        
+        # real_data = real_data.drop(['HIGH', 'LOW'], axis=1)            
+        buy_price = model_data[model_data['WORK_DATE']==data_begin] \
                     .rename(columns={'CLOSE':'BUY_PRICE'}) 
             
             
@@ -192,11 +216,11 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
     
     
         if len(buy_price) == 0:
-            
             print(str(loc_time_seq[i]) + ' without data.')
             continue
 
-    
+
+        
         # Model ......
         for j in range(0, len(model_list)):
 
@@ -208,11 +232,11 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
             # (2) Add data
             
             # global model_results_raw
-            model_results_raw = cur_model(data_begin=data_begin,
-                                          data_end=data_end,
-                                          stock_symbol=target_symbol,
-                                          predict_period=predict_period,
-                                          remove_none=False)                
+            model_results_raw = cur_model(model_data=model_data, 
+                                          predict_data=predict_data,
+                                          predict_date=predict_date,
+                                          model_x=model_x, model_y=model_y,
+                                          remove_none=True)                
             
             
             
@@ -237,7 +261,98 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
             temp_results['PREDICT_END'] = predict_end
             temp_results['BACKTEST_ID'] = i
             
-            buy_signal = buy_signal.append(temp_results)
+            buy_signal = buy_signal.append(temp_results)        
+        
+        
+        
+        
+        
+        
+        
+        
+
+
+
+
+
+
+
+
+
+
+        
+        # # ......
+        # # Bug, end_date可能沒有開盤，導致buy_price為空值
+        # real_data = btm_load_data(begin_date=data_begin,
+        #                           end_date=data_end)
+        
+        # real_data = real_data.drop(['HIGH', 'LOW'], axis=1)        
+        
+    
+        # # Buy Price
+        # # Bug, 檢查這一段邏輯有沒有錯
+        # buy_price = real_data[real_data['WORK_DATE']==data_begin] \
+        #             .rename(columns={'CLOSE':'BUY_PRICE'}) 
+            
+            
+        # buy_price = buy_price[['STOCK_SYMBOL', 'BUY_PRICE']] \
+        #             .reset_index(drop=True)
+    
+    
+        # if len(buy_price) == 0:
+            
+        #     print(str(loc_time_seq[i]) + ' without data.')
+        #     continue
+
+    
+        # # Model ......
+        # for j in range(0, len(model_list)):
+
+        #     cur_model = model_list[j]
+            
+        #     # Model results .......
+        #     # (1) Update, should deal with multiple signal issues.
+        #     #     Currently, only consider the first signal.
+        #     # (2) Add data
+            
+        #     # global model_results_raw
+        #     model_results_raw = cur_model(data_begin=data_begin,
+        #                                   data_end=data_end,
+        #                                   stock_symbol=target_symbol,
+        #                                   predict_period=predict_period,
+        #                                   remove_none=False)                
+            
+            
+            
+        #     temp_results = model_results_raw['RESULTS']
+        #     temp_results = temp_results.merge(buy_price, 
+        #                                         how='left',
+        #                                         on='STOCK_SYMBOL')
+            
+            
+        #     temp_results['ROI'] = (temp_results['CLOSE'] \
+        #                             - temp_results['BUY_PRICE']) \
+        #                             / temp_results['BUY_PRICE']
+
+
+        #     temp_results = temp_results[temp_results['ROI'] >= roi_base]
+        #     # \
+        #     #     .drop_duplicates(subset='STOCK_SYMBOL')
+            
+            
+        #     temp_results['MODEL'] = cur_model.__name__
+        #     temp_results['PREDICT_BEGIN'] = predict_begin
+        #     temp_results['PREDICT_END'] = predict_end
+        #     temp_results['BACKTEST_ID'] = i
+            
+        #     buy_signal = buy_signal.append(temp_results)
+            
+            
+            
+            
+            
+            
+            
             
             
     
@@ -419,7 +534,6 @@ def btm_add_hist_data():
 
 
 
-
 def master(begin_date=20190401, periods=5, stock_symbol=None,
            signal=None, budget=None, split_budget=False):
     '''
@@ -499,3 +613,6 @@ if __name__ == '__main__':
 # roi_base = 0.02    
     
     
+
+
+
