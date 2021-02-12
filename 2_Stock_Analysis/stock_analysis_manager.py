@@ -161,26 +161,35 @@ def get_model_data(data_begin=None, data_end=None,
         print(msg)
         return msg
     
+    
+    test_data = ar.stk_test_data_period(data_begin=data_begin, 
+                                        data_end=data_end, 
+                                        data_period=data_period,
+                                        predict_end=predict_end, 
+                                        predict_period=predict_period,
+                                        stock_type='tw',
+                                        local=local)
+    
+    
+    data_begin = test_data['DATA_BEGIN']
+    data_end = test_data['DATA_END']
+    predict_begin = test_data['PREDICT_BEGIN']
+    predict_end = test_data['PREDICT_END']    
+    
+    
+    
     # 為了避免執行df_add_shift_data，data_begin變成NA而被刪除，先將data_begin往前推
     # N天，且為了避免遇到假日，再往前推20天。
-    data_begin_new = cbyz.date_cal(data_begin, amount=-predict_period-20,
-                               unit='d')
+    temp_data_begin = cbyz.date_cal(data_begin,
+                                    amount=-predict_period-20,
+                                    unit='d')
 
 
-    test_data = ar.stk_test_data_period(data_begin=data_begin_new, 
-                                 data_end=data_end, 
-                                 data_period=data_period,
-                                 predict_end=predict_end, 
-                                 predict_period=predict_period,
-                                 stock_type='tw',
-                                 local=local)
-    
-    
-    periods = cbyz.date_get_period(data_begin=test_data['DATA_BEGIN'], 
-                                   data_end=test_data['DATE_END'], 
+    periods = cbyz.date_get_period(data_begin=temp_data_begin, 
+                                   data_end=data_end, 
                                    data_period=None,
-                                   predict_end=test_data['PREDICT_BEGIN'], 
-                                   predict_period=test_data['PREDICT_END'])
+                                   predict_end=predict_begin, 
+                                   predict_period=predict_end)
     
     # Date ......
     predict_date = cbyz.time_get_seq(begin_date=periods['PREDICT_BEGIN'],
@@ -234,20 +243,23 @@ def get_model_data(data_begin=None, data_end=None,
 
 
     # Predict data ......
-    predict_data_pre = cbyz.df_add_rank(df=loc_model_data,
-                                       group_key='STOCK_SYMBOL',
-                                       value='WORK_DATE',
-                                       reverse=True)
+    # predict_data_pre = cbyz.df_add_rank(df=loc_model_data,
+    #                                    group_key='STOCK_SYMBOL',
+    #                                    value='WORK_DATE',
+    #                                    reverse=True)
         
-    predict_data = predict_data_pre[(predict_data_pre['RANK']>=0) \
-                                  & (predict_data_pre['RANK']<predict_period)]
+    # predict_data = predict_data_pre[(predict_data_pre['RANK']>=0) \
+    #                               & (predict_data_pre['RANK']<predict_period)]
     
+    predict_data = 'predict_data will not be used?'
 
     export_dict = {'MODEL_DATA':loc_model_data,
                    'PRECIDT_DATA':predict_data,
                    'PRECIDT_DATE':predict_date,
                    'MODEL_X':model_x,
-                   'MODEL_Y':model_y}
+                   'MODEL_Y':model_y,
+                   'DATA_BEGIN':data_begin,
+                   'DATA_END':data_end}
     
     return export_dict
 
@@ -639,12 +651,6 @@ def select_stock():
 
 # Filter with 股本 and 成交量
 
-
-
-
-# 00:28 Lien 連祥宇 我剛剛想了一下 目前有個小問題。公式可能需要設一下時間差。台股一天漲幅最大10啪 如果漲停 按你的公式 他會回跌2趴的時候出場。可是如果只有漲2趴 回跌0.4趴的時候你的公式就會出場賣出 可是一般同日買賣 0.4啪算是很平常的小波動。又如當日2啪跌到1啪 是很正常的波動範圍 可是2啪跌到1啪已經是回檔5成了
-# 00:29 Lien 連祥宇 所以我在想是否兩最高價之間需要設立時間差？ 如每日計算一次之類的（我個人覺得每日還算太頻繁）否著你會過度交易 一天進出買賣100次之類的 手續費會直接讓你賠大錢
-# 00:31 Lien 連祥宇 先睡了 做夢時b波有助於思考
 
 
 

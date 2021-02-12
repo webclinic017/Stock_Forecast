@@ -13,6 +13,11 @@ Created on Sat Nov 14 17:23:09 2020
 
 
 
+# 在台灣投資股票的交易成本包含手續費與交易稅，
+# 手續費公定價格是0.1425%，買進和賣出時各要收取一次，
+# 股票交易稅是0.3%，如果投資ETF交易稅是0.1%，僅在賣出時收取。
+
+
 
 # % 讀取套件 -------
 import pandas as pd
@@ -135,29 +140,19 @@ def get_stock_fee():
 # roi_base = 0.02
     
 
-
-def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None, 
+def btm_predict(begin_date, data_period=90, interval=30,
+                volume=1000, budget=None, 
                 predict_period=15, backtest_times=5,
                 roi_base=0.03, stop_loss=0.9):
     
 
-
-    
     # .......
-    
     loc_time_seq = cbyz.time_get_seq(begin_date=begin_date,
                                      periods=backtest_times,
-                                     unit='d', skip=model_data_period,
+                                     unit='d', skip=interval,
                                      simplify_date=True)
     
     loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
-
-
-    # ......
-    
-    
-
-
 
     
     # Work area ----------
@@ -170,26 +165,34 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
     for i in range(0, len(loc_time_seq)):
     
 
-        date_period = cbyz.date_get_period(data_begin=loc_time_seq[i], 
+        date_period = cbyz.date_get_period(data_begin=loc_time_seq[i],
                                            data_end=None, 
-                                           data_period=model_data_period,
+                                           data_period=data_period,
                                            predict_end=None, 
                                            predict_period=predict_period)        
         
 
-        data_begin = date_period['DATA_BEGIN']
-        data_end = date_period['DATA_END']
+        data_begin_pre = date_period['DATA_BEGIN']
+        data_end_pre = date_period['DATA_END']
         predict_begin = date_period['PREDICT_BEGIN']
         predict_end = date_period['PREDICT_END']
 
-        
+
+
+        # (1) data_begin and data_end may be changed here.        
         # Update, transfer this model out side of loop.
-        data_raw = sam.get_model_data(data_begin=data_begin,
-                                      data_end=data_end,
+        # Update，增加df_normalize
+        
+        data_raw = sam.get_model_data(data_begin=data_begin_pre,
+                                      data_end=data_end_pre,
                                       data_period=None, 
                                       predict_end=predict_end, 
                                       predict_period=predict_period,
                                       stock_symbol=target_symbol)
+        
+        data_begin = data_raw['DATA_BEGIN']
+        data_end = data_raw['DATA_END']        
+        
         
         if isinstance(data_raw, str) :
             error_msg.append(data_raw)
@@ -221,7 +224,7 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
     
     
         if len(buy_price) == 0:
-            print(str(loc_time_seq[i]) + ' without data.')
+            print(str(data_begin) + ' without data.')
             continue
 
 
@@ -234,7 +237,7 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
             # Model results .......
             # (1) Update, should deal with multiple signal issues.
             #     Currently, only consider the first signal.
-            # (2) Add data
+            # (2) predict_data doesn't use.
             
             # global model_results_raw
             model_results_raw = cur_model(model_data=model_data, 
@@ -269,97 +272,6 @@ def btm_predict(begin_date, model_data_period=85, volume=1000, budget=None,
             buy_signal = buy_signal.append(temp_results)        
         
         
-        
-        
-        
-        
-        
-        
-
-
-
-
-
-
-
-
-
-
-        
-        # # ......
-        # # Bug, end_date可能沒有開盤，導致buy_price為空值
-        # real_data = btm_load_data(begin_date=data_begin,
-        #                           end_date=data_end)
-        
-        # real_data = real_data.drop(['HIGH', 'LOW'], axis=1)        
-        
-    
-        # # Buy Price
-        # # Bug, 檢查這一段邏輯有沒有錯
-        # buy_price = real_data[real_data['WORK_DATE']==data_begin] \
-        #             .rename(columns={'CLOSE':'BUY_PRICE'}) 
-            
-            
-        # buy_price = buy_price[['STOCK_SYMBOL', 'BUY_PRICE']] \
-        #             .reset_index(drop=True)
-    
-    
-        # if len(buy_price) == 0:
-            
-        #     print(str(loc_time_seq[i]) + ' without data.')
-        #     continue
-
-    
-        # # Model ......
-        # for j in range(0, len(model_list)):
-
-        #     cur_model = model_list[j]
-            
-        #     # Model results .......
-        #     # (1) Update, should deal with multiple signal issues.
-        #     #     Currently, only consider the first signal.
-        #     # (2) Add data
-            
-        #     # global model_results_raw
-        #     model_results_raw = cur_model(data_begin=data_begin,
-        #                                   data_end=data_end,
-        #                                   stock_symbol=target_symbol,
-        #                                   predict_period=predict_period,
-        #                                   remove_none=False)                
-            
-            
-            
-        #     temp_results = model_results_raw['RESULTS']
-        #     temp_results = temp_results.merge(buy_price, 
-        #                                         how='left',
-        #                                         on='STOCK_SYMBOL')
-            
-            
-        #     temp_results['ROI'] = (temp_results['CLOSE'] \
-        #                             - temp_results['BUY_PRICE']) \
-        #                             / temp_results['BUY_PRICE']
-
-
-        #     temp_results = temp_results[temp_results['ROI'] >= roi_base]
-        #     # \
-        #     #     .drop_duplicates(subset='STOCK_SYMBOL')
-            
-            
-        #     temp_results['MODEL'] = cur_model.__name__
-        #     temp_results['PREDICT_BEGIN'] = predict_begin
-        #     temp_results['PREDICT_END'] = predict_end
-        #     temp_results['BACKTEST_ID'] = i
-            
-        #     buy_signal = buy_signal.append(temp_results)
-            
-            
-            
-            
-            
-            
-            
-            
-            
     
     if len(buy_signal) == 0:
         print('bt_buy_signal return 0 row.')
@@ -482,8 +394,8 @@ def btm_add_hist_data():
         temp_symbol = temp_symbol['STOCK_SYMBOL'].tolist()  
             
             
-        new_data = ar.stk_get_data(begin_date=temp_begin, 
-                                   end_date=temp_end, 
+        new_data = ar.stk_get_data(data_begin=temp_begin, 
+                                   data_end=temp_end, 
                                    stock_type='tw', 
                                    stock_symbol=temp_symbol, 
                                    local=local)           
@@ -534,6 +446,12 @@ def btm_add_hist_data():
                                       'PREDICT_END'])    
     
     
+    # Reorganize ......
+    backtest_main = backtest_main \
+                    .sort_values(by=['STOCK_SYMBOL', 'BUY_DATE']) \
+                    .reset_index(drop=True)
+    
+    
     return ''
 
 
@@ -555,7 +473,6 @@ def master(begin_date=20190401, periods=5, stock_symbol=None,
     
     
     
-    
     # target_symbol
     # (1) Bug, top=150時會出錯
     # stock_symbol = ['0050', '0056']
@@ -568,7 +485,7 @@ def master(begin_date=20190401, periods=5, stock_symbol=None,
    
     # forecast_results
     btm_predict(begin_date=begin_date,
-                 model_data_period=180, volume=1000, 
+                 data_period=180, volume=1000, 
                  budget=None, predict_period=14, 
                  backtest_times=5)
     
@@ -576,10 +493,29 @@ def master(begin_date=20190401, periods=5, stock_symbol=None,
     # backtest_main
     btm_add_hist_data()
     
+    
+    # Update 1，在沒有sell_signal的情況下繼續放著，總收益會是多少？
+
+
+    # Update 2
+    # 00:28 Lien 連祥宇 我剛剛想了一下 目前有個小問題。公式可能需要設一下時間差。台股一天漲幅
+    # 最大10啪 如果漲停 按你的公式 他會回跌2趴的時候出場。可是如果只有漲2趴 回跌0.4趴的時候
+    # 你的公式就會出場賣出 可是一般同日買賣 0.4啪算是很平常的小波動。又如當日2啪跌到1啪
+    # 是很正常的波動範圍 可是2啪跌到1啪已經是回檔5成了
+    # 00:29 Lien 連祥宇 所以我在想是否兩最高價之間需要設立時間差？ 
+    # 如每日計算一次之類的（我個人覺得每日還算太頻繁）否著你會過度交易 一天進出買賣100次之類的 手續費會直接讓你賠大錢
+    
+    
+    # Update 3, how to generate action?
+    # Update 4, record rate of win
+    
+    # Update 5, connect Fugle API to get real time data?
+    
+    
     return ''
 
 
-# ..............
+# ..............=
 
 
 def check():
@@ -595,20 +531,6 @@ if __name__ == '__main__':
 
 
 
-# periods=5
-# signal=None
-# budget=None
-# split_budget=False
-# days=60
-# roi_base = 0.02
-# stock_symbol=['0050', '0056']
-# model_data_period=60
-
-
-# volume=1000
-# predict_period=30
-# backtest_times=5
-# roi_base=0.015
     
     
 # begin_date = 20170102
@@ -616,6 +538,15 @@ if __name__ == '__main__':
 # volume=None
 # budget=None
 # roi_base = 0.02    
+# data_period=90
+# interval=30
+# volume=1000
+# budget=None
+# predict_period=15
+# backtest_times=5
+# roi_base=0.03
+# stop_loss=0.9    
+    
     
     
 
