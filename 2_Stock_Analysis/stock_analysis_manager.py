@@ -78,12 +78,14 @@ def initialize(path):
 
 
 
-def sam_load_data(data_begin, data_end=None, period=None, 
-              stock_symbol=None):
+def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None, 
+                  stock_symbol=None, lite=True, full=False):
     '''
     讀取資料及重新整理
     '''
     
+
+            
     
     if stock_symbol == None:
         target = ar.stk_get_list(stock_type='tw', 
@@ -95,11 +97,33 @@ def sam_load_data(data_begin, data_end=None, period=None,
         stock_symbol = target['STOCK_SYMBOL'].tolist()
     
     
-    data_raw = ar.stk_get_data(data_begin=data_begin, data_end=data_end, 
-                               stock_type='tw', stock_symbol=stock_symbol, 
-                               local=local)    
+    if full == True:
+        full_data = ar.stk_get_data(data_begin=None, 
+                            data_end=None, 
+                            stock_type=stock_type, 
+                            stock_symbol=stock_symbol, 
+                            local=local)    
+    else:
+        full_data = pd.DataFrame()
+        
     
-    return data_raw
+
+    if lite == True:
+        lite_data = ar.stk_get_data(data_begin=data_begin, 
+                               data_end=data_end, 
+                               stock_type=stock_type, 
+                               stock_symbol=stock_symbol, 
+                               local=local)    
+    else:
+        lite_data = pd.DataFrame()    
+    
+    
+
+    export_dict = {'DATA':lite_data,
+                   'FULL_DATA':full_data}    
+    
+    
+    return export_dict
 
 
 
@@ -206,10 +230,12 @@ def get_model_data(data_begin=None, data_end=None,
     
     
     # Load Data ......
-    loc_data = sam_load_data(data_begin=periods['DATA_BEGIN'],
-                             data_end=periods['DATA_END'],
-                             stock_symbol=stock_symbol)    
+    loc_data_raw = sam_load_data(data_begin=periods['DATA_BEGIN'],
+                                 data_end=periods['DATA_END'],
+                                 stock_symbol=stock_symbol)    
     
+    
+    loc_data = loc_data_raw['DATA']
     
     loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
         .reset_index(drop=True)
@@ -242,6 +268,13 @@ def get_model_data(data_begin=None, data_end=None,
                         .reset_index(drop=True)
 
 
+    # Normalize ......
+    norm_cols = cbyz.list_join_flatten(model_x, model_y) 
+    loc_model_data_norm = cbyz.df_normalize(df=loc_model_data,
+                                            cols=norm_cols,
+                                            groupby=['STOCK_SYMBOL'])
+
+
     # Predict data ......
     # predict_data_pre = cbyz.df_add_rank(df=loc_model_data,
     #                                    group_key='STOCK_SYMBOL',
@@ -253,13 +286,15 @@ def get_model_data(data_begin=None, data_end=None,
     
     predict_data = 'predict_data will not be used?'
 
-    export_dict = {'MODEL_DATA':loc_model_data,
+    export_dict = {'MODEL_DATA':loc_model_data_norm['RESULTS'],
                    'PRECIDT_DATA':predict_data,
                    'PRECIDT_DATE':predict_date,
                    'MODEL_X':model_x,
                    'MODEL_Y':model_y,
                    'DATA_BEGIN':data_begin,
-                   'DATA_END':data_end}
+                   'DATA_END':data_end,
+                   'NORM_ORIG':loc_model_data_norm['ORIGINAL'],
+                   'NORM_GROUP':loc_model_data_norm['GROUPBY']}
     
     return export_dict
 
@@ -280,6 +315,7 @@ def model_1(model_data, predict_data, predict_date, model_x, model_y,
     # Model ........
     model_info = pd.DataFrame()
     results = pd.DataFrame()
+    rmse = pd.DataFrame()
     
     for i in range(0, len(stock_symbol)):
         
@@ -310,12 +346,9 @@ def model_1(model_data, predict_data, predict_date, model_x, model_y,
     
         # predict ......      
         preds_test = reg.predict(x_test)  
-        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
-        
-        
         preds = reg.predict(predict_x)            
         
-
+        
         # ...
         new_results = predict_date.copy()
         new_results['CLOSE'] = preds
@@ -323,13 +356,20 @@ def model_1(model_data, predict_data, predict_date, model_x, model_y,
         results = results.append(new_results)        
         
 
+        # RMSE ......
+        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
+        new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
+                                'RMSE':[new_rmse]})
+        rmse = rmse.append(new_rmse_df)        
+    
     
     # Reorganize ------
     results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
                 .reset_index(drop=True)
 
-    return_dict = {'MODEL_INFO':model_info,
-                   'RESULTS':results}
+    return_dict = {'RESULTS':results,
+                   'FEATURES':pd.DataFrame(),
+                   'RMSE':rmse} 
 
     return return_dict
 
