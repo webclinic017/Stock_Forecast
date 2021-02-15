@@ -12,6 +12,8 @@ Created on Sat Nov 14 17:23:09 2020
 # 2.Retrieve one symbol historical data to ensure calendar
 
 
+# Trend and associtation
+
 # Add date for sell signal
 # Delete success
 
@@ -27,7 +29,7 @@ Created on Sat Nov 14 17:23:09 2020
 
 
 # Monitoring
-# Trend and associtation
+
 
 
 
