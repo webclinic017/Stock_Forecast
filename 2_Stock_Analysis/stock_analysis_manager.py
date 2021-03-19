@@ -19,6 +19,18 @@ Created on Sat Nov 14 17:23:08 2020
 
 
 
+
+# 每日交易量很難看 不太準 因為有時候會爆大量 有時候很冷門。有時候正常交易 有時候是被當沖炒股
+# 流通性我基本上看股本
+# 台股來說 0-10億小股本股票 流通差。10-100億中型股。破100億算大型股
+
+
+# Dashboard，只跑三年資料
+# Process, select target > analyze > backtest
+# Filter with 股本 and 成交量
+
+
+
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -229,7 +241,9 @@ def get_model_data(data_begin=None, data_end=None,
     predict_df_pre['PREDICT'] = True
     
     
-    # Load Data ......
+    # Load Data ----------
+    
+    # Historical Data ...
     loc_data_raw = sam_load_data(data_begin=periods['DATA_BEGIN'],
                                  data_end=periods['DATA_END'],
                                  stock_symbol=stock_symbol)    
@@ -240,6 +254,12 @@ def get_model_data(data_begin=None, data_end=None,
     loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
         .reset_index(drop=True)
     
+     
+    # Calendar ...
+    calendar = ar.get_calendar(simplify=True)
+    calendar = calendar.drop('WEEK_ID', axis=1)
+    
+    
     # Add predict Data ......
     loc_predict_df = loc_data.merge(predict_df_pre, how='outer',
                                     on=['STOCK_SYMBOL', 'WORK_DATE'])
@@ -249,16 +269,27 @@ def get_model_data(data_begin=None, data_end=None,
                         .reset_index(drop=True)
     
     
+    loc_predict_df = loc_predict_df.merge(calendar, how='left', 
+                                          on='WORK_DATE')
+    
+    
+    # Shift ......
+    shift_cols = ['CLOSE', 'HIGH', 'LOW', 'VOLUME']
+
+    
     loc_data_shift = cbyz.df_add_shift_data(df=loc_predict_df, 
-                                            cols=['CLOSE', 'VOLUME'], 
+                                            cols=shift_cols, 
                                             shift=predict_period,
                                             group_key=['STOCK_SYMBOL'],
                                             suffix='_PRE', remove_na=False)
     
+    
+    var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
+    
             
     # Bug, predict_period的長度和data_period太接近時會出錯
     # Update, add as function   
-    model_x = loc_data_shift['SHIFT_COLS']
+    model_x = loc_data_shift['SHIFT_COLS'] + var_cols
     model_y = ['CLOSE']
 
     
@@ -304,7 +335,7 @@ def get_model_data(data_begin=None, data_end=None,
 
 
 def model_1(model_data, predict_data, predict_date, model_x, model_y,
-            remove_none=True):
+            stock_symbol, remove_none=True):
     '''
     Linear regression
     '''
@@ -378,7 +409,7 @@ def model_1(model_data, predict_data, predict_date, model_x, model_y,
     
 
 def model_2(model_data, predict_data, predict_date, model_x, model_y, 
-            remove_none=True):
+            stock_symbol, remove_none=True):
     '''
     XGBoost
     https://www.datacamp.com/community/tutorials/xgboost-in-python
@@ -484,10 +515,8 @@ def get_model_list(status=[0,1]):
     # (2) List by model historic performance
     # (3) List by function pattern
     
-    # function_list = [model_dev1, model_dev2, model_dev3]
     function_list = [model_1, model_2]
-    
-    
+
     return function_list
 
 
@@ -571,6 +600,7 @@ def master(data_begin=None, data_end=None,
     model1_results = model_1(model_data=model_data, predict_data=predict_data,
                              predict_date=predict_date,
                              model_x=model_x, model_y=model_y,
+                             stock_symbol=stock_symbol,
                              remove_none=True)
     
     
@@ -578,6 +608,7 @@ def master(data_begin=None, data_end=None,
     model2_results = model_2(model_data=model_data, predict_data=predict_data,
                              predict_date=predict_date,
                              model_x=model_x, model_y=model_y,
+                             stock_symbol=stock_symbol,
                              remove_none=True)    
     
     
@@ -585,12 +616,12 @@ def master(data_begin=None, data_end=None,
 
 
 
-data_begin=20171001
-data_end=20191231
-data_period=None
-predict_end=None
-predict_period=30
-stock_symbol=['2301', '2474', '1714', '2385']
+# data_begin=20171001
+# data_end=20191231
+# data_period=None
+# predict_end=None
+# predict_period=30
+# stock_symbol=['2301', '2474', '1714', '2385']
 
 
 
@@ -611,63 +642,7 @@ if __name__ == '__main__':
 
 
 
-# %% Dev ---------
 
-
-def model_template(data_end, data_begin=None, data_period=150,
-              predict_end=None, predict_period=30,
-              stock_symbol=None,
-              remove_none=True):
-    
-    from sklearn.linear_model import LinearRegression
-    
-    periods = cbyz.date_get_period(data_begin=data_begin, 
-                                 data_end=data_end, 
-                                 data_period=data_period,
-                                 predict_end=predict_end, 
-                                 predict_period=predict_period)
-    
-    
-    loc_data = sam_load_data(begin_date=periods['DATA_BEGIN'],
-                         end_date=periods['DATA_END'],
-                         stock_symbol=stock_symbol)    
-    
-    # Model .........
-
-
-    # Reorganize ------
-    model_info = pd.DataFrame()
-    predict_results = pd.DataFrame()
-    
-    cols = ['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']        
-    predict_results = predict_results[cols]
-
-    return_dict = {'MODEL_INFO':model_info,
-                   'RESULTS':predict_results}
-
-    return return_dict
-
-
-
-
-# data_begin = 20200301
-
-# # data_begin=None
-# data_end=None
-# data_period=30
-# predict_end=None
-# predict_period=30
-
-# stock_symbol=['0050', '0056']
-
-
-
-# periods = cbyz.date_get_period(data_begin=20191201, 
-#                              data_end=None, 
-#                              data_period=20191231,
-#                              predict_end=None, 
-#                              predict_period=10)
-    
 
 
 
@@ -679,17 +654,6 @@ def select_stock():
     
     return ''
 
-
-# 每日交易量很難看 不太準 因為有時候會爆大量 有時候很冷門。有時候正常交易 有時候是被當沖炒股
-# 流通性我基本上看股本
-# 台股來說 0-10億小股本股票 流通差。10-100億中型股。破100億算大型股
-
-
-# Dashboard，只跑三年資料
-
-# Process, select target > analyze > backtest
-
-# Filter with 股本 and 成交量
 
 
 

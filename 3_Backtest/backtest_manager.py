@@ -236,6 +236,7 @@ def btm_predict(begin_date, data_period=90, interval=30,
 
         # Buy Price ......
         # Bug, 檢查這一段邏輯有沒有錯
+        # BUG，BUY_PRICE可能有0
         
         # Bug, end_date可能沒有開盤，導致buy_price為空值
         # real_data = btm_load_data(begin_date=data_begin,
@@ -693,13 +694,12 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     
     # Backtest Report ------
     backtest_main = btm_add_hist_data(predict_results=predict_main)
-    
-
 
     
 
     # Action Insights ------
-
+    actions = btm_gen_actions(predict_results=predict_main,
+                              rmse=predict_rmse)
     
 
     # Update 2
@@ -713,44 +713,44 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     
     # Update 3, how to generate action?
     # Update 4, record rate of win
-    
-    # Update 5, connect Fugle API to get real time data?
-    
+        
     
     return ''
 
 
 
-def btm_gen_actions(backtest_data, rmse):
+def btm_gen_actions(predict_results, rmse):
     
-    
-    loc_rmse = rmse.copy()
-    loc_rmse = loc_rmse \
+    loc_rmse = rmse \
                 .groupby(['STOCK_SYMBOL', 'MODEL']) \
                 .aggregate({'RMSE':'mean'}) \
-                .reset_index()
+                .reset_index() \
+                .rename(columns={'RMSE':'RMSE_MEAN'})
+                
     
     
-    loc_rmse['RMSE_MIN'] = loc_rmse \
-                            .groupby('STOCK_SYMBOL')['RMSE'] \
-                            .transform(min)
+    loc_rmse['RMSE_MEAN_MIN'] = loc_rmse['RMSE_MEAN'].min()
+
     
-    loc_rmse = loc_rmse[loc_rmse['RMSE']==loc_rmse['RMSE_MIN']] \
-                .drop(['RMSE', 'RMSE_MIN'], axis=1) \
-                .reset_index(drop=True)
-    
-    loc_rmse['ACTION'] = True
+    loc_rmse.loc[loc_rmse['RMSE_MEAN']==loc_rmse['RMSE_MEAN_MIN'],
+        'ACTION'] = True 
     
     
     # ......
-    Bug, 這裡應該要join predict_results
-    loc_main = backtest_data.merge(loc_rmse, how='left',
+    
+    loc_main = predict_results.merge(loc_rmse, how='left',
                             on=['MODEL', 'STOCK_SYMBOL'])
     
     loc_main = loc_main[loc_main['ACTION']==True]
     
     
-    return ''
+    print('BUG,BUY_PRICE可能有0')
+    
+    
+    return_dict = {'SUMMARY':loc_rmse,
+                   'RESULTS':loc_main}
+    
+    return return_dict
 
 
 

@@ -15,22 +15,28 @@ Created on Tue Feb 18 22:04:08 2020
 """
 Version Note
 1. Add dropdown
+
+2.2 Add dash cache
+
 """
 
 
 # -*- coding: utf-8 -*-
+import os
+
+import pandas as pd
+import sys, arrow
+
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_daq as daq
 from dash.dependencies import Input, Output
-import pandas as pd
-import sys, arrow
 
-#import os
 #import re
 #import numpy as np
 from flask import Flask, request
+from flask_caching import Cache
 
 
 # Worklist
@@ -39,14 +45,17 @@ from flask import Flask, request
 
 # 設定工作目錄 .....
 
-# Local
-path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+local = False
+# local = True
 
 
 
-# Server
-# path = '/home/aronhack/stock_forecast/dashboard'
-# path = '/home/aronhack/stock_analysis_us/dashboard'
+if local == True:
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+else:
+    path = '/home/aronhack/stock_forecast/4_Visualization/Dashboard'
+    # path = '/home/aronhack/stock_analysis_us/dashboard'
+    
 
 
 
@@ -80,9 +89,6 @@ end_date = int(end_date)
 begin_date = begin_date.format('YYYYMMDD')
 begin_date = int(begin_date)
 
-
-local = False
-local = True
 
 
 stock_type = 'us'
@@ -238,6 +244,18 @@ master()
 
 
 app = dash.Dash()
+
+
+if local == False:
+    cache = Cache(app.server, config={
+        # try 'filesystem' if you don't want to setup redis
+        'CACHE_TYPE': 'redis',
+        'CACHE_REDIS_URL': os.environ.get('REDIS_URL', '')
+    })
+    app.config.suppress_callback_exceptions = True
+
+
+
 
 colors = {
     'background': '#f5f5f5',
@@ -396,7 +414,8 @@ def update_output(dropdown_value, btn_max):
     #               } for val in dropdown_value]
         
 
-    figure = [historical_plot, historical_plot]
+    # figure = [historical_plot, historical_plot]
+    figure = [historical_plot]
 
 
     # Debug
@@ -432,23 +451,23 @@ if __name__ == '__main__':
     
     
 
-dict1 = {'VALUE1':1, 'VALUE2':2}
-dict2 = str(dict1)
+# dict1 = {'VALUE1':1, 'VALUE2':2}
+# dict2 = str(dict1)
 
 
-test = ar.df_cross_join(stock_name, remove_same=True)
+# test = ar.df_cross_join(stock_name, remove_same=True)
 
-test = test[['STOCK_SYMBOL_x', 'STOCK_SYMBOL_y']]
-test.columns = ['STOCK_Y', 'STOCK_VAR']
-test['RULE_ID'] = 1
-test['RESULTS'] = dict2
-test['STOCK_Y'] = test['STOCK_Y'].astype(str)
-test = test[['RULE_ID', 'STOCK_Y', 'STOCK_VAR', 'RESULTS']]
-
-
-upload = test.iloc[0:10000, :]
-upload.to_csv(path + '/stock_rule.csv', index=False)
+# test = test[['STOCK_SYMBOL_x', 'STOCK_SYMBOL_y']]
+# test.columns = ['STOCK_Y', 'STOCK_VAR']
+# test['RULE_ID'] = 1
+# test['RESULTS'] = dict2
+# test['STOCK_Y'] = test['STOCK_Y'].astype(str)
+# test = test[['RULE_ID', 'STOCK_Y', 'STOCK_VAR', 'RESULTS']]
 
 
-ar.db_upload(upload, 'stock_rule_tw', True)
+# upload = test.iloc[0:10000, :]
+# upload.to_csv(path + '/stock_rule.csv', index=False)
+
+
+# ar.db_upload(upload, 'stock_rule_tw', True)
 

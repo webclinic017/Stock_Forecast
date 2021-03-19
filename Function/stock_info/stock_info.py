@@ -16,9 +16,26 @@ from bs4 import BeautifulSoup
 
 
 
+
 # Codebase ......
-path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ']
+
+local = True
+local = False
+
+
+if local == True:
+    path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
+                     r'/Users/Aron/Documents/GitHub/Codebase_YZ']
+    
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/stock_info'
+    
+else:
+    path_codebase = [r'/home/aronhack/arsenal']
+    
+    path = '/home/aronhack/stock_forecast/'   
+    
+            
+    
 
 
 for i in path_codebase:    
@@ -34,19 +51,17 @@ import arsenal as ar
 # ..................
 
 
-def initialize():
 
-    # 新增工作資料夾
-    global path_resource, path_function, path_temp, path_export
-    path_resource = path + '/Resource'
-    path_function = path + '/Function'
-    path_temp = path + '/Temp'
-    path_export = path + '/Export'
-    
-    
-    cbyz.os_create_folder(path=[path_resource, path_function, 
-                             path_temp, path_export])        
-    return ''
+# 新增工作資料夾
+path_resource = path + '/Resource'
+path_function = path + '/Function'
+path_temp = path + '/Temp'
+path_export = path + '/Export'
+
+
+cbyz.os_create_folder(path=[path_resource, path_function, 
+                         path_temp, path_export])        
+
 
 
 # .............
@@ -146,17 +161,7 @@ def load_data_us():
 # ...............
 
 
-def master(stock_type='tw', export=False, local=True, update=False):
-    
-     # Path .....
-    global path
-    if local == True:
-        path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/stock_info'
-    else:
-        path = '/home/aronhack/stock_forecast/dashboard'   
-    
-    
-    initialize()
+def master(stock_type='tw', export=False, update=False):
     
     
     if stock_type == 'tw':
