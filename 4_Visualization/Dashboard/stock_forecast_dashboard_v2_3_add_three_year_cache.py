@@ -23,6 +23,8 @@ Version Note
 
 Bug
 1.Dropdown中有空格
+2.因為dash一開始的物件是空的，導致dashboard會先呈現扁平狀態。
+Solution: add sample chart
 
 """
 
@@ -52,7 +54,7 @@ from flask_caching import Cache
 # 設定工作目錄 .....
 
 local = False
-# local = True
+local = True
 
 
 
@@ -259,9 +261,7 @@ if local == False:
         'CACHE_REDIS_URL': os.environ.get('REDIS_URL', '')
     })
     app.config.suppress_callback_exceptions = True
-
-
-
+    
 
 colors = {
     'background': '#f5f5f5',
