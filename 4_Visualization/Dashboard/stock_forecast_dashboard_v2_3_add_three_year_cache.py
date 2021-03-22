@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[2]:
-
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -13,17 +7,23 @@ Created on Tue Feb 18 22:04:08 2020
 """
 
 """
-Version Note
-1. Add dropdown
+Version Note -----
 
+Complete ...
+1. Add dropdown
 2.2 Add dash cache
-2.3 Add three year cache - in progress
+2.3 Add three year cache
+
+In progress
 2.4 Add multiple chart
 
 
-Bug
-1.Dropdown中有空格
-2.因為dash一開始的物件是空的，導致dashboard會先呈現扁平狀態。
+Bug ...
+
+
+Optimization ...
+1.Add loading icon
+因為dash一開始的物件是空的，導致dashboard會先呈現扁平狀態。
 Solution: add sample chart
 
 """
@@ -34,6 +34,7 @@ import os
 
 import pandas as pd
 import sys, arrow
+import datetime
 
 import dash
 import dash_core_components as dcc
@@ -43,7 +44,7 @@ from dash.dependencies import Input, Output
 
 #import re
 #import numpy as np
-from flask import Flask, request
+# from flask import Flask, request
 from flask_caching import Cache
 
 
@@ -54,7 +55,7 @@ from flask_caching import Cache
 # 設定工作目錄 .....
 
 local = False
-local = True
+# local = True
 
 
 
@@ -62,10 +63,7 @@ if local == True:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
 else:
     path = '/home/aronhack/stock_forecast/4_Visualization/Dashboard'
-    # path = '/home/aronhack/stock_analysis_us/dashboard'
     
-
-
 
 
 # Codebase
@@ -86,16 +84,11 @@ import codebase_yz as cbyz
 
 # 手動設定區 -------
 global begin_date, end_date
-end_date = arrow.now()
-begin_date = end_date.shift(months=-6)
-# begin_date = end_date.shift(years=-1)
+end_date = datetime.datetime.now()
+end_date = cbyz.date_simplify(end_date)
 
-
-end_date = end_date.format('YYYYMMDD')
-end_date = int(end_date)
-
-begin_date = begin_date.format('YYYYMMDD')
-begin_date = int(begin_date)
+begin_date_6m = cbyz.date_cal(end_date, amount=-6, unit='m')
+begin_date_3y = cbyz.date_cal(end_date, amount=-3, unit='y')
 
 
 
@@ -107,11 +100,6 @@ stock_type = 'tw'
 pd.set_option('display.max_columns', 30)
 
 
-def init(path):
-
-    return ''
-
-
 
 def load_data():
     '''
@@ -121,8 +109,9 @@ def load_data():
     # Load Data --------------------------
     
     # Historical Data .....
-    stock_data = get_stock_data(begin_date, end_date, 
+    stock_data = get_stock_data(begin_date_3y, end_date, 
                                 stock_type=stock_type)
+    
     
     # Stock Name .....
     global stock_name
@@ -131,14 +120,20 @@ def load_data():
 
 
     # Work Area -------------
-    global main_data
+    global main_data, main_data_lite
+    
     main_data = stock_data.copy()
     main_data = main_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
                 .reset_index(drop=True)
     
-    main_data = main_data.merge(stock_name, 
-                                how='left', 
+    
+    main_data = main_data.merge(stock_name, how='left', 
                                 on=['STOCK_SYMBOL'])
+    
+    # Some stock not in stock_name
+    # 00776, 910482
+    main_data = cbyz.df_conv_na(df=main_data, cols='STOCK_NAME', value='')
+    
     
     main_data['TYPE'] = 'HISTORICAL'
     main_data['WORK_DATE'] = main_data['WORK_DATE'].apply(ar.ymd)
@@ -146,6 +141,9 @@ def load_data():
     main_data['STOCK'] = (main_data['STOCK_SYMBOL'] 
                           + ' ' 
                           + main_data['STOCK_NAME'])
+    
+    main_data_lite = main_data[main_data['WORK_DATE']>=ar.ymd(begin_date_6m)]
+    
     
     global target_data, target_symbol
     target_symbol = []
@@ -166,6 +164,10 @@ def load_data():
         stock_list.append({'label': stock_list_pre.loc[i, 'STOCK'],
                            'value': stock_list_pre.loc[i, 'STOCK_SYMBOL']
                            })
+        
+      
+   
+        
 
     return ''
 
@@ -183,6 +185,14 @@ def check():
     '''
     資料驗證
     '''    
+    
+    chk = main_data[main_data['STOCK_SYMBOL']=='00776']
+    
+    chk = stock_list_pre[stock_list_pre['STOCK_SYMBOL']=='00776']
+    
+    chk = plot_data[plot_data['STOCK_SYMBOL']=='00776']
+    
+    
     return ''
 
 
@@ -244,12 +254,10 @@ def get_stock_data(begin_date=None, end_date=None,
 
 
 
-
-
-# Application ----------------------
 master()
 
 
+# %% Application ----
 
 app = dash.Dash()
 
@@ -272,6 +280,7 @@ colors = {
 container_style = {
     'backgroundColor': colors['background'],
     'padding': '0 30px',
+    'min-height': '650px',
     }
 
 
@@ -320,7 +329,7 @@ app.layout = html.Div([
             value=False,
             style={'padding':'0 10px'}
         ),
-        html.P('全部資料'),
+        html.P('三年資料'),
     ],style=btn_max_style),        
     
     
@@ -332,7 +341,7 @@ app.layout = html.Div([
     
     html.Div(id="line_chart"),
     # html.P('Data Source'),
-    ],
+    ],  
     
     style=container_style
 )
@@ -363,28 +372,31 @@ def update_output(dropdown_value, btn_max):
         
         # Add loading icon
         
-        global target_data, target_symbol
-        list_inter = ar.list_intersect(dropdown_value, target_symbol)
+        # global target_data, target_symbol
+        # list_inter = ar.list_intersect(dropdown_value, target_symbol)
 
-        # Remove data
-        if len(target_data)>0:
-            target_data = target_data[target_data['STOCK_SYMBOL'] \
-                                      .isin(list_inter['Intersect'])]
+        # # Remove data
+        # if len(target_data)>0:
+        #     target_data = target_data[target_data['STOCK_SYMBOL'] \
+        #                               .isin(list_inter['Intersect'])]
         
-        # Add new data
-        if len(list_inter['Diff_L']) > 0:
-            new_data = get_stock_data(stock_type=stock_type,
-                                      stock_symbol=list_inter['Diff_L'])
-            new_data['TYPE'] = 'HISTORICAL'
-            new_data['WORK_DATE'] = new_data['WORK_DATE'].apply(ar.ymd)
-            target_data = target_data.append(new_data)
+        # # Add new data
+        # if len(list_inter['Diff_L']) > 0:
+        #     new_data = get_stock_data(stock_type=stock_type,
+        #                               stock_symbol=list_inter['Diff_L'])
+        #     new_data['TYPE'] = 'HISTORICAL'
+        #     new_data['WORK_DATE'] = new_data['WORK_DATE'].apply(ar.ymd)
+        #     target_data = target_data.append(new_data)
         
-        target_symbol = dropdown_value
-        plot_data = target_data
+        # target_symbol = dropdown_value
+        # plot_data = target_data
         
-    else:
         global main_data
         plot_data = main_data
+        
+    else:
+        global main_data_lite
+        plot_data = main_data_lite
         
         
     data1 = [{'x': plot_data[(plot_data['STOCK_SYMBOL'] == \
@@ -426,6 +438,7 @@ def update_output(dropdown_value, btn_max):
 
     # Debug
     debug_dropdown = '_'.join(dropdown_value)
+    
 
     # return figure
     return figure, 'ID_'+debug_dropdown+'_MAX_'+str(btn_max)+'_'
