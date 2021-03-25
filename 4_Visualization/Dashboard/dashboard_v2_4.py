@@ -15,7 +15,8 @@ Complete ...
 2.3 Add three year cache
 
 In progress
-2.4 Add multiple chart
+2.4 Add mobile layout
+2.5 Add multiple chart
 
 
 Bug ...
@@ -29,7 +30,6 @@ Solution: add sample chart
 """
 
 
-# -*- coding: utf-8 -*-
 import os
 
 import pandas as pd
@@ -41,11 +41,18 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_daq as daq
 from dash.dependencies import Input, Output
+import dash_bootstrap_components as dbc
+
 
 #import re
 #import numpy as np
 # from flask import Flask, request
 from flask_caching import Cache
+
+
+# Parse url
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
 
 
 # Worklist
@@ -60,7 +67,7 @@ local = True
 
 
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/4_Visualization/Dashboard'
 else:
     path = '/home/aronhack/stock_forecast/4_Visualization/Dashboard'
     
@@ -69,6 +76,7 @@ else:
 # Codebase
 path_codebase = ['/Users/Aron/Documents/GitHub/Arsenal',
                  '/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 path, 
                  path + '/Function']
 
 
@@ -81,103 +89,28 @@ import arsenal as ar
 import codebase_yz as cbyz
 
 
-
-# 手動設定區 -------
-global begin_date, end_date
-end_date = datetime.datetime.now()
-end_date = cbyz.date_simplify(end_date)
-
-begin_date_6m = cbyz.date_cal(end_date, amount=-6, unit='m')
-begin_date_3y = cbyz.date_cal(end_date, amount=-3, unit='y')
+from app_master import app
+import app_master as ms
+import mobile_app
 
 
+# # 手動設定區 -------
+# global begin_date, end_date
+# end_date = datetime.datetime.now()
+# end_date = cbyz.date_simplify(end_date)
 
-stock_type = 'us'
-stock_type = 'tw'
+# begin_date_6m = cbyz.date_cal(end_date, amount=-6, unit='m')
+# begin_date_3y = cbyz.date_cal(end_date, amount=-3, unit='y')
 
 
-# 自動設定區 -------
+
+# stock_type = 'us'
+# stock_type = 'tw'
+
+
+# # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
 
-
-
-def load_data():
-    '''
-    讀取資料及重新整理
-    '''
-
-    # Load Data --------------------------
-    
-    # Historical Data .....
-    stock_data = get_stock_data(begin_date_3y, end_date, 
-                                stock_type=stock_type)
-    
-    
-    # Stock Name .....
-    global stock_name
-    stock_name = ar.stk_get_list(stock_type=stock_type)
-
-
-
-    # Work Area -------------
-    global main_data, main_data_lite
-    
-    main_data = stock_data.copy()
-    main_data = main_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
-                .reset_index(drop=True)
-    
-    
-    main_data = main_data.merge(stock_name, how='left', 
-                                on=['STOCK_SYMBOL'])
-    
-    # Some stock not in stock_name
-    # 00776, 910482
-    main_data = cbyz.df_conv_na(df=main_data, cols='STOCK_NAME', value='')
-    
-    
-    main_data['TYPE'] = 'HISTORICAL'
-    main_data['WORK_DATE'] = main_data['WORK_DATE'].apply(ar.ymd)
-    
-    main_data['STOCK'] = (main_data['STOCK_SYMBOL'] 
-                          + ' ' 
-                          + main_data['STOCK_NAME'])
-    
-    main_data_lite = main_data[main_data['WORK_DATE']>=ar.ymd(begin_date_6m)]
-    
-    
-    global target_data, target_symbol
-    target_symbol = []
-    target_data = pd.DataFrame()
-    
-    
-    # Dash ----------------------
-    
-    # Stock List
-    global stock_list, stock_list_pre
-    stock_list_pre = main_data[['STOCK_SYMBOL', 'STOCK']] \
-                        .drop_duplicates() \
-                        .reset_index(drop=True)
-                    
-                    
-    stock_list = []
-    for i in range(0, len(stock_list_pre)):
-        stock_list.append({'label': stock_list_pre.loc[i, 'STOCK'],
-                           'value': stock_list_pre.loc[i, 'STOCK_SYMBOL']
-                           })
-        
-      
-   
-        
-
-    return ''
-
-
-def master():
-    '''
-    主工作區
-    '''
-    load_data()
-    return ''
 
 
 
@@ -196,70 +129,7 @@ def check():
     return ''
 
 
-# %% Inner Function -------
-
-def get_stock_data(begin_date=None, end_date=None, 
-                   stock_type='tw', stock_symbol=None):
-    
-    
-    if stock_type == 'tw':
-        stock_tb = 'stock_data_tw'
-    elif stock_type == 'us':
-        stock_tb = 'stock_data_us'
-    
-
-    # Convert stock to list
-    stock_li = [stock_symbol]
-    stock_li = cbyz.list_flatten(stock_li)    
-    
-    
-    if (begin_date != None) & (end_date != None):
-        
-        if stock_symbol != None:
-            sql_stock = cbyz.list_add_quote(stock_li, "'")
-            sql_stock = ', '.join(sql_stock)
-            sql_stock = ' and stock_symbol in (' + sql_stock + ')'
-        else:
-            sql_stock = ''
-            
-        sql_cond = (" where date_format(work_date, '%Y%m%d') between " + str(begin_date) + " and " + str(end_date) +
-                    sql_stock)
-        
-    else:
-        sql_stock = cbyz.list_add_quote(stock_li, "'")
-        sql_stock = ', '.join(sql_stock)
-        sql_cond = ' where stock_symbol in (' + sql_stock + ')'
-    
-
-    sql = ( "select date_format(work_date, '%Y%m%d') work_date, " 
-    + " stock_symbol, high, close, low "
-    + " from " + stock_tb + " "
-    + sql_cond
-    )
-    
-        
-    results = ar.db_query(sql, local=local)
-    return results
-
-
-# def stock_get_name(stock_type='tw'):
-    
-#     if stock_type == 'tw':
-#         sql = "select * from stock_name;"
-#     elif stock_type == 'us':
-#         sql = "select * from stock_name_us;"
-        
-#     results = ar.db_query(sql, local=local)
-#     return results
-
-
-
-master()
-
-
 # %% Application ----
-
-app = dash.Dash()
 
 
 if local == False:
@@ -312,11 +182,14 @@ debug_style = {
 
 
 app.layout = html.Div([
+    
+    dcc.Location(id='url', refresh=False),
+    html.Div(id='url_debug'),
         
     html.Div([
         dcc.Dropdown(
             id='name_dropdown',
-            options=stock_list,
+            options=ms.stock_list,
             multi=True,
             value=[]
         ),
@@ -334,7 +207,6 @@ app.layout = html.Div([
     
     
     
-    
     html.Div(id='debug',
              style = debug_style),
     
@@ -342,61 +214,69 @@ app.layout = html.Div([
     html.Div(id="line_chart"),
     # html.P('Data Source'),
     ],  
-    
+    id='app',
     style=container_style
 )
 
 
+
+# @app.callback(
+#     Output(component_id='app', component_property='children'),
+#     Input(component_id='url', component_property='search')
+# )
+
+
+# def get_url(url):
+    
+#     if url != '':
+#         print('blank')
+
+    
+#     parsed = urlparse.urlparse(url)
+#     width = parse_qs(parsed.query)['w'][0]
+    
+#     if width != '' and int(width) < 992:
+#         return mobile_app.layout
+        
+#     return url
+    
+
+
+
+
+
 @app.callback(
-    
-    [Output('line_chart', 'children'),
-     Output('debug', 'children')
-     ],
-    [Input("name_dropdown", "value"),
-     Input('btn_max', 'value')
-     ]
-    
+    Output(component_id='line_chart', component_property='children'),
+    Output(component_id='debug', component_property='children'),
+    Input(component_id='name_dropdown', component_property='value'),
+    Input(component_id='btn_max', component_property='value')  
 )
 
 
+def update_output(dropdown_value, time_switch_value):
 
-def update_output(dropdown_value, btn_max):
-
-    global stock_list_pre
-    selected_list = stock_list_pre[stock_list_pre['STOCK_SYMBOL']
-                                    .isin(dropdown_value)] \
+    
+    print(dropdown_value)
+    
+    
+    if dropdown_value == None:
+        print('dropdown_value is None')
+        return ''
+    
+    
+    # global stock_list_pre
+    selected_list = ms.stock_list_pre[
+        ms.stock_list_pre['STOCK_SYMBOL'].isin(dropdown_value)] \
                     .reset_index(drop=True)
     
 
-    if btn_max == True:
+    if time_switch_value == True:
         
-        # Add loading icon
-        
-        # global target_data, target_symbol
-        # list_inter = ar.list_intersect(dropdown_value, target_symbol)
-
-        # # Remove data
-        # if len(target_data)>0:
-        #     target_data = target_data[target_data['STOCK_SYMBOL'] \
-        #                               .isin(list_inter['Intersect'])]
-        
-        # # Add new data
-        # if len(list_inter['Diff_L']) > 0:
-        #     new_data = get_stock_data(stock_type=stock_type,
-        #                               stock_symbol=list_inter['Diff_L'])
-        #     new_data['TYPE'] = 'HISTORICAL'
-        #     new_data['WORK_DATE'] = new_data['WORK_DATE'].apply(ar.ymd)
-        #     target_data = target_data.append(new_data)
-        
-        # target_symbol = dropdown_value
-        # plot_data = target_data
-        
-        global main_data
-        plot_data = main_data
+        plot_data = ms.main_data
         
     else:
-        global main_data_lite
-        plot_data = main_data_lite
+        # global main_data_lite
+        plot_data = ms.main_data_lite
         
         
     data1 = [{'x': plot_data[(plot_data['STOCK_SYMBOL'] == \
@@ -441,7 +321,7 @@ def update_output(dropdown_value, btn_max):
     
 
     # return figure
-    return figure, 'ID_'+debug_dropdown+'_MAX_'+str(btn_max)+'_'
+    return figure, 'ID_'+debug_dropdown+'_MAX_'+str(time_switch_value)+'_'
 
 
 

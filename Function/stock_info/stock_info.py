@@ -19,15 +19,15 @@ from bs4 import BeautifulSoup
 
 # Codebase ......
 
-local = True
 local = False
+local = True
 
 
 if local == True:
     path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                      r'/Users/Aron/Documents/GitHub/Codebase_YZ']
     
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/stock_info'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/Function/stock_info'
     
 else:
     path_codebase = [r'/home/aronhack/arsenal']
