@@ -149,10 +149,11 @@ colors = {
 }
 
 
-container_style = {
+app_main_style = {
     'backgroundColor': colors['background'],
-    'padding': '0 30px',
+    # 'padding': '0 30px',
     'min-height': '650px',
+    # 'display':'flex',
     }
 
 
@@ -181,6 +182,12 @@ btn_max_style = {
 debug_style = {
     'display': 'none',
     }
+
+
+figure_style = {
+    # 'transform': 'scale(1.1)'
+    }
+
 
 
 # Original
@@ -226,7 +233,7 @@ debug_style = {
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='url_debug'),
-    html.Div(id='app_main', style=container_style)
+    html.Div(id='app_main', style=app_main_style)
     
     ]
 )
@@ -305,7 +312,7 @@ def update_output(dropdown_value, time_switch_value):
         
 
     historical_plot =  dcc.Graph(
-                            id='example-graph',
+                            id='main_graph',
                             figure={
                                 'data': data1,
                                 'layout': {
@@ -314,20 +321,16 @@ def update_output(dropdown_value, time_switch_value):
                                     'font': {
                                         'color': colors['text']
                                     },
-                #                    'title': 'DASH'
-                                }
+                                },
                             },
+                            style=figure_style 
                         )
 
-    # data5 = [{'x': df[df[1] == val][0],
-    #               'y': df[df[1] == val][6],
-    #               'type': 'line',
-    #               'name': val + " - 交易量",
-    #               } for val in dropdown_value]
+
         
 
     # figure = [historical_plot, historical_plot]
-    figure = [historical_plot]
+    figure = historical_plot
 
 
     # Debug
@@ -343,6 +346,9 @@ if __name__ == '__main__':
     app.run_server()
     # app.run_server(debug=True)
 
+
+def execution():
+    app.run_server()
 
 
 

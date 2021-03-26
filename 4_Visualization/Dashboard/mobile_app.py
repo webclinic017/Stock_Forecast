@@ -128,7 +128,7 @@ colors = {
 
 container_style = {
     'backgroundColor': colors['background'],
-    'padding': '0 30px',
+    'padding': '0 5%',
     'min-height': '650px',
     }
 
@@ -138,11 +138,11 @@ title_style = {
     'color': '#303030',
     'padding-top': '20px',
     'disply': 'inline-block',
-    'width': '50%'
+    'width': '100%'
     }
 
 name_dropdown_style = {
-    'width': '50%', 
+    'width': '100%', 
     'padding-top': '40px', 
     'display': 'block'
     }
@@ -193,7 +193,7 @@ layout = html.Div([
     html.Div(id="line_chart"),
     # html.P('Data Source'),
     ],  
-    style=container_style
+    # style=container_style
 )
 
 
