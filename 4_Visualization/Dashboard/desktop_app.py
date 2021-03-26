@@ -165,7 +165,7 @@ debug_style = {
 layout = html.Div([
     
     # dcc.Location(id='url', refresh=False),
-    html.P('Mobile Layout'),    
+    html.P('Desktop Layout'),    
     html.Div(id='url_debug'),
     html.Div([
         dcc.Dropdown(

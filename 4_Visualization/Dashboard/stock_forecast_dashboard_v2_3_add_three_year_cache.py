@@ -55,7 +55,7 @@ from flask_caching import Cache
 # 設定工作目錄 .....
 
 local = False
-local = True
+# local = True
 
 
 

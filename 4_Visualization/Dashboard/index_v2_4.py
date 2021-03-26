@@ -91,6 +91,7 @@ import codebase_yz as cbyz
 
 from app_master import app
 import app_master as ms
+import desktop_app
 import mobile_app
 
 
@@ -127,6 +128,7 @@ def check():
     
     
     return ''
+
 
 
 # %% Application ----
@@ -181,68 +183,80 @@ debug_style = {
     }
 
 
-app.layout = html.Div([
+# Original
+# app.layout = html.Div([
     
-    dcc.Location(id='url', refresh=False),
-    html.Div(id='url_debug'),
+#     dcc.Location(id='url', refresh=False),
+#     html.Div(id='url_debug'),
         
-    html.Div([
-        dcc.Dropdown(
-            id='name_dropdown',
-            options=ms.stock_list,
-            multi=True,
-            value=[]
-        ),
-    ],style=name_dropdown_style),
+#     html.Div([
+#         dcc.Dropdown(
+#             id='name_dropdown',
+#             options=ms.stock_list,
+#             multi=True,
+#             value=[]
+#         ),
+#     ],style=name_dropdown_style),
     
-    html.Div([
-        html.P('半年資料'),
-        daq.ToggleSwitch(
-            id='btn_max',
-            value=False,
-            style={'padding':'0 10px'}
-        ),
-        html.P('三年資料'),
-    ],style=btn_max_style),        
-    
-    
-    
-    html.Div(id='debug',
-             style = debug_style),
+#     html.Div([
+#         html.P('半年資料'),
+#         daq.ToggleSwitch(
+#             id='btn_max',
+#             value=False,
+#             style={'padding':'0 10px'}
+#         ),
+#         html.P('三年資料'),
+#     ],style=btn_max_style),        
     
     
-    html.Div(id="line_chart"),
-    # html.P('Data Source'),
-    ],  
-    id='app',
-    style=container_style
-)
-
-
-
-# @app.callback(
-#     Output(component_id='app', component_property='children'),
-#     Input(component_id='url', component_property='search')
+    
+#     html.Div(id='debug',
+#              style = debug_style),
+    
+    
+#     html.Div(id="line_chart"),
+#     # html.P('Data Source'),
+#     ],  
+#     id='app',
+#     style=container_style
 # )
 
 
-# def get_url(url):
+
+app.layout = html.Div([
+    dcc.Location(id='url', refresh=False),
+    html.Div(id='url_debug'),
+    html.Div(id='app_main', style=container_style)
     
-#     if url != '':
-#         print('blank')
+    ]
+)
+
+
+@app.callback(
+    Output(component_id='app_main', component_property='children'),
+    Input(component_id='url', component_property='search')
+)
+
+
+def get_url(url):
+    
+    if url != '':
+        print('blank')
 
     
-#     parsed = urlparse.urlparse(url)
-#     width = parse_qs(parsed.query)['w'][0]
+    parsed = urlparse.urlparse(url)
+    width = parse_qs(parsed.query)['w'][0]
     
-#     if width != '' and int(width) < 992:
-#         return mobile_app.layout
+    print(width)
+    
+    if width != '' and int(width) < 992:
+        print('mobile_app')
+        return mobile_app.layout
+    else:
+        print('desktop_app')
+        return desktop_app.layout
         
-#     return url
     
-
-
-
 
 
 @app.callback(
