@@ -42,7 +42,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_daq as daq
 from dash.dependencies import Input, Output
-import dash_bootstrap_components as dbc
+# import dash_bootstrap_components as dbc
 
 
 #import re
@@ -91,7 +91,7 @@ import codebase_yz as cbyz
 
 
 
-from app_master import app
+# from app_master import app
 import app_master as ms
 
 
@@ -165,7 +165,7 @@ debug_style = {
 layout = html.Div([
     
     # dcc.Location(id='url', refresh=False),
-    html.P('Mobile Layout'),    
+    # html.P('Mobile Layout'),    
     html.Div(id='url_debug'),
     html.Div([
         dcc.Dropdown(

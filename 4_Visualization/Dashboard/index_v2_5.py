@@ -16,7 +16,10 @@ Complete ...
 
 In progress
 2.4 Add mobile layout
-2.5 Add multiple chart
+2.5 Change chart structure
+
+
+Add multiple chart
 
 
 Bug ...

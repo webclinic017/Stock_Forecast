@@ -52,8 +52,8 @@ end_date = datetime.datetime.now()
 end_date = cbyz.date_simplify(end_date)
 
 begin_date_6m = cbyz.date_cal(end_date, amount=-12, unit='m')
-# begin_date_3y = cbyz.date_cal(end_date, amount=-3, unit='y')
-begin_date_3y = cbyz.date_cal(end_date, amount=-13, unit='m') # Dev
+begin_date_3y = cbyz.date_cal(end_date, amount=-3, unit='y')
+# begin_date_3y = cbyz.date_cal(end_date, amount=-13, unit='m') # Dev
 
 
 
@@ -75,8 +75,14 @@ def load_data():
     # Load Data --------------------------
     
     # Historical Data .....
+    # stock_data = get_stock_data(begin_date_3y, end_date, 
+    #                             stock_type=stock_type)
+
+    
+    # Dev
     stock_data = get_stock_data(begin_date_3y, end_date, 
-                                stock_type=stock_type)
+                                stock_type=stock_type,
+                                stock_symbol=['0050', '0056'])    
     
     
     # Stock Name .....
@@ -198,8 +204,8 @@ master()
 
 # %% Dash ----------
 
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
+# app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
 
-if __name__ == '__main__':
-    server = app.server
+# if __name__ == '__main__':
+#     server = app.server
