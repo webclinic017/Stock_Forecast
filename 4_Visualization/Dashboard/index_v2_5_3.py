@@ -445,12 +445,3 @@ if __name__ == '__main__':
 
 
 
-
-
-df = pd.read_csv(path + '/stock_info_tw.csv')
-
-df = cbyz.df_chk_column_na(df)
-
-
-
-
