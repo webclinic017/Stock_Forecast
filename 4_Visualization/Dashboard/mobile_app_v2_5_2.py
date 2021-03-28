@@ -63,7 +63,7 @@ from urllib.parse import parse_qs
 # 設定工作目錄 .....
 
 local = False
-local = True
+# local = True
 
 
 

@@ -16,6 +16,7 @@ Complete ...
 2.4 Add mobile layout
 2.5 Change chart structure
 2.5.1 Restore dcc
+2.5.3 Fixe dropdown issue
 
 In progress
 Add stock_info_tw to database
@@ -181,7 +182,7 @@ stk_selector_style = {
     }
 
 stk_selector_style_desktop = {
-    'width': '50%', 
+    'width': '70%', 
     'padding-top': '40px', 
     'display': 'block'
     }
@@ -250,8 +251,8 @@ app.layout = html.Div([
 
 @app.callback(
     # Output(component_id='app_main', component_property='children'),
-    # Output(component_id='stk_selector', component_property='style')
-    Output(component_id='debug', component_property='children'),
+    Output(component_id='stk_selector', component_property='style'),
+    # Output(component_id='debug', component_property='children'),
     Input(component_id='url', component_property='search'),
     Input(component_id='stk_selector', component_property='style')
 )
@@ -259,15 +260,16 @@ app.layout = html.Div([
 
 def get_url(url, style):
 
+    
+    # Bug, 有兩個id=stk_selector
+    
     global device
     
 
     if url == '':
         device = 'desktop'
-        loc_style = stk_selector_style_mobile
-        # return desktop_app.layout
-        # return '', loc_style
-        return ''
+        loc_style = stk_selector_style_desktop
+        return loc_style
 
     
     parsed = urlparse.urlparse(url)
@@ -275,22 +277,17 @@ def get_url(url, style):
     
     
     if int(width) < 992:
-        # print('mobile_app')
         device = 'mobile'
         loc_style = stk_selector_style_mobile
         # return mobile_app.layout
     else:
-        # print('desktop_app')
         device = 'desktop'
-        loc_style = stk_selector_style_mobile
+        loc_style = stk_selector_style_desktop
         # return desktop_app.layout
         
-        
-    print(device)
-    print(loc_style)
-        
-    # return '', loc_style
-    return ''
+
+    # return ''
+    return loc_style
         
     
 
@@ -442,4 +439,18 @@ if __name__ == '__main__':
 
 
 # ar.db_upload(upload, 'stock_rule_tw', True)
+
+
+
+
+
+
+
+
+df = pd.read_csv(path + '/stock_info_tw.csv')
+
+df = cbyz.df_chk_column_na(df)
+
+
+
 

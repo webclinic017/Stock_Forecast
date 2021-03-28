@@ -13,12 +13,21 @@ import pandas as pd
 import sys, arrow
 import datetime
 import dash
+import h5py
 
 
 # 設定工作目錄 .....
 
 local = False
 local = True
+
+
+load_cache = False
+# load_cache = True
+
+
+dev = False
+dev = True
 
 
 
@@ -43,6 +52,10 @@ for i in path_codebase:
 
 import arsenal as ar
 import codebase_yz as cbyz
+
+
+path_temp = path + '/Temp'
+cbyz.os_create_folder(path=[path_temp])
 
 
 
@@ -74,15 +87,25 @@ def load_data():
 
     # Load Data --------------------------
     
-    # Historical Data .....
-    # stock_data = get_stock_data(begin_date_3y, end_date, 
-    #                             stock_type=stock_type)
-
     
-    # Dev
-    stock_data = get_stock_data(begin_date_3y, end_date, 
-                                stock_type=stock_type,
-                                stock_symbol=['0050', '0056'])    
+    # Historical Data .....
+    if load_cache == True:
+        try:
+            stock_data = pd.read_hdf(path_temp + '/stock_data.h5', 's')
+            print('load cache')
+        except:
+            stock_data = get_stock_data(begin_date_3y, end_date, 
+                                        stock_type=stock_type)            
+            stock_data.to_hdf(path_temp + '/stock_data.h5', key='s')
+    
+    elif dev == True:
+        stock_data = get_stock_data(begin_date_3y, end_date, 
+                                    stock_type=stock_type,
+                                    stock_symbol=['0050', '0056'])    
+    else:
+        stock_data = get_stock_data(begin_date_3y, end_date, 
+                                    stock_type=stock_type)        
+
     
     
     # Stock Name .....
