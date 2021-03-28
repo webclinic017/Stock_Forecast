@@ -15,6 +15,7 @@ Complete ...
 2.3 Add three year cache
 2.4 Add mobile layout
 2.5 Change chart structure
+2.5.1 Restore dcc
 
 In progress
 Add stock_info_tw to database
@@ -68,7 +69,7 @@ from urllib.parse import parse_qs
 # 設定工作目錄 .....
 
 local = False
-# local = True
+local = True
 
 
 
@@ -97,8 +98,8 @@ import codebase_yz as cbyz
 
 # from app_master import app
 import app_master as ms
-import desktop_app
-import mobile_app
+import desktop_app_v2_5_2
+import mobile_app_v2_5_2
 
 
 # # 手動設定區 -------
@@ -244,50 +245,73 @@ figure_style = {
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='url_debug'),
+
+
+    html.Div([
+        dcc.Dropdown(
+            id='name_dropdown',
+            options=ms.stock_list,
+            multi=True,
+            value=[]
+        ),
+    ],style=name_dropdown_style),
     
-    html.Div(dcc.Graph(id='main_graph'),
+    html.Div([
+        html.P('半年資料'),
+        daq.ToggleSwitch(
+            id='btn_max',
+            value=False,
+            style={'padding':'0 10px'}
+        ),
+        html.P('三年資料'),
+    ], style=btn_max_style),      
+
+    
+    html.Div(
              id='app_main', 
-             style=app_main_style)
+             style=app_main_style),
     
     ]
 )
 
 
-@app.callback(
-    Output(component_id='app_main', component_property='children'),
-    Input(component_id='url', component_property='search')
-)
+
+# @app.callback(
+#     Output(component_id='app_main', component_property='children'),
+#     Input(component_id='url', component_property='search')
+# )
 
 
-def get_url(url):
+# def get_url(url):
 
-    global device
+#     global device
 
-    if url == '':
-        device = 'desktop'
-        return desktop_app.layout
+#     if url == '':
+#         device = 'desktop'
+#         return desktop_app.layout
 
     
-    parsed = urlparse.urlparse(url)
-    width = parse_qs(parsed.query)['w'][0]
+#     parsed = urlparse.urlparse(url)
+#     width = parse_qs(parsed.query)['w'][0]
     
     
-    if width != '' and int(width) < 992:
-        # print('mobile_app')
-        device = 'mobile'
-        return mobile_app.layout
-    else:
-        # print('desktop_app')
-        device = 'desktop'
-        return desktop_app.layout
+#     if width != '' and int(width) < 992:
+#         # print('mobile_app')
+#         device = 'mobile'
+#         return mobile_app.layout
+#     else:
+#         # print('desktop_app')
+#         device = 'desktop'
+#         return desktop_app.layout
         
     
 
 # Output(component_id='line_chart', component_property='children'),
 
 @app.callback(
-    [Output(component_id='main_graph', component_property='figure'),
-    Output(component_id='debug', component_property='children')],
+    [Output(component_id='app_main', component_property='children'),
+    # Output(component_id='debug', component_property='children')
+    ],
     [Input(component_id='name_dropdown', component_property='value'),
      Input(component_id='btn_max', component_property='value')]  
 )
@@ -299,31 +323,44 @@ def update_output(dropdown_value, time_switch_value):
     # Debug
     # dropdown_value = ['0050']
     # time_switch_value = False
+    device = 'desktop'
     
     
     # print(dropdown_value)
     # print(time_switch_value)
     
-
-    
-    # global stock_list_pre
-    # selected_list = ms.stock_list_pre[
-    #     ms.stock_list_pre['STOCK_SYMBOL'].isin(dropdown_value)] \
-    #                 .reset_index(drop=True)
     
 
+    global stock_list_pre
+    selected_list = ms.stock_list_pre[
+        ms.stock_list_pre['STOCK_SYMBOL'].isin(dropdown_value)] \
+                    .reset_index(drop=True)
+    
 
+
+    if time_switch_value == True:
+        plot_data = ms.main_data
+    else:
+        plot_data = ms.main_data_lite
+
+
+    # if dropdown_value == []:
+    #     plot_data = pd.DataFrame({'WORK_DATE':[], 'CLOSE':[]})
+        # figure = px.scatter(plot_data, x='WORK_DATE', y='CLOSE')
+    # else:
+        # figure = px.scatter(plot_data, x='WORK_DATE', y='CLOSE',
+        #             color='STOCK')
         
         
-    # data1 = [{'x': plot_data[(plot_data['STOCK_SYMBOL'] == \
-    #                           selected_list['STOCK_SYMBOL'][i]) & \
-    #                   (plot_data['TYPE'] == 'HISTORICAL')]['WORK_DATE'],
-    #           'y': plot_data[(plot_data['STOCK_SYMBOL'] == \
-    #                           selected_list['STOCK_SYMBOL'][i]) & \
-    #                   (plot_data['TYPE'] == 'HISTORICAL')]['CLOSE'],
-    #           'type': 'line',
-    #           'name': selected_list['STOCK'][i],
-    #           } for i in range(0, len(selected_list))]
+    data1 = [{'x': plot_data[(plot_data['STOCK_SYMBOL'] == \
+                              selected_list['STOCK_SYMBOL'][i]) & \
+                      (plot_data['TYPE'] == 'HISTORICAL')]['WORK_DATE'],
+              'y': plot_data[(plot_data['STOCK_SYMBOL'] == \
+                              selected_list['STOCK_SYMBOL'][i]) & \
+                      (plot_data['TYPE'] == 'HISTORICAL')]['CLOSE'],
+              'type': 'line',
+              'name': selected_list['STOCK'][i],
+              } for i in range(0, len(selected_list))]
         
 
 
@@ -332,16 +369,16 @@ def update_output(dropdown_value, time_switch_value):
 
 
     # Legend Layout ......
-    # if device == 'desktop':
-    #     legend_style = dict()        
-    # else:
-    #     legend_style = dict(
-    #         orientation="h",
-    #         yanchor="bottom",
-    #         y=1.02,
-    #         xanchor="right",
-    #         x=1
-    #     )
+    if device == 'desktop':
+        legend_style = dict()        
+    else:
+        legend_style = dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
 
 
 
@@ -357,6 +394,28 @@ def update_output(dropdown_value, time_switch_value):
     #     },
     # }
   
+    
+    
+    results =  dcc.Graph(
+                id='main_graph',
+                figure={
+                    'data': data1,
+                    'layout': {
+                        'plot_bgcolor': colors['background'],
+                        'paper_bgcolor': colors['background'],
+                        'font': {
+                            'color': colors['text']
+                        },
+                        'legend': legend_style,
+                    },
+                },
+                style=figure_style 
+            )
+    
+    
+    
+    
+    
     # style=figure_style 
 
     
@@ -368,67 +427,62 @@ def update_output(dropdown_value, time_switch_value):
 
 
 
-    if dropdown_value != [] and time_switch_value == True:
-        plot_data = ms.main_data
-    else:
-        plot_data = ms.main_data_lite
+    # if dropdown_value != [] and time_switch_value == True:
+    #     plot_data = ms.main_data
+    # else:
+    #     plot_data = ms.main_data_lite
         
         
-    plot_data = plot_data[plot_data['STOCK_SYMBOL'].isin(dropdown_value)]
+    # plot_data = plot_data[plot_data['STOCK_SYMBOL'].isin(dropdown_value)]
     
     
-    if dropdown_value == []:
-        plot_data = pd.DataFrame({'WORK_DATE':[], 'CLOSE':[]})
-        figure = px.scatter(plot_data, x='WORK_DATE', y='CLOSE')
-    else:
-        figure = px.scatter(plot_data, x='WORK_DATE', y='CLOSE',
-                    color='STOCK')
+
 
         # Legend
         # figure.update_layout(legend_title_text='')
 
 
 
-    figure.update_traces(mode='lines')
+    # figure.update_traces(mode='lines')
 
 
     # Axes
-    figure.update_xaxes(title='日期',
-                        title_font=dict(size=10))
+    # figure.update_xaxes(title='日期',
+    #                     title_font=dict(size=10))
     
-    figure.update_yaxes(title='收盤價',
-                        title_font={'size':10})
+    # figure.update_yaxes(title='收盤價',
+    #                     title_font={'size':10})
     
-    figure.update_layout(
-        plot_bgcolor=colors['background'],
-        paper_bgcolor=colors['background'],            
-    )    
+    # figure.update_layout(
+    #     plot_bgcolor=colors['background'],
+    #     paper_bgcolor=colors['background'],            
+    # )    
 
 
 
-    if device == 'mobile':
+    # if device == 'mobile':
         
-        figure.update_xaxes(fixedrange=True)
-        figure.update_yaxes(fixedrange=True)        
+    #     figure.update_xaxes(fixedrange=True)
+    #     figure.update_yaxes(fixedrange=True)        
         
-        figure.update_layout(           
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            ),
-            margin={'l':10, 'r':10, 't':0, 'b':0}
-        )
+    #     figure.update_layout(           
+    #         legend=dict(
+    #             orientation="h",
+    #             yanchor="bottom",
+    #             y=1.02,
+    #             xanchor="right",
+    #             x=1
+    #         ),
+    #         margin={'l':10, 'r':10, 't':0, 'b':0}
+    #     )
 
 
     # Debug
     debug_dropdown = '_'.join(dropdown_value)
     
 
-    # return figure
-    return figure, 'ID_'+debug_dropdown+'_MAX_'+str(time_switch_value)+'_'
+    return [results]
+    # return figure, 'ID_'+debug_dropdown+'_MAX_'+str(time_switch_value)+'_'
 
 
 
