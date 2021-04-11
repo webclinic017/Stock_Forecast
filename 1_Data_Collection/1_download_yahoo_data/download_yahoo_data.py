@@ -43,6 +43,8 @@ local = False
 local = True
 
 
+
+
 # Load Data ----------------
 
 # 自動設定區 -------
@@ -76,7 +78,7 @@ def load_data(stock_list=None):
     if stock_list == None:
         stock_list = ar.stk_get_list(stock_type=stock_type)
     else:
-        stock_list = pd.DataFrame({'STOCK_SYMBOL':['2301', '2474', '1714', '2385']})
+        stock_list = pd.DataFrame({'STOCK_SYMBOL':stock_list})
         stock_list['STOCK_SYMBOL'] = stock_list['STOCK_SYMBOL'].astype(str)
     
     
@@ -148,13 +150,13 @@ def load_data(stock_list=None):
 
     
     # Export
-    global path_export
-    time_seq = cbyz.get_time_serial(with_time=True)
-    hist_data.to_hdf(path_export + '/yahoo_finance_data_'+time_seq+'.h5', 
-                     key='s')
+    # global path_export
+    # time_seq = cbyz.get_time_serial(with_time=True)
+    # hist_data.to_hdf(path_export + '/yahoo_finance_data_'+time_seq+'.h5', 
+    #                  key='s')
     
-    hist_data.to_csv(path_export + '/yahoo_finance_data_'+time_seq+'.csv', 
-                     index=False)
+    # hist_data.to_csv(path_export + '/yahoo_finance_data_'+time_seq+'.csv', 
+    #                  index=False)
     
     return ''
 
@@ -164,6 +166,13 @@ def master():
     '''
     主工作區
     '''
+    
+    
+    # Update, delete old data
+    
+    stock_list = [2520, 2605, 6116, 6191, 3481, 2409]
+    load_data(stock_list)
+    
     
     return ''
 

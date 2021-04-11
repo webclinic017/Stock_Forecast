@@ -167,10 +167,10 @@ def get_stock_fee():
 # roi_base = 0.02
     
 
-def btm_predict(begin_date, data_period=90, interval=30,
+def btm_predict(begin_date, data_period=360, interval=30,
                 volume=1000, budget=None, 
                 predict_period=15, backtest_times=5,
-                roi_base=0.03, stop_loss=0.9, debug=False):
+                roi_base=0.03, stop_loss=0.8, debug=False):
     
 
     # .......
@@ -268,13 +268,20 @@ def btm_predict(begin_date, data_period=90, interval=30,
             # (2) predict_data doesn't use.
             
             # global model_results_raw
-            model_results_raw = cur_model(model_data=model_data, 
+            model_results_raw = cur_model(stock_symbol=stock_symbol,
+                                          model_data=model_data, 
                                           predict_data=predict_data,
                                           predict_date=predict_date,
                                           model_x=model_x, model_y=model_y,
-                                          remove_none=True)                
+                                          remove_none=True)      
+            
+            
+            if len(model_results_raw['RESULTS']) == 0:
+                continue
+            
             
             model_name = cur_model.__name__
+            
             
             # Buy Signal
             temp_results = model_results_raw['RESULTS']
@@ -633,6 +640,60 @@ def btm_add_hist_data(predict_results):
     return backtest_results
 
 
+# .............
+    
+
+def btm_gen_actions(predict_results, rmse):
+    
+
+                
+    loc_rmse = rmse.copy()
+    
+    loc_rmse['RMSE_MEAN'] = loc_rmse \
+                                .groupby(['STOCK_SYMBOL', 'MODEL'])['RMSE'] \
+                                .transform('mean')
+    
+    
+    
+    loc_rmse['RMSE_MEAN_MIN'] = loc_rmse \
+                                .groupby(['STOCK_SYMBOL', 'MODEL'])['RMSE'] \
+                                .transform('min')
+
+
+    loc_rmse['RMSE_MEAN_MAX'] = loc_rmse \
+                                .groupby(['STOCK_SYMBOL', 'MODEL'])['RMSE'] \
+                                .transform('max')
+
+
+    
+    # loc_rmse.loc[loc_rmse['RMSE_MEAN']==loc_rmse['RMSE_MEAN_MIN'],
+    #     'ACTION'] = True 
+
+
+    # Check, 這個方式是否合理
+    loc_rmse = loc_rmse \
+                .drop_duplicates(subset=['STOCK_SYMBOL', 'MODEL']) \
+                .sort_values(by=['STOCK_SYMBOL', 'MODEL']) \
+                .reset_index(drop=True)
+                
+    # ......
+    
+    loc_main = predict_results.merge(loc_rmse, how='left',
+                            on=['MODEL', 'STOCK_SYMBOL'])
+    
+    # loc_main = loc_main[loc_main['ACTION']==True]
+    
+    
+    print('BUG,BUY_PRICE可能有0')
+    
+    
+    return_dict = {'SUMMARY':loc_rmse,
+                   'RESULTS':loc_main}
+    
+    return return_dict
+
+
+# ...............
 
 
 def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
@@ -647,19 +708,22 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     
     # Variables    
     # (1) Fix missing date issues
-    # begin_date = 20190401
+    begin_date = 20170401
     
     
     
     # target_symbol
     # (1) Bug, top=150時會出錯
     # stock_symbol = ['0050', '0056']
-    stock_symbol = ['2301', '2474', '1714', '2385']
+    # stock_symbol = ['2301', '2474', '1714', '2385']
+    
+    global stock_symbol
+    stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
+    stock_symbol = cbyz.list_conv_ele_type(stock_symbol, to_type='str')
     
     
     btm_get_stock_symbol(stock_symbol=stock_symbol,
                          top=100) 
-
 
 
     
@@ -675,22 +739,14 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     # (1) Bug, predict_main裡面可能會有duplicated rows by stock_symbole and 
     # model and backtest_id
     predict_main_raw = btm_predict(begin_date=begin_date,
-                                   data_period=180, volume=1000, 
+                                   data_period=365, volume=1000, 
                                    budget=None, predict_period=14, 
-                                   backtest_times=5, debug=False)
+                                   backtest_times=10, debug=False)
     
     predict_main = predict_main_raw['RESULTS']
     predict_rmse = predict_main_raw['RMSE']
     
 
-    predict_main_raw = btm_predict(begin_date=begin_date,
-                                   data_period=180, volume=1000, 
-                                   budget=None, predict_period=14, 
-                                   backtest_times=5, debug=False)
-    
-    predict_main = predict_main_raw['RESULTS']
-    predict_rmse = predict_main_raw['RMSE']    
-    
     
     # Backtest Report ------
     backtest_main = btm_add_hist_data(predict_results=predict_main)
@@ -713,44 +769,34 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     
     # Update 3, how to generate action?
     # Update 4, record rate of win
+    
+    
+    # Predictions -----
+    predict_date = cbyz.date_gat_calendar(begin_date=20210406, 
+                                          end_date=20210420)
+    
+    predict_date = predict_date[['WORK_DATE']]
+    predict_date['PREDICT'] = True
+    
+    predict_date_list = predict_date['WORK_DATE'].tolist()
+
+    
+    
+    predict_full_data = full_data.merge(predict_date, how='outer',
+                                  on='WORK_DATE')
+    
+# predict_date = predict_date['WORK_DATE'].tolist()
+    
+    
+    prediction = sam.model_2(model_data=predict_full_data, 
+                             predict_data=predict_data, 
+                             predict_date=predict_date_list,
+                             model_x=model_x, model_y=model_y, 
+                             stock_symbol=stock_symbol, remove_none=True)
         
     
     return ''
 
-
-
-def btm_gen_actions(predict_results, rmse):
-    
-    loc_rmse = rmse \
-                .groupby(['STOCK_SYMBOL', 'MODEL']) \
-                .aggregate({'RMSE':'mean'}) \
-                .reset_index() \
-                .rename(columns={'RMSE':'RMSE_MEAN'})
-                
-    
-    
-    loc_rmse['RMSE_MEAN_MIN'] = loc_rmse['RMSE_MEAN'].min()
-
-    
-    loc_rmse.loc[loc_rmse['RMSE_MEAN']==loc_rmse['RMSE_MEAN_MIN'],
-        'ACTION'] = True 
-    
-    
-    # ......
-    
-    loc_main = predict_results.merge(loc_rmse, how='left',
-                            on=['MODEL', 'STOCK_SYMBOL'])
-    
-    loc_main = loc_main[loc_main['ACTION']==True]
-    
-    
-    print('BUG,BUY_PRICE可能有0')
-    
-    
-    return_dict = {'SUMMARY':loc_rmse,
-                   'RESULTS':loc_main}
-    
-    return return_dict
 
 
 

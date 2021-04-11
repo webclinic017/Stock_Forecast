@@ -369,35 +369,41 @@ def model_1(model_data, predict_data, predict_date, model_x, model_y,
     
         x_train, x_test, y_train, y_test = train_test_split(x, y)
         
-        reg = LinearRegression().fit(x, y)
-        reg.score(x, y)
-        reg.coef_
-        reg.intercept_
+        try:
+            reg = LinearRegression().fit(x, y)
+            # reg.score(x, y)
+            # reg.coef_
+            # reg.intercept_
+        
+        
+            # predict ......      
+            preds_test = reg.predict(x_test)  
+            preds = reg.predict(predict_x)            
+            
+            
+            # ...
+            new_results = predict_date.copy()
+            new_results['CLOSE'] = preds
+            new_results['STOCK_SYMBOL'] = cur_symbol
+            results = results.append(new_results)        
+            
     
-    
-        # predict ......      
-        preds_test = reg.predict(x_test)  
-        preds = reg.predict(predict_x)            
-        
-        
-        # ...
-        new_results = predict_date.copy()
-        new_results['CLOSE'] = preds
-        new_results['STOCK_SYMBOL'] = cur_symbol
-        results = results.append(new_results)        
-        
-
-        # RMSE ......
-        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
-        new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
-                                'RMSE':[new_rmse]})
-        rmse = rmse.append(new_rmse_df)        
+            # RMSE ......
+            new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
+            new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
+                                    'RMSE':[new_rmse]})
+            rmse = rmse.append(new_rmse_df)           
+            
+        except:
+            
+            continue
     
     
     # Reorganize ------
-    results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
-                .reset_index(drop=True)
-
+    if len(results) > 0:
+        results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
+                    .reset_index(drop=True)
+    
     return_dict = {'RESULTS':results,
                    'FEATURES':pd.DataFrame(),
                    'RMSE':rmse} 
@@ -445,39 +451,44 @@ def model_2(model_data, predict_data, predict_date, model_x, model_y,
     
         x_train, x_test, y_train, y_test = train_test_split(x, y)
         
-        regressor = xgb.XGBRegressor(
-            n_estimators=100,
-            reg_lambda=1,
-            gamma=0,
-            max_depth=3
-        )
         
-
-        regressor.fit(x_train, y_train)
+        # Bug, 確認為什麼會有問題
+        try:
+            regressor = xgb.XGBRegressor(
+                n_estimators=100,
+                reg_lambda=1,
+                gamma=0,
+                max_depth=3
+            )
+            
+    
+            regressor.fit(x_train, y_train)
+            
+            # Feature Importance ......
+            importance_dict = {'FEATURES':list(x.columns),
+                               'IMPORTANCE':regressor.feature_importances_}
+            
+            new_features = pd.DataFrame(importance_dict)    
+            new_features['STOCK_SYMBOL'] = cur_symbol
+            
+            features = features.append(new_features)
+    
+    
+            # Test Group ......
+            preds_test = regressor.predict(x_test)
+            new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
+    
+    
+            # Prediction ......
+            preds = regressor.predict(predict_x)
+            
+            new_results = predict_date.copy()
+            new_results['CLOSE'] = preds
+            new_results['STOCK_SYMBOL'] = cur_symbol
+            results = results.append(new_results)
         
-        # Feature Importance ......
-        importance_dict = {'FEATURES':list(x.columns),
-                           'IMPORTANCE':regressor.feature_importances_}
-        
-        new_features = pd.DataFrame(importance_dict)    
-        new_features['STOCK_SYMBOL'] = cur_symbol
-        
-        features = features.append(new_features)
-
-
-        # Test Group ......
-        preds_test = regressor.predict(x_test)
-        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
-
-
-        # Prediction ......
-        preds = regressor.predict(predict_x)
-        
-        new_results = predict_date.copy()
-        new_results['CLOSE'] = preds
-        new_results['STOCK_SYMBOL'] = cur_symbol
-        results = results.append(new_results)
-        
+        except:
+            continue
         
         # RMSE ......
         new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
@@ -487,13 +498,15 @@ def model_2(model_data, predict_data, predict_date, model_x, model_y,
         
 
 
-    results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
-                .reset_index(drop=True)
-                
-    features = features[['STOCK_SYMBOL', 'FEATURES', 'IMPORTANCE']] \
-                .reset_index(drop=True)
-                
-    rmse = rmse.reset_index(drop=True)
+    if len(results) > 0:
+        results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
+                    .reset_index(drop=True)
+                    
+        features = features[['STOCK_SYMBOL', 'FEATURES', 'IMPORTANCE']] \
+                    .reset_index(drop=True)
+                    
+        rmse = rmse.reset_index(drop=True)
+
 
     return_dict = {'RESULTS':results,
                    'FEATURES':features,
