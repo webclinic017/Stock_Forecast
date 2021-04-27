@@ -99,6 +99,28 @@ backtest = btm.master(being_date=20190101,
 
 
 
+def master():
+    '''
+    主工作區
+    '''
+    
+    return ''
+
+
+
+
+def check():
+    '''
+    資料驗證
+    '''    
+    return ''
+
+
+
+
+if __name__ == '__main__':
+    master()
+
 
 
 
