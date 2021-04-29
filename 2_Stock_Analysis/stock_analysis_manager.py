@@ -583,16 +583,18 @@ def get_model_list(status=[0,1]):
 
 
 
-def predict(predict_begin, predict_end, predict_period, stock_symbol):
+def predict(predict_begin, predict_end, predict_period, stock_symbol,
+            lag=14):
     
     
     # predict_begin = 20210402
     # predict_end = 20210415
     # predict_period = 14
+    # lag = 14
     
     # stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
-    lag = 14
+    
 
 
     # # .......
@@ -780,8 +782,8 @@ def predict(predict_begin, predict_end, predict_period, stock_symbol):
 
 # %% Master ------
 # data_begin=None, data_end=None, 
-def master(data_period=150, predict_begin=None, predict_end=None, 
-           predict_period=15,
+def master(predict_begin=None, predict_end=None, 
+           predict_period=15, data_period=150, 
            stock_symbol=None, today=None, hold_stocks=None, limit=90):
     '''
     主工作區
@@ -790,18 +792,17 @@ def master(data_period=150, predict_begin=None, predict_end=None,
     '''
     
     
-    
     shift_begin, shift_end, \
             data_begin, data_end, predict_begin, predict_end = \
                 cbyz.date_get_period(data_begin=None,
                                        data_end=None, 
                                        data_period=data_period,
-                                       predict_begin=20210402,
-                                       predict_end=20210415, 
+                                       predict_begin=predict_begin,
+                                       predict_end=predict_end, 
                                        predict_period=predict_period)        
             
     
-    global stock_data
+    # global stock_data
     # stock_symbol = ['2301', '2474', '1714', '2385']
     # stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
     
@@ -829,19 +830,15 @@ def master(data_period=150, predict_begin=None, predict_end=None,
     model_x = data_raw['MODEL_X']
     model_y = data_raw['MODEL_Y']    
     
-
     
     # predict_begin = 20210402
     # predict_end = 20210415
-    predict_period = 14
-    
+    # predict_period = 14
     
     
     results = predict(predict_begin=predict_begin, predict_end=predict_end,
                        predict_period=predict_period, 
                        stock_symbol=stock_symbol)
-    
-    
     
     
     return results

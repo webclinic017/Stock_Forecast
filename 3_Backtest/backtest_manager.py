@@ -162,7 +162,7 @@ def get_stock_fee():
 # ..........
     
 
-begin_date = 20180701
+begin_date = 20170701
 data_period=360
 interval=30
 volume=1000
@@ -176,20 +176,224 @@ lag=7
 backtest_times=5
     
 
+stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409]
+stock_type='tw'
+predict_period=15
+backtest_times=5
+signal_thld=0.03
+stop_loss=0.8
+lag=7
+debug=False
 
 
-def backtest_predict():
+
+
+
+
+def backtest_predict(begin, 
+                     predict_period=14, data_period=360, 
+                     interval=30,
+                     volume=1000, budget=None, 
+                     stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
+                     stock_type='tw', backtest_times=5,
+                     signal_thld=0.03, stop_loss=0.8, lag=7, debug=False):
+    
+
+    # .......
+    loc_time_seq = cbyz.time_get_seq(begin_date=begin,
+                                     periods=backtest_times,
+                                     unit='d', skip=interval,
+                                     simplify_date=True)
+    
+    loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
+    
+    
+    # Work area ----------
+    model_list = sam.get_model_list()
+    buy_signal = pd.DataFrame()
+    rmse = pd.DataFrame()    
+    error_msg = []
+
+    
+    # Date .........
+    results = pd.DataFrame()
+    actions = pd.DataFrame()
+    
+    for i in range(0, len(loc_time_seq)):
+        
+        
+        last_date = cbyz.date_cal(loc_time_seq[i], -1, 'd')
+        
+        # Last price ......
+        last_price = stk.get_data(data_begin=last_date,
+                                  data_end=last_date,
+                                  stock_symbol=stock_symbol,
+                                  stock_type=stock_type,
+                                  shift=1)
+        
+        last_price = last_price[['STOCK_SYMBOL', 'CLOSE']] \
+                        .rename(columns={'CLOSE':'LAST_CLOSE'})
+        
+        # Predict ......
+        results_raw, rmse = sam.master(predict_begin=begin, 
+                                       predict_end=None, 
+                                       predict_period=predict_period,
+                                       data_period=data_period, 
+                                       stock_symbol=stock_symbol, 
+                                       today=None, hold_stocks=None, 
+                                       limit=90)
+        
+         # Merge Data ......   
+        results = results_raw.merge(last_price, on=['STOCK_SYMBOL'])
+        results['INCREASE'] = (results['CLOSE'] - results['LAST_CLOSE']) \
+                                / results['LAST_CLOSE']
+        
+        
+        # Decision ......
+        results.loc[results['INCREASE']>=signal_thld, 'BUY_SIGNAL'] = 1
+        results = cbyz.df_conv_na(df=results, cols='BUY_SIGNAL', value=0)
+        
+        
+        actions = results[results['BUY_SIGNAL']==1] \
+                    .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+                    .drop_duplicates(subset='STOCK_SYMBOL') \
+                    .reset_index(drop=True)    
+    
+
+    return results, actions
+
+
+def backtest_verify(begin_date, actions, stock_symbol, stock_type='tw', 
+                    stop_loss=0.8):
+    
+    
+    # Historic Data
+    hist_data = stk.get_data(data_begin=begin_date, data_end=None,
+                             stock_symbol=stock_symbol,
+                             stock_type=stock_type,
+                             shift=0)
+    
+    
+    
+    for i in range(len(actions)):
+
+        cur_date = actions.loc[i, 'WORK_DATE']
+        cur_data = hist_data[hist_data['WORK_DATE']>cur_date]
+        cur_data['BUY_PRICE'] = actions.loc[i, 'WORK_DATE']
+
+        
+        print(hist_data[i])
+        
+        
+    
+    
+    
+    
+    
+    
+    # Add dynamic ROI -------
+    predict_roi_pre = cbyz.df_add_rank(buy_signal, 
+                             value='WORK_DATE',
+                             group_key=['STOCK_SYMBOL', 'BACKTEST_ID'])
+          
+
+    predict_roi = pd.DataFrame()
+    
+    
+    for i in range(0, len(loc_time_seq)):
+    
+        df_lv1 = predict_roi_pre[predict_roi_pre['BACKTEST_ID']==i]
+        unique_symbol = df_lv1['STOCK_SYMBOL'].unique()
+        
+        
+        for j in range(0, len(unique_symbol)):
+            
+            df_lv2 = df_lv1[df_lv1['STOCK_SYMBOL']==unique_symbol[j]] \
+                        .reset_index(drop=True)
+            
+            for k in range(0, len(df_lv2)):
+                
+                if k == 0:
+                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'BUY_PRICE']
+                    continue
+                    
+                if df_lv2.loc[k, 'FORECAST_CLOSE'] >= df_lv2.loc[k-1, 'MAX_PRICE']:
+                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'FORECAST_CLOSE']
+                else:
+                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k-1, 'MAX_PRICE']
+                            
+            predict_roi = predict_roi.append(df_lv2)
+    
+    # ............
+    predict_results = predict_roi.copy()
+    predict_results.loc[predict_results['MAX_PRICE'] * stop_loss \
+                        >= predict_results['FORECAST_CLOSE'], \
+                        'SELL_SIGNAL'] = True
+    
+    predict_results = cbyz.df_conv_na(predict_results,
+                                cols='SELL_SIGNAL',
+                                value=False)
+ 
+    predict_results['GRP_SELL_SIGNAL'] = predict_results \
+        .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['SELL_SIGNAL'] \
+        .transform(max)
+    
+    
+    
+    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==True) \
+                   & (predict_results['SELL_SIGNAL']==False), \
+                   'REMOVE'] = True
+    
+    
+    # Remove for GRP_SELL_SIGNAL == NA ......
+    # Bug, 移除在period內完全沒碰到停損點的還沒判斷        
+    predict_results['MAX_RANK'] = predict_results \
+                    .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['RANK'] \
+                    .transform(max)
+
+    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==False) \
+                   & (predict_results['RANK']<predict_results['MAX_RANK']), \
+                   'REMOVE'] = True
+      
+
     
     return ''
 
 
-def backtest_verity():
+
+
+
+def backtest_master(predict_begin=20200801, predict_period=15,
+                    interval=30,
+                volume=1000, budget=None, 
+                stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
+                stock_type='tw',
+                backtest_times=14,
+                signal_thld=0.03, stop_loss=0.8, lag=7, debug=False):
+    
+    
+    results, actions = \
+        backtest_predict(begin=20190801, predict_period=15,
+                         interval=30, data_period=360, 
+                        volume=1000, budget=None, 
+                         stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
+                         stock_type='tw',
+                         backtest_times=5,
+                         signal_thld=0.03, lag=7, debug=False)    
+
+    
+    
+    backtest_verify(begin_date=begin_date, actions=actions, 
+                    stock_symbol=stock_symbol, stop_loss=stop_loss)
+    
+    
     
     
     return ''
 
 
-def btm_predict(begin_date, data_period=360, interval=30,
+
+def btm_predict_backup20210428(begin_date, data_period=360, interval=30,
                 volume=1000, budget=None, 
                 stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
                 stock_type='tw',
@@ -369,8 +573,6 @@ def btm_predict(begin_date, data_period=360, interval=30,
                     'RMSE':rmse}
     
     return predict_dict
-
-
 
 
 
@@ -920,8 +1122,8 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     
     # Variables    
     # (1) Fix missing date issues
-    begin_date = 20170401
-    stock_type='tw'
+    # begin_date = 20170401
+    # stock_type='tw'
     
     
     
@@ -931,7 +1133,7 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     # stock_symbol = ['2301', '2474', '1714', '2385']
     
     # global stock_symbol
-    stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
+    # stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
     
     
