@@ -186,6 +186,8 @@ lag=7
 debug=False
 
 
+begin=20190301
+
 
 
 
@@ -264,7 +266,7 @@ def backtest_predict(begin,
 
 
 def backtest_verify(begin_date, actions, stock_symbol, stock_type='tw', 
-                    stop_loss=0.8):
+                    stop_loss=0.8, buffer_days=7):
     
     
     # Historic Data
@@ -274,90 +276,90 @@ def backtest_verify(begin_date, actions, stock_symbol, stock_type='tw',
                              shift=0)
     
     
-    
+    bt_results = pd.DataFrame()
     for i in range(len(actions)):
 
-        cur_date = actions.loc[i, 'WORK_DATE']
-        cur_data = hist_data[hist_data['WORK_DATE']>cur_date]
-        cur_data['BUY_PRICE'] = actions.loc[i, 'WORK_DATE']
-
-        
-        print(hist_data[i])
+        action_date = actions.loc[i, 'WORK_DATE']
+        action_symbol = actions.loc[i, 'STOCK_SYMBOL']
         
         
-    
-    
-    
-    
-    
-    
-    # Add dynamic ROI -------
-    predict_roi_pre = cbyz.df_add_rank(buy_signal, 
-                             value='WORK_DATE',
-                             group_key=['STOCK_SYMBOL', 'BACKTEST_ID'])
-          
-
-    predict_roi = pd.DataFrame()
-    
-    
-    for i in range(0, len(loc_time_seq)):
-    
-        df_lv1 = predict_roi_pre[predict_roi_pre['BACKTEST_ID']==i]
-        unique_symbol = df_lv1['STOCK_SYMBOL'].unique()
         
-        
-        for j in range(0, len(unique_symbol)):
-            
-            df_lv2 = df_lv1[df_lv1['STOCK_SYMBOL']==unique_symbol[j]] \
+        cur_data = hist_data[(hist_data['WORK_DATE']>action_date) \
+                             & (hist_data['STOCK_SYMBOL']==action_symbol)] \
                         .reset_index(drop=True)
+
+        cur_data['SELL_SIGNAL'] = False
+                        
             
-            for k in range(0, len(df_lv2)):
-                
-                if k == 0:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'BUY_PRICE']
-                    continue
+        # Buy Price
+        buy_price =  hist_data[(hist_data['WORK_DATE']==action_date) \
+                             & (hist_data['STOCK_SYMBOL']==action_symbol)] \
+                        .reset_index(drop=True)
+    
+        buy_price = buy_price.loc[0, 'CLOSE']
+        
+        # Highest Prices
+        highest_price = buy_price
+    
+
+        # Wrap This as function
+        for j in range(len(cur_data)):
+
+            
+            cur_price = cur_data.loc[i, 'CLOSE']
+
+            
+            if cur_price > highest_price:
+                highest_price = cur_price
+            
+            
+            # Get Sell Signal
+            if (j > buffer_days) \
+                and ((highest_price - cur_price) \
+                     >= (highest_price - buy_price) * (1 - stop_loss)):
                     
-                if df_lv2.loc[k, 'FORECAST_CLOSE'] >= df_lv2.loc[k-1, 'MAX_PRICE']:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'FORECAST_CLOSE']
-                else:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k-1, 'MAX_PRICE']
-                            
-            predict_roi = predict_roi.append(df_lv2)
-    
-    # ............
-    predict_results = predict_roi.copy()
-    predict_results.loc[predict_results['MAX_PRICE'] * stop_loss \
-                        >= predict_results['FORECAST_CLOSE'], \
-                        'SELL_SIGNAL'] = True
-    
-    predict_results = cbyz.df_conv_na(predict_results,
-                                cols='SELL_SIGNAL',
-                                value=False)
- 
-    predict_results['GRP_SELL_SIGNAL'] = predict_results \
-        .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['SELL_SIGNAL'] \
-        .transform(max)
-    
-    
-    
-    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==True) \
-                   & (predict_results['SELL_SIGNAL']==False), \
-                   'REMOVE'] = True
-    
-    
-    # Remove for GRP_SELL_SIGNAL == NA ......
-    # Bug, 移除在period內完全沒碰到停損點的還沒判斷        
-    predict_results['MAX_RANK'] = predict_results \
-                    .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['RANK'] \
-                    .transform(max)
+                    
+                new_results = cur_data.loc[j, :]
+                new_results['BUY_PRICE'] = buy_price
+                new_results['HIGHEST_PRICE'] = highest_price
+                new_results['SELL_DATE'] = cur_data.loc[j, 'WORK_DATE']
+                new_results['BUY_DATE'] = action_date
+                new_results['SELL_SIGNAL'] = True
+                
+                bt_results = bt_results.append(new_results)
+                break
+            
+            # Not Get Sell Signal
+            if j == len(cur_data) - 1:
+                
+                new_results = cur_data.loc[j, :]
+                new_results['BUY_PRICE'] = buy_price
+                new_results['HIGHEST_PRICE'] = highest_price
+                new_results['SELL_DATE'] = np.nan
+                new_results['BUY_DATE'] = action_date
+                new_results['SELL_SIGNAL'] = False
+            
+                bt_results = bt_results.append(new_results)
 
-    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==False) \
-                   & (predict_results['RANK']<predict_results['MAX_RANK']), \
-                   'REMOVE'] = True
-      
+
+    # I don't know why SELL_SIGNAL in bt_results will convert to 0/1 from 
+    # True/False automatically.
+    bt_results = bt_results \
+        .rename(columns={'WORK_DATE':'LAST_DATE'}) \
+        .reset_index(drop=True)
+        
+        
+    bt_results['PROFIT'] = bt_results['CLOSE'] - bt_results['BUY_PRICE']     
+    bt_results['ROI'] = bt_results['PROFIT'] / bt_results['BUY_PRICE']
+        
+        
+    bt_results = bt_results[['STOCK_SYMBOL', 'BUY_DATE', 'BUY_PRICE',
+                             'SELL_SIGNAL', 'SELL_DATE', 'HIGHEST_PRICE',
+                             'LAST_DATE', 'HIGH', 'CLOSE', 'LOW', 'VOLUME',
+                             'PROFIT', 'ROI']]
 
     
-    return ''
+    return bt_results
 
 
 
@@ -369,10 +371,10 @@ def backtest_master(predict_begin=20200801, predict_period=15,
                 stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
                 stock_type='tw',
                 backtest_times=14,
-                signal_thld=0.03, stop_loss=0.8, lag=7, debug=False):
+                signal_thld=0.03, stop_loss=0.8, buffer_days=7, lag=7, debug=False):
     
     
-    results, actions = \
+    pred_results, actions = \
         backtest_predict(begin=20190801, predict_period=15,
                          interval=30, data_period=360, 
                         volume=1000, budget=None, 
@@ -383,13 +385,14 @@ def backtest_master(predict_begin=20200801, predict_period=15,
 
     
     
-    backtest_verify(begin_date=begin_date, actions=actions, 
-                    stock_symbol=stock_symbol, stop_loss=stop_loss)
+    bt_results = backtest_verify(begin_date=begin_date, actions=actions, 
+                                 stock_symbol=stock_symbol, 
+                                 stop_loss=stop_loss,
+                                 buffer_days=buffer_days)
     
     
     
-    
-    return ''
+    return pred_results, actions, bt_results
 
 
 
