@@ -14,7 +14,7 @@ import sys, time, os, gc
 
 
 local = False
-local = True
+# local = True
 
 
 # Path .....
@@ -65,7 +65,7 @@ def load_data():
 
 
 
-def notif_stop_loss(stock_type='tw'):
+def notif_stop_loss_backup_20210510(stock_type='tw'):
     
     stock_data_raw = stk.get_today_data(stock_type='tw')
     stock_data = stock_data_raw[['WORK_DATE', 'SECURITY_CODE', 'NAME',
@@ -90,6 +90,43 @@ def notif_stop_loss(stock_type='tw'):
     
     return ''
 
+
+
+
+
+
+def notif_stop_loss(stock_type='tw'):
+    
+    # Hold Data
+    hold_symbols = ['00646', '00762']
+    hold_data = pd.DataFrame({'STOCK_SYMBOL':hold_symbols,
+                              'MEAN_COST':[30.11, 35.03],
+                                # 'FIRST_PURCHASE':[20190828, 20191105]})                              
+                                'FIRST_PURCHASE':[20200828, 20201105]})
+
+    main_data = stk.get_stop_loss(df=hold_data, date='FIRST_PURCHASE', 
+                              price='MEAN_COSE', thld=0.2)
+
+        
+    content_li = []
+    
+    for i in range(len(hold_symbols)):
+        
+        temp_data = main_data[main_data['STOCK_SYMBOL']==hold_symbols[i]]
+        temp_data = temp_data.T
+        content_li.append(temp_data)
+        print(i)
+    
+    
+    # table = [main_data]
+    
+    ar.send_mail(to='myself20130612@gmail.com',
+                 subject='ARON HACK Stock Stop Loss Notification', 
+                  content='ARON HACK Stock Stop Loss Notification', 
+                  df_list=content_li,
+                 preamble='ARON HACK Stock Stop Loss Notification')
+    
+    return ''
 
 
 
