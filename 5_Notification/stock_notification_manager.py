@@ -57,10 +57,30 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
+#
+url ='https://docs.google.com/spreadsheets/d/1xEZ7khMMNstzrGMPhTNPmkyepsyXKtdeYAAl6txdCCk/edit?usp=sharing'
+
+
+# %% Query -------
+
+
+def get_hist_data():
+    
+    url ='https://docs.google.com/spreadsheets/d/1xEZ7khMMNstzrGMPhTNPmkyepsyXKtdeYAAl6txdCCk/edit?usp=sharing'
+    hist_data = ar.google_get_sheet_data(url, worksheet='Hist_Data')
+    hist_data = cbyz.df_conv_col_type(df=hist_data, cols=['HIST_HIGH'], 
+                                      to='float')
+    
+    hist_data = hist_data[['MARKET', 'SYMBOL', 'HIST_HIGH']]
+    
+    return hist_data
+
+
+
+
 
 def get_ledger():
     
-    url ='https://docs.google.com/spreadsheets/d/1xEZ7khMMNstzrGMPhTNPmkyepsyXKtdeYAAl6txdCCk/edit?usp=sharing'
     ledger = ar.google_get_sheet_data(url, worksheet='Ledger')
     ledger = cbyz.df_conv_col_type(df=ledger, cols=['VOLUME', 'PRICE'],
                                    to='float')
@@ -78,10 +98,13 @@ def get_ledger():
                 .reset_index() \
                 .rename(columns={'DATE':'FIRST_PURCHASE'})
                 
-    ledger = ledger[ledger['VOLUME']>0].reset_index(drop=True)
+    ledger = ledger[(ledger['VOLUME']>0) & (ledger['PRICE']>10)] \
+                .reset_index(drop=True)
     ledger['MEAN_PRICE'] = ledger['PRICE'] / ledger['VOLUME']
     return ledger
 
+
+# %% Operation ------
 
 
 def notif_stop_loss_backup_20210510(stock_type='tw'):
@@ -150,34 +173,60 @@ def notif_stop_loss_backup_20210520(stock_type='tw'):
 
 
 
-def get_hist_price():
-    
-    url ='https://docs.google.com/spreadsheets/d/1xEZ7khMMNstzrGMPhTNPmkyepsyXKtdeYAAl6txdCCk/edit?usp=sharing'
-    hist_data = ar.google_get_sheet_data(url, worksheet='Hist_Data')
-    hist_data = cbyz.df_conv_col_type(df=hist_data, cols=['HIST_HIGH'], 
-                                      to='float')
-    
-    hist_data = hist_data[['MARKET', 'SYMBOL', 'HIST_HIGH']]
-    
-    return hist_data
 
+def update_hist_data():
+    
+    # Update, write a load_data(), then set ledger as a global vars,
+    # preventing from call API repeatedly.
+    ledger = get_ledger()
+    ledger = ledger[['MARKET', 'SYMBOL']]
+    
+    # Historical Data
+    hist_data = get_hist_data()
+    
+    
+    # TW Stock ......
+    # tw_stock = ledger[ledger['MARKET']=='TW_Stock'].reset_index(drop=True)
+    # tw_stock_main
+    
+    
+    # Crypto ......
+    crypto = ledger[ledger['MARKET']=='Crypto'].reset_index(drop=True)
+    crypto_symbol = crypto['SYMBOL'].unique().tolist()
+    
+    # Query from API
+    crypto_price_raw = stk.crypto_get_price()
+    
+    crypto_price = \
+        crypto_price_raw[crypto_price_raw['SYMBOL'].isin(crypto_symbol)]
+    
+    crypto_price = crypto_price[['ID', 'SYMBOL', 'PRICE', 'LAST_UPDATED']] \
+                    .reset_index(drop=True)
+    
+    # Merge data
+    crypto_main = crypto \
+        .merge(hist_data, how='left', on=['MARKET', 'SYMBOL']) \
+        .merge(crypto_price, how='left', on=['SYMBOL'])
+    
+    crypto_main = crypto_main[crypto_main['PRICE']>crypto_main['HIST_HIGH']] \
+                    .reset_index(drop=True)
+    
 
-
-def update_hist_price():
+    # Merget Data of All Markets ......
+    main_data = crypto_main.copy()
+    # main_data = crypto_main.append(tw_stock_main)
     
+    # Upload ......
+    ar.google_sheet_write(obj=main_data, url=url, worksheet='Hist_Data',
+                          append=True)
     
-    # get_ledger()
-    # crypto
-    # tw_stock
+    # Log ......
+    log_time = cbyz.get_time_serial(with_time=True)
     
+    ar.google_sheet_write(obj=[[log_time]], url=url, 
+                          worksheet='Hist_Data_Log', append=True)    
     
-    # if len(crypto) > 0:
-    #     update
-    
-    
-    # fugle api
-    # crypto api
-    
+    print('update_hist_data finished.')
     return ''
 
 
@@ -186,9 +235,16 @@ def update_hist_price():
 def notif_stop_loss():
     
     
-    # Get current price
-    # TW stock stop when weekend or holiday
-    # 因為crypto free api doesn't provide historical data, so it should be 
+    # Update 
+    update_hist_data()
+    
+    
+    # 1.Get current price
+    #   According to CryptoMarketCap, the best practice is to use their
+    #   symbol ID rather than symbl name, because symbol name may be duplicated.
+    #   The function crypto_get_id() was completed, but I haven't use it .
+    # 2. TW stock stop when weekend or holiday
+    # 3. 因為crypto free api doesn't provide historical data, so it should be 
     # record in the google sheet
     
     # ADD STOCK NAME
@@ -196,7 +252,7 @@ def notif_stop_loss():
 
     
     # Historical Price
-    hist_price = get_hist_price()
+    hist_price = get_hist_data()
     
     # Merge
     main_data = ledger.merge(hist_price, how='left', on=['MARKET', 'SYMBOL'])
@@ -220,7 +276,6 @@ def notif_stop_loss():
         temp_data.columns = ['']
         
         content_li.append(temp_data)
-        print(i)
     
     
     ar.send_mail(to='myself20130612@gmail.com',
@@ -233,12 +288,14 @@ def notif_stop_loss():
 
 
 
+
+
 def master():
     '''
     主工作區
     '''
     
-    notif_stop_loss(stock_type='tw')    
+    notif_stop_loss()    
     
     return ''
 
