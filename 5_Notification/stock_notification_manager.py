@@ -6,6 +6,11 @@ Created on Sun Apr 18 20:27:39 2021
 @author: Aron
 """
 
+# Worklist
+# 1. 當交易完台股後，當天也要馬上記錄最高價
+
+
+
 
 # % 讀取套件 -------
 import pandas as pd
@@ -14,7 +19,7 @@ import sys, time, os, gc
 
 
 local = False
-# local = True
+local = True
 
 
 # Path .....
@@ -71,7 +76,9 @@ def get_hist_data():
     hist_data = cbyz.df_conv_col_type(df=hist_data, cols=['HIST_HIGH'], 
                                       to='float')
     
-    hist_data = hist_data[['MARKET', 'SYMBOL', 'HIST_HIGH']]
+    hist_data = hist_data[['MARKET', 'ID', 'SYMBOL', 'HIST_HIGH']]
+    hist_data.loc[hist_data['ID']=='', 'ID'] = hist_data['SYMBOL']
+    hist_data = cbyz.df_conv_col_type(df=hist_data, cols='ID', to='str')
     
     return hist_data
 
@@ -82,96 +89,40 @@ def get_hist_data():
 def get_ledger():
     
     ledger = ar.google_get_sheet_data(url, worksheet='Ledger')
-    ledger = cbyz.df_conv_col_type(df=ledger, cols=['VOLUME', 'PRICE'],
+    ledger = cbyz.df_conv_col_type(df=ledger, cols=['VOLUME', 'COST'],
                                    to='float')
 
     cond = ledger['TYPE']=='Sell'
-    ledger['PRICE'] = np.where(cond, -ledger['PRICE'], ledger['PRICE'])
+    ledger['COST'] = np.where(cond, -ledger['COST'], ledger['COST'])
     ledger['VOLUME'] = np.where(cond, -ledger['VOLUME'], ledger['VOLUME'])
    
 
     ledger = ledger \
                 .groupby(['MARKET', 'SYMBOL']) \
-                .agg({'VOLUME':'sum',
-                      'PRICE':'sum',
+                .agg({'COST':'sum',
+                      'VOLUME':'sum',
                       'DATE':'min'}) \
                 .reset_index() \
                 .rename(columns={'DATE':'FIRST_PURCHASE'})
                 
-    ledger = ledger[(ledger['VOLUME']>0) & (ledger['PRICE']>10)] \
+    ledger = ledger[(ledger['VOLUME']>0) & (ledger['COST']>10)] \
                 .reset_index(drop=True)
-    ledger['MEAN_PRICE'] = ledger['PRICE'] / ledger['VOLUME']
+                
+    ledger['MEAN_COST'] = ledger['COST'] / ledger['VOLUME']
+    
+    
+    # Hold Days ......
+    ledger = cbyz.df_ymd(df=ledger, cols='FIRST_PURCHASE')
+    ledger['TODAY'] = cbyz.date_get_today(simplify=True)
+    ledger = cbyz.df_date_diff(df=ledger, col1='TODAY', col2='FIRST_PURCHASE')
+    
+    ledger = ledger.rename(columns={'DAYS':'HOLD_DAYS'})
+    ledger = ledger.drop(['FIRST_PURCHASE', 'TODAY'], axis=1)
+    
     return ledger
 
 
 # %% Operation ------
-
-
-def notif_stop_loss_backup_20210510(stock_type='tw'):
-    
-    stock_data_raw = stk.get_today_data(stock_type='tw')
-    stock_data = stock_data_raw[['WORK_DATE', 'SECURITY_CODE', 'NAME',
-                                 'OPEN_PRICE', 'CLOSE_PRICE', 
-                                 'HIGH_PRICE', 'LOW_PRICE']]
-
-    # Hold Data
-    hold_data = pd.DataFrame({'SECURITY_CODE':['00646', '00762'],
-                              'MEAN_COST':[30.11, 35.03]})
-    
-
-    # Merge Data
-    main_data = stock_data.merge(hold_data, on=['SECURITY_CODE'])
-    
-    table = [main_data]
-    
-    ar.send_mail(to='myself20130612@gmail.com',
-                 subject='ARON HACK Stock Stop Loss Notification', 
-                 content='ARON HACK Stock Stop Loss Notification', 
-                 df_list=table,
-                 preamble='ARON HACK Stock Stop Loss Notification')
-    
-    return ''
-
-
-
-
-
-
-def notif_stop_loss_backup_20210520(stock_type='tw'):
-    
-    # Hold Data
-    hold_symbols = ['00646', '00762']
-    hold_data = pd.DataFrame({'STOCK_SYMBOL':hold_symbols,
-                              'MEAN_COST':[30.11, 35.03],
-                                # 'FIRST_PURCHASE':[20190828, 20191105]})                              
-                                'FIRST_PURCHASE':[20200828, 20201105]})
-
-    main_data = stk.get_stop_loss(df=hold_data, date='FIRST_PURCHASE', 
-                              price='MEAN_COSE', thld=0.2)
-
-        
-    content_li = []
-    
-    for i in range(len(hold_symbols)):
-        
-        temp_data = main_data[main_data['STOCK_SYMBOL']==hold_symbols[i]]
-        temp_data = temp_data.T
-        content_li.append(temp_data)
-        print(i)
-    
-    
-    # table = [main_data]
-    
-    ar.send_mail(to='myself20130612@gmail.com',
-                 subject='ARON HACK Stock Stop Loss Notification', 
-                  content='ARON HACK Stock Stop Loss Notification', 
-                  df_list=content_li,
-                 preamble='ARON HACK Stock Stop Loss Notification')
-    
-    return ''
-
-
-
 
 
 def update_hist_data():
@@ -197,11 +148,17 @@ def update_hist_data():
     # Query from API
     crypto_price_raw = stk.crypto_get_price()
     
+    
+    global crypto_price
     crypto_price = \
         crypto_price_raw[crypto_price_raw['SYMBOL'].isin(crypto_symbol)]
     
     crypto_price = crypto_price[['ID', 'SYMBOL', 'PRICE', 'LAST_UPDATED']] \
                     .reset_index(drop=True)
+
+    crypto_price = cbyz.df_conv_col_type(df=crypto_price, cols='ID', to='str')
+
+                    
     
     # Merge data
     crypto_main = crypto \
@@ -227,7 +184,6 @@ def update_hist_data():
                           worksheet='Hist_Data_Log', append=True)    
     
     print('update_hist_data finished.')
-    return ''
 
 
 
@@ -249,25 +205,48 @@ def notif_stop_loss():
     
     # ADD STOCK NAME
     ledger = get_ledger()
-
+    
+    
+    # Current Price
+    loc_crypto_price = crypto_price.copy()
+    loc_crypto_price = loc_crypto_price.drop('LAST_UPDATED', axis=1)
+    
     
     # Historical Price
     hist_price = get_hist_data()
     
+    
     # Merge
-    main_data = ledger.merge(hist_price, how='left', on=['MARKET', 'SYMBOL'])
-    main_data = stk.cal_stop_loss(df=main_data, mean_price='MEAN_PRICE', 
+    main_data = ledger \
+        .merge(hist_price, how='left', on=['MARKET', 'SYMBOL']) \
+        .merge(loc_crypto_price, how='left', on=['ID', 'SYMBOL'])            
+        
+    main_data = stk.cal_stop_loss(df=main_data, mean_price='MEAN_COST',
                                   hist_high='HIST_HIGH', thld=0.2)
     
-    # main_data['ACTION'] = \
-    #     np.where(main_data['CUR_PRICE'] <= main_data['STOP_LOSS'])
+    main_data['ACTION'] = \
+        np.where(main_data['PRICE'] <= main_data['STOP_LOSS'], True, False)
     
     
-    # Reorder Columns
-    main_data = main_data[['MARKET', 'SYMBOL', 'FIRST_PURCHASE', 'VOLUME', 
-                           'PRICE', 'MEAN_PRICE', 'STOP_LOSS']]
+    # Reorder Columns ......
+    main_data = main_data[['MARKET', 'SYMBOL', 'HOLD_DAYS', 'VOLUME', 
+                           'COST', 'MEAN_COST', 'PRICE', 
+                           'STOP_LOSS', 'HIST_HIGH', 'ACTION']]
     
-    # Reorganize Data
+    main_data = main_data.sort_values(by=['MARKET', 'COST'], 
+                                      ascending=[True, False]) \
+                .reset_index(drop=True)
+    
+    
+    # Action Rows ......
+    chk = main_data[main_data['ACTION']==True] 
+    
+    if len(chk) == 0:
+        print('No action needed.')
+        return ''
+    
+    
+    # Reorganize Data ......
     content_li = []
     for i in range(len(main_data)):
         
@@ -285,7 +264,6 @@ def notif_stop_loss():
                  preamble='ARON HACK Stock Stop Loss Notification')
     
     return ''
-
 
 
 
