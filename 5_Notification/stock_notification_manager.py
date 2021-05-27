@@ -16,10 +16,11 @@ Created on Sun Apr 18 20:27:39 2021
 import pandas as pd
 import numpy as np
 import sys, time, os, gc
+import datetime
 
 
 local = False
-local = True
+# local = True
 
 
 # Path .....
@@ -83,6 +84,14 @@ def get_hist_data():
     return hist_data
 
 
+def get_dismiss_symbol():
+    
+    url ='https://docs.google.com/spreadsheets/d/1xEZ7khMMNstzrGMPhTNPmkyepsyXKtdeYAAl6txdCCk/edit?usp=sharing'
+    data = ar.google_get_sheet_data(url, worksheet='Dismiss')
+    data = cbyz.df_conv_col_type(df=data, cols='DISMISS', to='int')
+
+    return data
+
 
 
 
@@ -91,11 +100,6 @@ def get_ledger():
     ledger = ar.google_get_sheet_data(url, worksheet='Ledger')
     ledger = cbyz.df_conv_col_type(df=ledger, cols=['VOLUME', 'COST'],
                                    to='float')
-
-    cond = ledger['TYPE']=='Sell'
-    ledger['COST'] = np.where(cond, -ledger['COST'], ledger['COST'])
-    ledger['VOLUME'] = np.where(cond, -ledger['VOLUME'], ledger['VOLUME'])
-   
 
     ledger = ledger \
                 .groupby(['MARKET', 'SYMBOL']) \
@@ -132,6 +136,7 @@ def update_hist_data():
     ledger = get_ledger()
     ledger = ledger[['MARKET', 'SYMBOL']]
     
+    
     # Historical Data
     hist_data = get_hist_data()
     
@@ -144,6 +149,7 @@ def update_hist_data():
     # Crypto ......
     crypto = ledger[ledger['MARKET']=='Crypto'].reset_index(drop=True)
     crypto_symbol = crypto['SYMBOL'].unique().tolist()
+    
     
     # Query from API
     crypto_price_raw = stk.crypto_get_price()
@@ -187,8 +193,7 @@ def update_hist_data():
 
 
 
-
-def notif_stop_loss():
+def notif_stop_loss_backup_20210523():
     
     
     # Update 
@@ -264,6 +269,112 @@ def notif_stop_loss():
                  preamble='ARON HACK Stock Stop Loss Notification')
     
     return ''
+
+
+
+
+def notif_stop_loss():
+    
+    
+    import pytz
+    central = pytz.timezone('Asia/Taipei')
+    cur_time = datetime.datetime.now(central)    
+    
+    
+    # Break during 02:00 - 07:00
+    # 每次呼叫API會用掉25credits，Basic Plan的單日上限為333
+    if (cur_time.hour >= 2 and cur_time.hour <= 7) or (cur_time.hour % 2 == 1):
+        return ''
+    
+    
+    # Update 
+    update_hist_data()
+    
+    
+    # 1.Get current price
+    #   According to CryptoMarketCap, the best practice is to use their
+    #   symbol ID rather than symbl name, because symbol name may be duplicated.
+    #   The function crypto_get_id() was completed, but I haven't use it .
+    # 2. TW stock stop when weekend or holiday
+    # 3. 因為crypto free api doesn't provide historical data, so it should be 
+    # record in the google sheet
+    
+    # ADD STOCK NAME
+    ledger = get_ledger()
+    
+    
+    # Current Price
+    loc_crypto_price = crypto_price.copy()
+    loc_crypto_price = loc_crypto_price.drop('LAST_UPDATED', axis=1)
+    
+    
+    # Historical Price
+    # Update, 如果舊的歷史資料沒有刪，當再買入同一個symbol時可能會出錯
+    hist_price = get_hist_data()
+    
+    
+    # Dismiss Sysbol
+    dismiss_symbols = get_dismiss_symbol()
+    
+    
+    # Merge
+    main_data = ledger \
+        .merge(hist_price, how='left', on=['MARKET', 'SYMBOL']) \
+        .merge(loc_crypto_price, how='left', on=['ID', 'SYMBOL']) \
+        .merge(dismiss_symbols, how='left', on=['MARKET', 'ID', 'SYMBOL'])
+    
+    
+    # Dismiss
+    main_data = cbyz.df_conv_na(df=main_data, cols=['DISMISS'])
+    main_data = main_data[main_data['DISMISS']==0].reset_index(drop=True)
+    main_data = cbyz.df_conv_col_type(df=main_data, cols='DISMISS', to='int')
+
+    
+    main_data = stk.cal_stop_loss(df=main_data, mean_price='MEAN_COST',
+                                  hist_high='HIST_HIGH', thld=0.2)
+    
+    main_data['ACTION'] = \
+        np.where(main_data['PRICE'] <= main_data['STOP_LOSS'], True, False)
+    
+    
+    # Reorder Columns ......
+    main_data = main_data[['MARKET', 'SYMBOL', 'HOLD_DAYS', 'VOLUME', 
+                           'COST', 'MEAN_COST', 'PRICE', 
+                           'STOP_LOSS', 'HIST_HIGH', 'DISMISS', 'ACTION']]
+    
+    main_data = main_data.sort_values(by=['MARKET', 'COST'], 
+                                      ascending=[True, False]) \
+                .reset_index(drop=True)
+    
+    
+    # Action Rows ......
+    chk = main_data[(main_data['ACTION']==True) \
+                    & (main_data['DISMISS']==0)]
+    
+    if len(chk) == 0:
+        print('No action needed.')
+        return ''
+    
+    
+    # Reorganize Data ......
+    content_li = []
+    for i in range(len(main_data)):
+        
+        temp_data = main_data[main_data.index==i]
+        temp_data = temp_data.T
+        temp_data.columns = ['']
+        
+        content_li.append(temp_data)
+    
+    
+    ar.send_mail(to='myself20130612@gmail.com',
+                 subject='ARON HACK Stock Stop Loss Notification', 
+                  content='ARON HACK Stock Stop Loss Notification', 
+                  df_list=content_li,
+                 preamble='ARON HACK Stock Stop Loss Notification')
+    
+    return ''
+
 
 
 
