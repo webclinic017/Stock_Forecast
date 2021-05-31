@@ -53,7 +53,6 @@ else:
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
                  r'/home/aronhack/stock_predict/Function']
 
 
@@ -97,13 +96,12 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     讀取資料及重新整理
     '''
     
-
     
     if stock_symbol == None:
         target = stk.get_list(stock_type='tw', 
                               stock_info=False, 
                               update=False,
-                              local=local)    
+                              bar=True, local=local)
         # Dev
         target = target.iloc[0:10, :]
         stock_symbol = target['STOCK_SYMBOL'].tolist()
@@ -114,7 +112,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                             data_end=None, 
                             stock_type=stock_type, 
                             stock_symbol=stock_symbol, 
-                            local=local)    
+                            bar=True, local=local)
     else:
         full_data = pd.DataFrame()
         
@@ -125,7 +123,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                                data_end=data_end, 
                                stock_type=stock_type, 
                                stock_symbol=stock_symbol, 
-                               local=local)
+                               bar=True, local=local)
     else:
         lite_data = pd.DataFrame()    
     
@@ -139,11 +137,6 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 
 
 
-
-def get_hold_stock():
-    
-    
-    return ''
 
 
 
@@ -160,7 +153,6 @@ def get_buy_signal(data, hold_stocks=None):
                             .shift(-1) \
                             .reset_index(drop=True)        
         
-     
         
     loc_data.loc[loc_data['PREV_PRICE'] > loc_data['SIGNAL_THRESHOLD'], 
                  'SIGNAL'] = True
@@ -189,8 +181,7 @@ def get_model_data(data_begin=None, data_end=None,
                    data_period=150, predict_end=None, predict_period=15,
                    stock_symbol=[], lag=7):
     
-    
-    today = cbyz.get_time_serial()
+    today = cbyz.get_time_serial(to_int=True)
     
     if today < data_end:
         msg = "sam.get_model_data - " + str(data_end) + ' exceed today.'
@@ -235,7 +226,7 @@ def get_model_data(data_begin=None, data_end=None,
                                    predict_period=predict_end)
     
     # Date ......
-    predict_date = cbyz.time_get_seq(begin_date=predict_begin,
+    predict_date = cbyz.date_get_seq(begin_date=predict_begin,
                                       periods=predict_period,
                                       unit='d', simplify_date=True)
         
@@ -253,13 +244,12 @@ def get_model_data(data_begin=None, data_end=None,
     # Historical Data ...
     loc_data_raw = sam_load_data(data_begin=shift_head_begin,
                                  data_end=data_end,
-                                 stock_symbol=stock_symbol)    
+                                 stock_symbol=stock_symbol)  
     
     
     loc_data = loc_data_raw['DATA']
-    
     loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
-        .reset_index(drop=True)
+                .reset_index(drop=True)
     
      
     # Calendar ...
@@ -280,8 +270,12 @@ def get_model_data(data_begin=None, data_end=None,
     
     
     # Shift ......
-    shift_cols = ['CLOSE', 'HIGH', 'LOW', 'VOLUME']
-    
+    shift_cols = \
+        cbyz.df_get_cols_except(df=loc_predict_df,
+                                except_cols=['WORK_DATE', 'STOCK_SYMBOL',
+                                             'YEAR', 'MONTH', 'WEEKDAY', 
+                                             'WEEK_NUM'])
+        
     loc_data_shift, lag_cols = cbyz.df_add_shift_data(df=loc_predict_df, 
                                             cols=shift_cols, 
                                             shift=predict_period,
@@ -310,17 +304,16 @@ def get_model_data(data_begin=None, data_end=None,
                                             cols=norm_cols,
                                             groupby=['STOCK_SYMBOL'])
 
-
-
-    export_dict = {'MODEL_DATA':loc_model_data_norm['RESULTS'],
+    
+    export_dict = {'MODEL_DATA':loc_model_data_norm[0],
                    # 'PRECIDT_DATA':predict_data,
                    'PRECIDT_DATE':predict_date_list,
                    'MODEL_X':model_x,
                    'MODEL_Y':model_y,
                    'DATA_BEGIN':data_begin,
                    'DATA_END':data_end,
-                   'NORM_ORIG':loc_model_data_norm['ORIGINAL'],
-                   'NORM_GROUP':loc_model_data_norm['GROUPBY']}
+                   'NORM_ORIG':loc_model_data_norm[0],
+                   'NORM_GROUP':loc_model_data_norm[1]}
     
     return export_dict
 
@@ -438,13 +431,11 @@ def model_2(model_data, predict_date, model_x, model_y,
     '''
     
     import xgboost as xgb    
-   
 
     # ......
     results = pd.DataFrame()
     features = pd.DataFrame()
     rmse = pd.DataFrame()
-    
     
     for i in range(len(stock_symbol)):
         
@@ -456,27 +447,7 @@ def model_2(model_data, predict_date, model_x, model_y,
                        predict_begin=predict_date[0], model_x=model_x,
                        model_y=model_y)
         
-        # # Model Data ......
-        # cur_model_data = model_data[
-        #     (model_data['STOCK_SYMBOL']==cur_symbol) \
-        #         & (model_data['WORK_DATE']<predict_date[0])] \
-        #     .reset_index(drop=True)
 
-
-        # # Predict Data ......
-        # cur_predict_data = model_data[
-        #     (model_data['STOCK_SYMBOL']==cur_symbol) \
-        #         & (model_data['WORK_DATE'].isin(predict_date))
-        #     ]
-            
-        # predict_x = cur_predict_data[model_x]
-
-        
-        # # Traning And Test
-        # X = cur_model_data[model_x]
-        # y = cur_model_data[model_y]      
-        # X_train, X_test, y_train, y_test = train_test_split(X, y)
-        
         
         # Bug, 確認為什麼會有問題
         try:
@@ -486,10 +457,8 @@ def model_2(model_data, predict_date, model_x, model_y,
                 gamma=0,
                 max_depth=3
             )
-            
         except:
             continue
-
 
         regressor.fit(X_train, y_train)
         
@@ -506,7 +475,10 @@ def model_2(model_data, predict_date, model_x, model_y,
 
         # Test Group ......
         preds_test = regressor.predict(X_test)
-        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
+        
+        # Bug, y_test['CLOSE']裡面有NA
+        # new_rmse = np.sqrt(mean_squared_error(y_test['CLOSE'].tolist(),
+        #                                       len(preds_test)))
 
 
         # Prediction ......
@@ -520,10 +492,10 @@ def model_2(model_data, predict_date, model_x, model_y,
 
         
         # RMSE ......
-        new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
-                                'RMSE':[new_rmse]})
+        # new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
+        #                         'RMSE':[new_rmse]})
         
-        rmse = rmse.append(new_rmse_df)
+        # rmse = rmse.append(new_rmse_df)
         
 
 
@@ -539,7 +511,9 @@ def model_2(model_data, predict_date, model_x, model_y,
 
     return_dict = {'RESULTS':results,
                    'FEATURES':features,
-                   'RMSE':rmse} 
+                    'RMSE':''
+                   # 'RMSE':rmse,
+                   } 
 
     return return_dict
 
@@ -594,11 +568,10 @@ def predict(predict_begin, predict_end, predict_period, stock_symbol,
     
     # stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
-    
 
 
     # # .......
-    # loc_time_seq = cbyz.time_get_seq(begin_date=begin_date,
+    # loc_time_seq = cbyz.date_get_seq(begin_date=begin_date,
     #                                  periods=backtest_times,
     #                                  unit='d', skip=interval,
     #                                  simplify_date=True)
@@ -606,14 +579,9 @@ def predict(predict_begin, predict_end, predict_period, stock_symbol,
     # loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
 
     
-    # # Work area ----------
+    # Work area ----------
 
-    
-    
-    # # Date .........
-    # for i in range(0, len(loc_time_seq)):
-    
-
+     # .........
     shift_begin, shift_end, \
             data_begin, data_end, predict_begin, predict_end = \
                 cbyz.date_get_period(data_begin=None,
@@ -646,14 +614,11 @@ def predict(predict_begin, predict_end, predict_period, stock_symbol,
     data_end = data_raw['DATA_END']        
 
     
-    
     # Update, set to global variables?
     model_data = data_raw['MODEL_DATA']
     predict_date = data_raw['PRECIDT_DATE']
     model_x = data_raw['MODEL_X']
     model_y = data_raw['MODEL_Y']            
-
-
 
 
     # Model ......
@@ -791,7 +756,6 @@ def master(predict_begin=None, predict_end=None,
     limit:   days
     '''
     
-    
     shift_begin, shift_end, \
             data_begin, data_end, predict_begin, predict_end = \
                 cbyz.date_get_period(data_begin=None,
@@ -810,12 +774,10 @@ def master(predict_begin=None, predict_end=None,
                                data_end=data_end,
                                stock_symbol=stock_symbol)
     
-    
     # 2301 光寶科
     # 2474可成
     # 1714和桐
     # 2385群光
-    
     
     data_raw = get_model_data(data_begin=data_begin,
                               data_end=data_end,
@@ -836,9 +798,10 @@ def master(predict_begin=None, predict_end=None,
     # predict_period = 14
     
     
-    results = predict(predict_begin=predict_begin, predict_end=predict_end,
-                       predict_period=predict_period, 
-                       stock_symbol=stock_symbol)
+    results = predict(predict_begin=predict_begin, 
+                      predict_end=predict_end,
+                      predict_period=predict_period, 
+                      stock_symbol=stock_symbol)
     
     
     return results

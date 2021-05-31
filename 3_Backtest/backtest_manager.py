@@ -69,7 +69,6 @@ else:
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
                  master_path + '/2_Stock_Analysis',
                  master_path + '/Function']
 
@@ -162,37 +161,8 @@ def get_stock_fee():
 # ..........
     
 
-begin_date = 20170701
-data_period=360
-interval=30
-volume=1000
-budget=None
-days=60
-volume=None
-budget=None
-roi_base = 0.02
-stop_loss=0.8
-lag=7
-backtest_times=5
-    
 
-stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409]
-stock_type='tw'
-predict_period=15
-backtest_times=5
-signal_thld=0.03
-stop_loss=0.8
-lag=7
-debug=False
-
-
-begin=20190301
-
-
-
-
-
-def backtest_predict(begin, 
+def backtest_predict(begin_date, 
                      predict_period=14, data_period=360, 
                      interval=30,
                      volume=1000, budget=None, 
@@ -202,7 +172,7 @@ def backtest_predict(begin,
     
 
     # .......
-    loc_time_seq = cbyz.time_get_seq(begin_date=begin,
+    loc_time_seq = cbyz.date_get_seq(begin_date=begin,
                                      periods=backtest_times,
                                      unit='d', skip=interval,
                                      simplify_date=True)
@@ -410,7 +380,7 @@ def btm_predict_backup20210428(begin_date, data_period=360, interval=30,
     
 
     # .......
-    loc_time_seq = cbyz.time_get_seq(begin_date=begin_date,
+    loc_time_seq = cbyz.date_get_seq(begin_date=begin_date,
                                      periods=backtest_times,
                                      unit='d', skip=interval,
                                      simplify_date=True)
@@ -591,7 +561,7 @@ def btm_predict_backup_20210426(begin_date, data_period=360, interval=30,
     
 
     # .......
-    loc_time_seq = cbyz.time_get_seq(begin_date=begin_date,
+    loc_time_seq = cbyz.date_get_seq(begin_date=begin_date,
                                      periods=backtest_times,
                                      unit='d', skip=interval,
                                      simplify_date=True)
@@ -1113,6 +1083,34 @@ def btm_gen_actions(predict_results, rmse):
 # ...............
 
 
+begin_date = 20170701
+data_period=360
+interval=30
+volume=1000
+budget=None
+days=60
+volume=None
+budget=None
+roi_base = 0.02
+stop_loss=0.8
+lag=7
+backtest_times=5
+    
+
+stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409]
+stock_type='tw'
+predict_period=15
+backtest_times=5
+signal_thld=0.03
+stop_loss=0.8
+lag=7
+debug=False
+
+
+begin=20190301
+
+
+
 def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
            signal=None, budget=None, split_budget=False):
     '''
@@ -1156,10 +1154,21 @@ def master(begin_date=20190401, periods=5, stock_symbol=None, stock_type='tw',
     # Predict ------
     # (1) Bug, predict_main裡面可能會有duplicated rows by stock_symbole and 
     # model and backtest_id
-    predict_main_raw = btm_predict(begin_date=begin_date,
-                                   data_period=365, volume=1000, 
-                                   budget=None, predict_period=14, 
-                                   backtest_times=10, debug=False)
+    
+    # predict_main_raw = btm_predict(begin_date=begin_date,
+    #                                data_period=365, volume=1000, 
+    #                                budget=None, predict_period=14, 
+    #                                backtest_times=10, debug=False)
+    
+    
+    predict_main_raw = backtest_predict(begin_date=begin_date, 
+                     predict_period=14, data_period=360, 
+                     interval=30,
+                     volume=1000, budget=None, 
+                     stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
+                     stock_type='tw', backtest_times=5,
+                     signal_thld=0.03, stop_loss=0.8, lag=7, debug=False)
+    
     
     predict_main = predict_main_raw['RESULTS']
     predict_rmse = predict_main_raw['RMSE']

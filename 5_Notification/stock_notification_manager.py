@@ -11,7 +11,6 @@ Created on Sun Apr 18 20:27:39 2021
 
 
 
-
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -112,7 +111,7 @@ def get_ledger():
     ledger = ledger[(ledger['VOLUME']>0) & (ledger['COST']>10)] \
                 .reset_index(drop=True)
                 
-    ledger['MEAN_COST'] = ledger['COST'] / ledger['VOLUME']
+    ledger['PRICE'] = ledger['COST'] / ledger['VOLUME']
     
     
     # Hold Days ......
@@ -134,7 +133,8 @@ def update_hist_data():
     # Update, write a load_data(), then set ledger as a global vars,
     # preventing from call API repeatedly.
     ledger = get_ledger()
-    ledger = ledger[['MARKET', 'SYMBOL']]
+    ledger = ledger[['MARKET', 'SYMBOL', 'PRICE']] \
+                .rename(columns={'PRICE':'BUY_PRICE'})
     
     
     # Historical Data
@@ -152,10 +152,11 @@ def update_hist_data():
     
     
     # Query from API
-    crypto_price_raw = stk.crypto_get_price()
+    global crypto_price_raw, crypto_price
     
+    if "crypto_price_raw" not in globals():
+        crypto_price_raw = stk.crypto_get_price()
     
-    global crypto_price
     crypto_price = \
         crypto_price_raw[crypto_price_raw['SYMBOL'].isin(crypto_symbol)]
     
@@ -165,19 +166,50 @@ def update_hist_data():
     crypto_price = cbyz.df_conv_col_type(df=crypto_price, cols='ID', to='str')
 
                     
-    
     # Merge data
     crypto_main = crypto \
         .merge(hist_data, how='left', on=['MARKET', 'SYMBOL']) \
         .merge(crypto_price, how='left', on=['SYMBOL'])
     
+    
+    # Check Id ......
+    
+    # First time record in hist price
+    crypto_main.loc[crypto_main['ID_x'].isna(), 'ID_x'] = crypto_main['ID_y']
+    crypto_main = crypto_main \
+                    .rename(columns={'ID_x':'ID'}) \
+                    .drop('ID_y', axis=1)
+    
+    
+    # Identify the correct id if there are same symboles ......
+    crypto_main['PRICE_RATIO'] = abs(crypto_main['BUY_PRICE'] \
+                                  - crypto_main['PRICE']) \
+                                / crypto_main['BUY_PRICE']
+
+    crypto_main['HIST_HIGH'] = np.where((crypto_main['HIST_HIGH'].isna()) \
+                                        & (crypto_main['PRICE_RATIO']<0.15), 
+                                        0, crypto_main['HIST_HIGH'])
+
+    crypto_main = crypto_main[~crypto_main['HIST_HIGH'].isna()]
+
+    
+    # Update price ......
+    crypto_main = cbyz.df_conv_na(df=crypto_main, cols=['HIST_HIGH'])
     crypto_main = crypto_main[crypto_main['PRICE']>crypto_main['HIST_HIGH']] \
                     .reset_index(drop=True)
-    
+
 
     # Merget Data of All Markets ......
     main_data = crypto_main.copy()
     # main_data = crypto_main.append(tw_stock_main)
+    
+    
+    main_data['CURRENCY'] = np.select([main_data['MARKET']=='TW_Stock',
+                                   main_data['MARKET']=='Crypto'],
+                                  ['TWD', 'USD'])
+    main_data['NOTE'] = ''
+    main_data = main_data[['MARKET', 'LAST_UPDATED', 'ID', 'SYMBOL',
+                           'PRICE', 'CURRENCY', 'NOTE']]
     
     # Upload ......
     ar.google_sheet_write(obj=main_data, url=url, worksheet='Hist_Data',
@@ -226,7 +258,7 @@ def notif_stop_loss_backup_20210523():
         .merge(hist_price, how='left', on=['MARKET', 'SYMBOL']) \
         .merge(loc_crypto_price, how='left', on=['ID', 'SYMBOL'])            
         
-    main_data = stk.cal_stop_loss(df=main_data, mean_price='MEAN_COST',
+    main_data = stk.cal_stop_loss(df=main_data, mean_price='PRICE',
                                   hist_high='HIST_HIGH', thld=0.2)
     
     main_data['ACTION'] = \
@@ -235,7 +267,7 @@ def notif_stop_loss_backup_20210523():
     
     # Reorder Columns ......
     main_data = main_data[['MARKET', 'SYMBOL', 'HOLD_DAYS', 'VOLUME', 
-                           'COST', 'MEAN_COST', 'PRICE', 
+                           'COST', 'PRICE', 'PRICE', 
                            'STOP_LOSS', 'HIST_HIGH', 'ACTION']]
     
     main_data = main_data.sort_values(by=['MARKET', 'COST'], 
@@ -301,7 +333,7 @@ def notif_stop_loss():
     
     # ADD STOCK NAME
     ledger = get_ledger()
-    
+    ledger = ledger.rename(columns={'PRICE':'MEAN_COST'})
     
     # Current Price
     loc_crypto_price = crypto_price.copy()
@@ -330,7 +362,7 @@ def notif_stop_loss():
     main_data = cbyz.df_conv_col_type(df=main_data, cols='DISMISS', to='int')
 
     
-    main_data = stk.cal_stop_loss(df=main_data, mean_price='MEAN_COST',
+    main_data = stk.cal_stop_loss(df=main_data, mean_price='PRICE',
                                   hist_high='HIST_HIGH', thld=0.2)
     
     main_data['ACTION'] = \
@@ -374,8 +406,6 @@ def notif_stop_loss():
                  preamble='ARON HACK Stock Stop Loss Notification')
     
     return ''
-
-
 
 
 
