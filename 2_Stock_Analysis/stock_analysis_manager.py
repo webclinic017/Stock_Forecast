@@ -20,11 +20,6 @@ Created on Sat Nov 14 17:23:08 2020
 
 
 
-# 每日交易量很難看 不太準 因為有時候會爆大量 有時候很冷門。有時候正常交易 有時候是被當沖炒股
-# 流通性我基本上看股本
-# 台股來說 0-10億小股本股票 流通差。10-100億中型股。破100億算大型股
-
-
 # Dashboard，只跑三年資料
 # Process, select target > analyze > backtest
 # Filter with 股本 and 成交量
@@ -53,7 +48,8 @@ else:
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/home/aronhack/stock_predict/Function']
+                 r'/home/aronhack/stock_predict/Function',
+                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',]
 
 
 for i in path_codebase:    
@@ -71,21 +67,15 @@ import arsenal_stock as stk
 pd.set_option('display.max_columns', 30)
  
 
+path_resource = path + '/Resource'
+path_function = path + '/Function'
+path_temp = path + '/Temp'
+path_export = path + '/Export'
 
 
-def initialize(path):
+cbyz.os_create_folder(path=[path_resource, path_function, 
+                         path_temp, path_export])        
 
-    # 新增工作資料夾
-    global path_resource, path_function, path_temp, path_export
-    path_resource = path + '/Resource'
-    path_function = path + '/Function'
-    path_temp = path + '/Temp'
-    path_export = path + '/Export'
-    
-    
-    cbyz.create_folder(path=[path_resource, path_function, 
-                             path_temp, path_export])        
-    return ''
 
 
 
@@ -164,16 +154,6 @@ def get_buy_signal(data, hold_stocks=None):
 
 
 # ..............
-
-
-def get_sell_signal(data, hold_stocks=None):
-    
-    return ''
-
-
-# .............
-    
-
 
 
 
@@ -835,20 +815,109 @@ if __name__ == '__main__':
 
 
 
+# Select Rules
+# 1. 先找百元以下的，才有資金可以買一整張
+# 2. 不要找疫情後才爆漲到歷史新高的
+
+
+
+# data_begin = 20180101
+# data_end = 20200831
+
+
+
+# 每日交易量很難看 不太準 因為有時候會爆大量 有時候很冷門。有時候正常交易 有時候是被當沖炒股
+# 流通性我基本上看股本
+# 台股來說 0-10億小股本股票 流通差。10-100億中型股。破100億算大型股
 
 
 
 
 
+def find_target_price(data_begin, data_end):
+    
+    # 704929
+    data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
+                            shift=0, stock_type='tw', local=True)
+    
+    # 665
+    unique_days = len(data_raw['WORK_DATE'].unique())
+    
+    
+    # Workspace ......
+    results_raw = pd.DataFrame()    
+    results = pd.DataFrame()
+    
+    for i in range(10, 31):
+        
+        data, cols_pre = cbyz.df_add_shift(df=data_raw, 
+                                              group_key=['STOCK_SYMBOL'], 
+                                              cols=['CLOSE'], shift=5,
+                                              remove_na=False)
+        
+        # NT 10 - 10308
+        # 3714
+        data = data[data['CLOSE'] - data['CLOSE_PRE']>=i]
+        
+        summary = data \
+                    .groupby(['STOCK_SYMBOL']) \
+                    .size() \
+                    .reset_index(name='COUNT')
+                    
+        temp = pd.DataFrame({'PROFIT': [i],
+                             'ROW': [len(data)],
+                             'SYMBOL': [len(summary)]
+                             })
+    
+        results = results.append(temp)
+        results_raw = results_raw.append(data)        
+    
+    
+    results = results.reset_index(drop=True)
+    results_raw = results_raw.reset_index(drop=True)
+    
+    
+    # Select Symboles ......
+    stk_info = stk.tw_get_stock_info_1()
+    
+    target_symbols = results_raw.copy()
+    target_symbols = cbyz.df_add_size(df=target_symbols,
+                                      group_by='STOCK_SYMBOL',
+                                      col_name='TIMES')
+        
+    target_symbols = target_symbols \
+                    .groupby(['STOCK_SYMBOL']) \
+                    .agg({'CLOSE':'mean',
+                          'TIMES':'mean'}) \
+                    .reset_index()
+    
+    target_symbols = target_symbols.merge(stk_info, how='left', 
+                                          on='STOCK_SYMBOL')
+    
+    target_symbols = target_symbols \
+                        .sort_values(by=['TIMES', 'CLOSE'],
+                                     ascending=[False, True]) \
+                        .reset_index(drop=True)
+                        
+    target_symbols = target_symbols[target_symbols['CLOSE']<=100] \
+                            .reset_index(drop=True)
 
-def select_stock():
-    2301
+
+    # Export ......
+    time_serial = cbyz.get_time_serial()
+    target_symbols.to_excel(path_export + '/target_symbols_' \
+                            + time_serial + '.xlsx',
+                            index=False)
+
+
+    # Plot ......       
+    plot_data = results.melt(id_vars='PROFIT')
+
+    cbyz.plotly(df=plot_data, x='PROFIT', y='value', groupby='variable', 
+                title="", xaxes="", yaxes="", mode=1)
+        
+
     
     return ''
-
-
-
-
-
 
 
