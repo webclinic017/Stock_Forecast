@@ -519,24 +519,6 @@ def get_model_list(status=[0,1]):
 # ...............
 
 
-# def analyze_center(data):
-#     '''
-#     List all analysis here
-#     '''    
-    
-#     analyze_results = get_top_price(data)
-    
-
-#     # Results format
-#     # (1) Only stock passed test will show in the results
-#     # STOCK_SYMBOL
-#     # MODEL_ID, or MODEL_ID
-    
-#     return analyze_results
-
-
-
-
 def predict(predict_begin, predict_end, predict_period, stock_symbol,
             lag=14):
     
@@ -815,71 +797,99 @@ if __name__ == '__main__':
 
 
 
-# Select Rules
-# 1. 先找百元以下的，才有資金可以買一整張
-# 2. 不要找疫情後才爆漲到歷史新高的
+df = data_raw.copy()
+df = df[df['STOCK_SYMBOL'].isin(['1101', '9958'])]
 
 
+def add_ma(df, values=[5,15]):
+    
+    
+    values = cbyz.conv_to_list(values)
+    values.sort(reverse=True)
+    
+    
+    # Add Shift Columns .....
+    shift_cols = []
+    for i in range(1, values[0]+1):
+        
+        shift_cols.append('CLOSE_PRE_' + str(i))
+        df['CLOSE_PRE_' + str(i)] = df.groupby(['STOCK_SYMBOL'])['CLOSE'] \
+                                    .shift(i)
 
-# data_begin = 20180101
-# data_end = 20200831
+
+    for i in values:
+        
+        cols = ['CLOSE_PRE_' + str(j) for j in range(1, i + 1)]
+        temp = df[['STOCK_SYMBOL', 'WORK_DATE'] + cols]
+        temp = temp.melt(id_vars=['STOCK_SYMBOL', 'WORK_DATE'])
+        
+        print('bug, 用日期做排除')
+        
+        temp = temp \
+                .groupby(['STOCK_SYMBOL', 'WORK_DATE']) \
+                .agg({'value':'mean'}) \
+                .reset_index() \
+                .rename(columns={'value':'MA_' + str(i)})
+                
+        df = df.merge(temp, how='left', on=['STOCK_SYMBOL', 'WORK_DATE'])
 
 
+    df = df.drop(shift_cols, axis=1)
+    
+    return df
 
-# 每日交易量很難看 不太準 因為有時候會爆大量 有時候很冷門。有時候正常交易 有時候是被當沖炒股
-# 流通性我基本上看股本
-# 台股來說 0-10億小股本股票 流通差。10-100億中型股。破100億算大型股
+
 
 
 
 
 
 def find_target_price(data_begin, data_end):
+
+
+    # Select Rules
+    # 1. 先找百元以下的，才有資金可以買一整張
+    # 2. 不要找疫情後才爆漲到歷史新高的
+
+
+    # data_begin = 20180101
+    # data_end = 20210615          
+
+
+    # Stock info
+    stock_info = stk.tw_get_stock_info()
+
+
+    # 挑選中大型股 ......
+    level3_symbom = stock_info[stock_info['CAPITAL_LEVEL']>=2]
+    level3_symbom = level3_symbom['STOCK_SYMBOL'].tolist()
     
-    # 704929
+    
+    # Stock Data ......
     data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
+                            stock_symbol=level3_symbom, 
                             shift=0, stock_type='tw', local=True)
     
-    # 665
-    unique_days = len(data_raw['WORK_DATE'].unique())
+    data_raw = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbom)]
     
     
-    # Workspace ......
-    results_raw = pd.DataFrame()    
-    results = pd.DataFrame()
+    # Calculation ......
+    data, cols_pre = cbyz.df_add_shift(df=data_raw, 
+                                          group_key=['STOCK_SYMBOL'], 
+                                          cols=['CLOSE'], shift=5,
+                                          remove_na=False)
     
-    for i in range(10, 31):
-        
-        data, cols_pre = cbyz.df_add_shift(df=data_raw, 
-                                              group_key=['STOCK_SYMBOL'], 
-                                              cols=['CLOSE'], shift=5,
-                                              remove_na=False)
-        
-        # NT 10 - 10308
-        # 3714
-        data = data[data['CLOSE'] - data['CLOSE_PRE']>=i]
-        
-        summary = data \
-                    .groupby(['STOCK_SYMBOL']) \
-                    .size() \
-                    .reset_index(name='COUNT')
-                    
-        temp = pd.DataFrame({'PROFIT': [i],
-                             'ROW': [len(data)],
-                             'SYMBOL': [len(summary)]
-                             })
+    results_raw = data[data['CLOSE'] - data['CLOSE_PRE']>=10] \
+                    .reset_index(drop=True)
     
-        results = results.append(temp)
-        results_raw = results_raw.append(data)        
-    
-    
-    results = results.reset_index(drop=True)
-    results_raw = results_raw.reset_index(drop=True)
+    summary = results_raw \
+                .groupby(['STOCK_SYMBOL']) \
+                .size() \
+                .reset_index(name='COUNT')
+                
     
     
     # Select Symboles ......
-    stk_info = stk.tw_get_stock_info_1()
-    
     target_symbols = results_raw.copy()
     target_symbols = cbyz.df_add_size(df=target_symbols,
                                       group_by='STOCK_SYMBOL',
@@ -891,7 +901,7 @@ def find_target_price(data_begin, data_end):
                           'TIMES':'mean'}) \
                     .reset_index()
     
-    target_symbols = target_symbols.merge(stk_info, how='left', 
+    target_symbols = target_symbols.merge(main_symbol, how='left', 
                                           on='STOCK_SYMBOL')
     
     target_symbols = target_symbols \
@@ -899,8 +909,8 @@ def find_target_price(data_begin, data_end):
                                      ascending=[False, True]) \
                         .reset_index(drop=True)
                         
-    target_symbols = target_symbols[target_symbols['CLOSE']<=100] \
-                            .reset_index(drop=True)
+    # target_symbols = target_symbols[target_symbols['CLOSE']<=100] \
+    #                         .reset_index(drop=True)
 
 
     # Export ......
@@ -909,13 +919,11 @@ def find_target_price(data_begin, data_end):
                             + time_serial + '.xlsx',
                             index=False)
 
-
     # Plot ......       
-    plot_data = results.melt(id_vars='PROFIT')
+    # plot_data = results.melt(id_vars='PROFIT')
 
-    cbyz.plotly(df=plot_data, x='PROFIT', y='value', groupby='variable', 
-                title="", xaxes="", yaxes="", mode=1)
-        
+    # cbyz.plotly(df=plot_data, x='PROFIT', y='value', groupby='variable', 
+    #             title="", xaxes="", yaxes="", mode=1)
 
     
     return ''
