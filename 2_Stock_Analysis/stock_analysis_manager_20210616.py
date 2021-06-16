@@ -304,8 +304,82 @@ def get_model_data(lag=7):
     return export_dict
 
 
-# ...............
 
+
+
+
+def model_1(remove_none=True):
+    '''
+    Linear regression
+    '''
+    
+    from sklearn.linear_model import LinearRegression
+    
+        
+    global stock_symbol, model_x, model_y, model_data, predict_date
+
+    
+    # Model ........
+    model_info = pd.DataFrame()
+    results = pd.DataFrame()
+    rmse = pd.DataFrame()
+    
+    for i in range(0, len(stock_symbol)):
+        
+        cur_symbol = stock_symbol[i]
+        
+        # Dataset
+        X_train, X_test, y_train, y_test, X_predict = \
+            split_data(symbol=cur_symbol)        
+        
+        try:
+            reg = LinearRegression().fit(X_train, y_train)
+            # reg.score(x, y)
+            # reg.coef_
+            # reg.intercept_
+        except:
+            continue
+
+
+        # Test Group ......
+        preds_test = reg.predict(X_test)
+        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
+    
+    
+        # predict ......      
+        preds_test = reg.predict(X_predict)  
+        preds = reg.predict(X_predict).tolist()
+        preds = cbyz.li_join_flatten(preds)
+        
+        
+        # Combine ......
+        new_results = pd.DataFrame({'WORK_DATE':predict_date,
+                                    'CLOSE':preds})
+        new_results['STOCK_SYMBOL'] = cur_symbol
+        results = results.append(new_results)           
+
+
+        # RMSE ......
+        new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
+                                    'RMSE':[new_rmse]})
+        
+        rmse = rmse.append(new_rmse_df)
+    
+    
+    # Reorganize ------
+    if len(results) > 0:
+        results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
+                    .reset_index(drop=True)
+    
+    return_dict = {'RESULTS':results,
+                   'FEATURES':pd.DataFrame(),
+                   'RMSE':rmse} 
+
+    return return_dict
+
+
+# ................
+    
 
 def split_data(symbol):
     
@@ -333,95 +407,21 @@ def split_data(symbol):
     return X_train, X_test, y_train, y_test, X_predict
 
 
-# ..............
 
 
-
-def model_1(remove_none=True):
-    '''
-    Linear regression
-    '''
-    
-    from sklearn.linear_model import LinearRegression
-    global stock_symbol, model_x, model_y, model_data, predict_date
-
-    
-    # Model ........
-    model_info = pd.DataFrame()
-    results = pd.DataFrame()
-    rmse = pd.DataFrame()
-    rmse_li = []
-    
-    for i in range(0, len(stock_symbol)):
-        
-        cur_symbol = stock_symbol[i]
-        
-        # Dataset
-        X_train, X_test, y_train, y_test, X_predict = \
-            split_data(symbol=cur_symbol)        
-        
-        try:
-            reg = LinearRegression().fit(X_train, y_train)
-            # reg.score(x, y)
-            # reg.coef_
-            # reg.intercept_
-        except:
-            continue
-
-
-        # Test Group ......
-        preds_test = reg.predict(X_test)
-        
-        # RMSE ......
-        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
-        rmse_li.append([cur_symbol, new_rmse])
-    
-    
-        # predict ......      
-        preds_test = reg.predict(X_predict)  
-        preds = reg.predict(X_predict).tolist()
-        preds = cbyz.li_join_flatten(preds)
-        
-        
-        # Combine ......
-        new_results = pd.DataFrame({'WORK_DATE':predict_date,
-                                    'CLOSE':preds})
-        new_results['STOCK_SYMBOL'] = cur_symbol
-        results = results.append(new_results)           
-
-
-    rmse = pd.DataFrame(data=rmse_li, columns=['STOCK_SYMBOL', 'RMSE'])
-    
-    # Reorganize ------
-    if len(results) > 0:
-        results = results[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']] \
-                    .reset_index(drop=True)
-    
-    return_dict = {'RESULTS':results,
-                   'FEATURES':pd.DataFrame(),
-                   'RMSE':rmse} 
-
-    return return_dict
-
-
-# ................
-    
-
-
-def model_2(remove_none=True):
+def model_2(model_data, predict_date, model_x, model_y, 
+            stock_symbol, remove_none=True):
     '''
     XGBoost
     https://www.datacamp.com/community/tutorials/xgboost-in-python
     '''
     
     import xgboost as xgb    
-    global stock_symbol, model_x, model_y, model_data, predict_date
-
 
     # ......
     results = pd.DataFrame()
     features = pd.DataFrame()
-    rmse_li = []
+    rmse = pd.DataFrame()
     
     for i in range(len(stock_symbol)):
         
@@ -429,8 +429,11 @@ def model_2(remove_none=True):
         
         # Dataset
         X_train, X_test, y_train, y_test, X_predict = \
-            split_data(symbol=cur_symbol)
+            split_data(model_data=model_data, symbol=cur_symbol, 
+                       predict_begin=predict_date[0], model_x=model_x,
+                       model_y=model_y)
         
+
         
         # Bug, 確認為什麼會有問題
         try:
@@ -460,12 +463,8 @@ def model_2(remove_none=True):
         preds_test = regressor.predict(X_test)
         
         # Bug, y_test['CLOSE']裡面有NA
-        new_rmse = np.sqrt(mean_squared_error(y_test['CLOSE'].tolist(),
-                                              preds_test))
-
-        # RMSE ......
-        new_rmse = np.sqrt(mean_squared_error(y_test, preds_test))
-        rmse_li.append([cur_symbol, new_rmse])
+        # new_rmse = np.sqrt(mean_squared_error(y_test['CLOSE'].tolist(),
+        #                                       len(preds_test)))
 
 
         # Prediction ......
@@ -477,8 +476,13 @@ def model_2(remove_none=True):
         new_results['STOCK_SYMBOL'] = cur_symbol
         results = results.append(new_results)
 
-
-    rmse = pd.DataFrame(data=rmse_li, columns=['STOCK_SYMBOL', 'RMSE'])        
+        
+        # RMSE ......
+        # new_rmse_df = pd.DataFrame({'STOCK_SYMBOL':[cur_symbol],
+        #                         'RMSE':[new_rmse]})
+        
+        # rmse = rmse.append(new_rmse_df)
+        
 
 
     if len(results) > 0:
@@ -493,7 +497,8 @@ def model_2(remove_none=True):
 
     return_dict = {'RESULTS':results,
                    'FEATURES':features,
-                    'RMSE':rmse
+                    'RMSE':''
+                   # 'RMSE':rmse,
                    } 
 
     return return_dict
@@ -512,8 +517,8 @@ def get_model_list(status=[0,1]):
     # (2) List by model historic performance
     # (3) List by function pattern
     
-    function_list = [model_1, model_2]
-    # function_list = [model_1]
+    # function_list = [model_1, model_2]
+    function_list = [model_1]
 
     return function_list
 
@@ -523,12 +528,50 @@ def get_model_list(status=[0,1]):
 
 def predict():
     
+
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end    
     global model_data, predict_date, model_x, model_y, norm_orig, norm_group
     
     
-   
+    
+    # .......
+    # loc_time_seq = cbyz.date_get_seq(begin_date=begin_date,
+    #                                  periods=backtest_times,
+    #                                  unit='d', skip=interval,
+    #                                  simplify_date=True)
+    
+    # loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
+
+    
+    # Work area ----------
+
+     # .........
+    # shift_begin, shift_end, \
+    #         data_begin, data_end, predict_begin, predict_end = \
+    #             cbyz.date_get_period(data_begin=None,
+    #                                    data_end=None, 
+    #                                    data_period=360,
+    #                                    predict_begin=predict_begin, 
+    #                                    predict_end=None, 
+    #                                    predict_period=predict_period)        
+    
+
+    # (1) data_begin and data_end may be changed here.        
+    # Update，增加df_normalize
+    
+    
+    # data_begin = data_raw['DATA_BEGIN']
+    # data_end = data_raw['DATA_END']        
+
+    
+    # # Update, set to global variables?
+    # model_data = data_raw['MODEL_DATA']
+    # predict_date = data_raw['PRECIDT_DATE']
+    # model_x = data_raw['MODEL_X']
+    # model_y = data_raw['MODEL_Y']            
+
+
     # Model ......
     model_list = get_model_list()
     results = pd.DataFrame()
@@ -542,6 +585,7 @@ def predict():
         # Model results .......
         # (1) Update, should deal with multiple signal issues.
         #     Currently, only consider the first signal.
+        # (2) predict_data doesn't use.
         
         # global model_results_raw
         model_results_raw = cur_model(remove_none=True)      
@@ -556,15 +600,42 @@ def predict():
         
         # Buy Signal
         temp_results = model_results_raw['RESULTS']
+        # temp_results = temp_results.merge(buy_price, 
+        #                                     how='left',
+        #                                     on='STOCK_SYMBOL')
+        
+        
+        # temp_results['ROI'] = (temp_results['CLOSE'] \
+        #                         - temp_results['BUY_PRICE']) \
+        #                         / temp_results['BUY_PRICE']
+
+
+        # temp_results = temp_results[temp_results['ROI'] >= roi_base]
+        
+        
+        # temp_results['MODEL'] = model_name
+        # temp_results['DATA_BEGIN'] = data_begin
+        # temp_results['DATA_END'] = data_end
+        # temp_results['PREDICT_BEGIN'] = predict_begin
+        # temp_results['PREDICT_END'] = predict_end
+        # temp_results['BACKTEST_ID'] = i
+        
+        # buy_signal = buy_signal.append(temp_results)        
         
         
         # RMSE ......
         new_rmse = model_results_raw['RMSE']
         new_rmse['MODEL'] = model_name
+        new_rmse['BACKTEST_ID'] = i
         rmse = rmse.append(new_rmse)
         
         results = results.append(temp_results)
         
+    
+    # if len(buy_signal) == 0:
+    #     print('bt_buy_signal return 0 row.')
+    #     return pd.DataFrame()
+    
     
     # buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
     rmse = rmse.reset_index(drop=True)
@@ -608,9 +679,9 @@ def predict():
     
     print('predict > df_normalize_restore裡面有bug，需要用df A去還原df b')
     # loc_norm_group = norm_group[norm_group['COLUMN']=='CLOSE']
-    results = cbyz.df_normalize_restore(df=results, 
-                                        original=norm_orig,
-                                        groupby=loc_norm_group)
+    # results = cbyz.df_normalize_restore(df=results, 
+    #                                     original=norm_orig,
+    #                                     groupby=loc_norm_group)
     
     export_dict = {'RESULTS':results, 
                    'RMSE':rmse}
@@ -635,11 +706,10 @@ def master(predict_begin=None, predict_end=None,
     # stock_symbol = ['2301', '2474', '1714', '2385']    
     
     
-    # print('predict > df_normalize_restore裡面有bug，需要用df A去還原df b')    
-    
     data_period = 180
     predict_begin = 20210601
     predict_period = 15
+    
     
 
     global shift_begin, shift_end, data_begin, data_end
@@ -660,6 +730,8 @@ def master(predict_begin=None, predict_end=None,
     stock_symbol = ['2301', '2474', '1714', '2385']
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
 
+    # stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
+    
 
     # ......
     data_raw = get_model_data(lag=7)
@@ -678,6 +750,15 @@ def master(predict_begin=None, predict_end=None,
     
     
     return results
+
+
+
+# data_begin=20171001
+# data_end=20191231
+# data_period=None
+# predict_end=None
+# predict_period=30
+# stock_symbol=['2301', '2474', '1714', '2385']
 
 
 
