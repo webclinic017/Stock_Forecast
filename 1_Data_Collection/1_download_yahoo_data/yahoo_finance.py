@@ -133,6 +133,9 @@ def download_data(stock_list=[], chunk_begin=None, chunk_end=None,
     hist_data = hist_data.reset_index()
     hist_data['Date'] = hist_data['Date'].astype('str')
     
+    # There are some na values.
+    hist_data = hist_data[~hist_data['Open'].isna()]
+    
     
     # Rename
     hist_data = hist_data \
