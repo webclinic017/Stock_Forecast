@@ -12,6 +12,11 @@ Created on Sat Nov 14 17:23:08 2020
 # 2. Add crypto
 
 
+# Optimization
+# 1. 如何在回測的時候，不要分多次讀取歷史資料，而可以一次讀取完？
+
+
+
 # 2301 光寶科
 # 2474可成
 # 1714和桐
@@ -159,7 +164,7 @@ def get_model_data(lag=7):
     
     
     global shift_begin, shift_end, data_begin, data_end
-    global predict_begin, predict_end    
+    global predict_begin, predict_end, predict_period
     
     today = cbyz.get_time_serial(to_int=True)
     
@@ -174,23 +179,7 @@ def get_model_data(lag=7):
     stock_symbol = cbyz.conv_to_list(stock_symbol)
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, 'str')
     
-    # test_data = stk.stk_test_data_period(data_begin=data_begin, 
-    #                                      data_end=data_end, 
-    #                                      data_period=data_period,
-    #                                      predict_end=predict_end, 
-    #                                      predict_period=predict_period,
-    #                                      lag=lag,
-    #                                      stock_type='tw', 
-    #                                      stock_symbol=stock_symbol[0],
-    #                                      local=local)
-    
-    
-    # data_shift_begin = test_data['DATA_SHIFT_BEGIN']
-    # data_end = test_data['DATA_END']
-    # predict_begin = test_data['PREDICT_BEGIN']
-    # predict_end = test_data['PREDICT_END']    
-    
-    
+
     
     # 為了避免執行df_add_shift_data，data_begin變成NA而被刪除，先將data_begin往前推
     # N天，且為了避免遇到假日，再往前推20天。
@@ -204,10 +193,10 @@ def get_model_data(lag=7):
                 cbyz.date_get_period(data_begin=temp_data_begin, 
                                     data_end=data_end, 
                                     data_period=None,
-                                    predict_end=predict_begin, 
-                                    predict_period=predict_end)
-    
-    
+                                    predict_begin=predict_begin,
+                                    predict_end=predict_end, 
+                                    predict_period=None)
+
     
     # Date ......
     predict_date = cbyz.date_get_seq(begin_date=predict_begin,
@@ -273,7 +262,6 @@ def get_model_data(lag=7):
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     
             
-    # Bug, predict_period的長度和data_period太接近時會出錯
     model_x = lag_cols + var_cols
     model_y = ['CLOSE']
 
@@ -298,8 +286,8 @@ def get_model_data(lag=7):
                    'MODEL_Y':model_y,
                    'DATA_BEGIN':data_begin,
                    'DATA_END':data_end,
-                   'NORM_ORIG':loc_model_data_norm[0],
-                   'NORM_GROUP':loc_model_data_norm[1]}
+                   'NORM_ORIG':loc_model_data_norm[1],
+                   'NORM_GROUP':loc_model_data_norm[2]}
     
     return export_dict
 
@@ -527,7 +515,6 @@ def predict():
     global predict_begin, predict_end    
     global model_data, predict_date, model_x, model_y, norm_orig, norm_group
     
-    
    
     # Model ......
     model_list = get_model_list()
@@ -569,48 +556,12 @@ def predict():
     # buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
     rmse = rmse.reset_index(drop=True)
     
-    
-    # Add dynamic ROI -------
-    # Temporaily Remove
-    # predict_roi_pre = cbyz.df_add_rank(buy_signal, 
-    #                            value='WORK_DATE',
-    #                            group_key=['STOCK_SYMBOL', 'BACKTEST_ID'])
-            
 
-    # predict_roi = pd.DataFrame()
     
     
-    # for i in range(0, len(loc_time_seq)):
-    
-    #     df_lv1 = predict_roi_pre[predict_roi_pre['BACKTEST_ID']==i]
-    #     unique_symbol = df_lv1['STOCK_SYMBOL'].unique()
-        
-        
-    #     for j in range(0, len(unique_symbol)):
-            
-    #         df_lv2 = df_lv1[df_lv1['STOCK_SYMBOL']==unique_symbol[j]] \
-    #                     .reset_index(drop=True)
-            
-    #         for k in range(0, len(df_lv2)):
-                
-    #             if k == 0:
-    #                 df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'BUY_PRICE']
-    #                 continue
-                    
-    #             if df_lv2.loc[k, 'FORECAST_CLOSE'] >= df_lv2.loc[k-1, 'MAX_PRICE']:
-    #                 df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'FORECAST_CLOSE']
-    #             else:
-    #                 df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k-1, 'MAX_PRICE']
-                            
-    #         predict_roi = predict_roi.append(df_lv2)    
-    
-    
-    
-    print('predict > df_normalize_restore裡面有bug，需要用df A去還原df b')
-    # loc_norm_group = norm_group[norm_group['COLUMN']=='CLOSE']
     results = cbyz.df_normalize_restore(df=results, 
                                         original=norm_orig,
-                                        groupby=loc_norm_group)
+                                        groupby=norm_group)
     
     export_dict = {'RESULTS':results, 
                    'RMSE':rmse}
@@ -622,42 +573,39 @@ def predict():
 
 
 # %% Master ------
-# data_begin=None, data_end=None, 
-def master(predict_begin=None, predict_end=None, 
-           predict_period=15, data_period=150, 
-           stock_symbol=None, today=None, hold_stocks=None, limit=90):
+
+def master(_predict_begin, _predict_end=None, 
+           _predict_period=15, data_period=150, 
+           _stock_symbol=None):
     '''
     主工作區
-    roi:     percent
-    limit:   days
     '''
     
-    # stock_symbol = ['2301', '2474', '1714', '2385']    
+
     
     
-    # print('predict > df_normalize_restore裡面有bug，需要用df A去還原df b')    
-    
-    data_period = 180
-    predict_begin = 20210601
-    predict_period = 15
+    # data_period = 180
+    # predict_begin = 20210601
+    # predict_period = 15
     
 
     global shift_begin, shift_end, data_begin, data_end
-    global predict_begin, predict_end
+    global predict_begin, predict_end, predict_period
+    predict_period = _predict_period
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_begin, predict_end = \
                 cbyz.date_get_period(data_begin=None,
                                        data_end=None, 
                                        data_period=data_period,
-                                       predict_begin=predict_begin,
-                                       predict_end=None, 
-                                       predict_period=predict_period)        
+                                       predict_begin=_predict_begin,
+                                       predict_end=_predict_end, 
+                                       predict_period=_predict_period)        
             
     
-    # global stock_data
     global stock_symbol
-    stock_symbol = ['2301', '2474', '1714', '2385']
+    stock_symbol = _stock_symbol
+    # stock_symbol = ['2301', '2474', '1714', '2385']
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
 
 
@@ -674,10 +622,11 @@ def master(predict_begin=None, predict_end=None,
     norm_group = data_raw['NORM_GROUP']
     
     
-    results = predict()
+    global predict_results
+    predict_results = predict()
     
     
-    return results
+    return predict_results
 
 
 
@@ -692,9 +641,10 @@ def check():
 
 
 if __name__ == '__main__':
-    master()
+    
+    # master()
 
-
-
-
+    report = master(_predict_begin=20210601, _predict_end=None, 
+           _predict_period=15, data_period=360, 
+           _stock_symbol=['2301', '2474', '1714', '2385'])
 
