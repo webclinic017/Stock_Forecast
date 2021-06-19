@@ -10,6 +10,7 @@ Created on Sat Nov 14 17:23:08 2020
 # 1. Some models only work for some stock symbol.
 # > Clustering
 # 2. Add crypto
+# 3. 把Lag改成MA
 
 
 # Optimization
@@ -200,9 +201,10 @@ def get_model_data(lag=7):
     
     # Date ......
     predict_date = cbyz.date_get_seq(begin_date=predict_begin,
-                                      periods=predict_period,
-                                      unit='d', simplify_date=True,
-                                      ascending=True)
+                                     seq_length=predict_period,
+                                     interval=1,
+                                     unit='d', simplify_date=True,
+                                     ascending=True)
         
     predict_date = predict_date[['WORK_DATE']]
     predict_date_list = predict_date['WORK_DATE'].tolist()
@@ -543,7 +545,7 @@ def predict():
         
         # Buy Signal
         temp_results = model_results_raw['RESULTS']
-        
+        temp_results['MODEL'] = model_name
         
         # RMSE ......
         new_rmse = model_results_raw['RMSE']
@@ -576,12 +578,10 @@ def predict():
 
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, data_period=150, 
-           _stock_symbol=None):
+           _stock_symbol=None, _stock_type='tw'):
     '''
     主工作區
     '''
-    
-
     
     
     # data_period = 180
@@ -603,7 +603,9 @@ def master(_predict_begin, _predict_end=None,
                                        predict_period=_predict_period)        
             
     
-    global stock_symbol
+    global stock_symbol, stock_type
+    
+    stock_type = _stock_type
     stock_symbol = _stock_symbol
     # stock_symbol = ['2301', '2474', '1714', '2385']
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
@@ -611,6 +613,7 @@ def master(_predict_begin, _predict_end=None,
 
     # ......
     data_raw = get_model_data(lag=7)
+    # print(data_raw)
     
     
     global model_data, predict_date, model_x, model_y, norm_orig, norm_group
