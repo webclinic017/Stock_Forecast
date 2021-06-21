@@ -419,7 +419,6 @@ def master(bt_last_date, predict_period=14, interval=360, bt_times=5,
     cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15)
     
     
-    
     # Worlist
     # 1. Add 一周、兩周、三周、四周後的獲利狀況
     # 2. Query full data
@@ -427,11 +426,9 @@ def master(bt_last_date, predict_period=14, interval=360, bt_times=5,
     # 4, record rate of win    
     
     
-    
     # predict_main = predict_main_raw['RESULTS']
     # predict_rmse = predict_main_raw['RMSE']
     
-
     
     # # Backtest Report ------
     # backtest_main = btm_add_hist_data(predict_results=predict_main)
