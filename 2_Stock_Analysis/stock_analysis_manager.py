@@ -293,6 +293,7 @@ def get_model_data(lag=7):
     norm_cols = cbyz.li_join_flatten(model_x, model_y) 
     
     print("bug, df_normalize, 是不是na造成以下錯誤")
+    print('檢查modex_x中是否有na')
     # '<=' not supported between instances of 'float' and 'str'    
     
     loc_model_data_norm = cbyz.df_normalize(df=loc_model_data,
@@ -653,6 +654,7 @@ def master(_predict_begin, _predict_end=None,
     
     
     Bug, shift_begin - shift_end的區間應該要大於_predict_period
+    add shift amount
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_begin, predict_end = \
