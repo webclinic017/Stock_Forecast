@@ -187,41 +187,45 @@ def get_model_data():
     
     # Predict DataFrame ......
     stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
-    predict_df = cbyz.df_cross_join(stock_symbol_df, predict_date)
+    predict_df_pre = cbyz.df_cross_join(stock_symbol_df, predict_date)
     
     
-    # Load Historical Data ......
+    # Load Data ----------
+    
+    # Historical Data ...
     loc_data_raw = sam_load_data(data_begin=shift_begin,
                                  data_end=data_end,
                                  stock_symbol=stock_symbol)  
+    
     
     loc_data = loc_data_raw['DATA']
     loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
                 .reset_index(drop=True)
 
+
     # Add K line
     loc_data = stk.add_k_line(loc_data)
     
      
-    # Calendar ......
+    # Calendar ...
     calendar = ar.get_calendar(simplify=True)
     calendar = calendar.drop('WEEK_ID', axis=1)
     
     
     # Add predict Data ......
-    loc_main = loc_data.merge(predict_df, how='outer',
+    loc_predict_df = loc_data.merge(predict_df_pre, how='outer',
                                     on=['STOCK_SYMBOL', 'WORK_DATE'])
     
-    loc_main = loc_main \
+    loc_predict_df = loc_predict_df \
                         .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
                         .reset_index(drop=True)
     
-    loc_main = loc_main.merge(calendar, how='left', 
+    loc_predict_df = loc_predict_df.merge(calendar, how='left', 
                                           on='WORK_DATE')
     
     
     # One Hot Encoding ......
-    data_types = loc_main.dtypes
+    data_types = loc_predict_df.dtypes
     data_types = pd.DataFrame(data_types, columns=['TYPE']).reset_index()
     
     obj_cols = data_types[(data_types['TYPE']=='object') \
@@ -231,59 +235,52 @@ def get_model_data():
     
     # Assign columns munually
     obj_cols = obj_cols + ['K_LINE_TYPE']
-    loc_main = cbyz.df_get_dummies(loc_main, cols=obj_cols, 
+    loc_predict_df = cbyz.df_get_dummies(loc_predict_df, cols=obj_cols, 
                                          expand_col_name=True)    
+    
     
     # Shift ......
     shift_cols = \
-        cbyz.df_get_cols_except(df=loc_main,
+        cbyz.df_get_cols_except(df=loc_predict_df,
                                 except_cols=['WORK_DATE', 'STOCK_SYMBOL',
-                                             'YEAR', 'MONTH', 'WEEKDAY', 
-                                             'WEEK_NUM'])
+                                              'YEAR', 'MONTH', 'WEEKDAY', 
+                                              'WEEK_NUM'])
          
-
-    loc_main, ma_cols = stk.add_ma(df=loc_main, cols=shift_cols, 
-                                   key=['STOCK_SYMBOL'], 
-                          date='WORK_DATE', values=[5,20])
-
-
-    # loc_data_shift, lag_cols = cbyz.df_add_shift(df=loc_predict_df, 
-    #                                               cols=shift_cols, 
-    #                                               shift=predict_period,
-    #                                               group_key=['STOCK_SYMBOL'],
-    #                                               suffix='_LAG', 
-    #                                               remove_na=False)
+    loc_data_shift, lag_cols = cbyz.df_add_shift(df=loc_predict_df, 
+                                                  cols=shift_cols, 
+                                                  shift=predict_period,
+                                                  group_key=['STOCK_SYMBOL'],
+                                                  suffix='_LAG', 
+                                                  remove_na=False)
     
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
-    # model_x = lag_cols + var_cols
-    model_x = ma_cols + var_cols
+    model_x = lag_cols + var_cols
     model_y = ['CLOSE']
 
     
     # Model Data ......
     # loc_model_data = loc_data_shift.dropna(subset=model_x)
-    loc_main = loc_main[loc_main['WORK_DATE']>=data_begin] \
+    loc_model_data = loc_data_shift[loc_data_shift['WORK_DATE']>=data_begin] \
                         .reset_index(drop=True)
 
 
     # Check - X裡面不應該有na，但Y的預測區間會是na ......
-    chk = loc_main[model_x]
+    chk = loc_model_data[model_x]
     chk = cbyz.df_chk_col_na(df=chk, positive_only=True)
 
-
     if len(chk) > 0:
-        msg = 'get_model_data - loc_main[model_x]中有na'
+        msg = 'get_model_data - loc_model_data[model_x]中有na'
         print(msg)
 
 
     # Normalize ......
     norm_cols = cbyz.li_join_flatten(model_x, model_y) 
-    loc_main_norm = cbyz.df_normalize(df=loc_main,
+    loc_model_data_norm = cbyz.df_normalize(df=loc_model_data,
                                             cols=norm_cols,
                                             groupby=['STOCK_SYMBOL'])
     
     
-    loc_model_data_raw = loc_main_norm[0]
+    loc_model_data_raw = loc_model_data_norm[0]
     
     identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
     loc_model_data = loc_model_data_raw[norm_cols + identify_cols] \
@@ -298,8 +295,8 @@ def get_model_data():
                    'MODEL_Y':model_y,
                    'DATA_BEGIN':data_begin,
                    'DATA_END':data_end,
-                   'NORM_ORIG':loc_main_norm[1],
-                   'NORM_GROUP':loc_main_norm[2]}
+                   'NORM_ORIG':loc_model_data_norm[1],
+                   'NORM_GROUP':loc_model_data_norm[2]}
     
     return export_dict
 
@@ -660,7 +657,6 @@ def master(_predict_begin, _predict_end=None,
     # ......
     print('Worklist，把lag用ma的算法代替')
     print('Bug, PRICE_CHANGE_RATIO會有NA')    
-    # 移動平均線加權weight?
     data_raw = get_model_data()
     
     
@@ -698,10 +694,13 @@ if __name__ == '__main__':
 
 
 def check():
+    
     chk = cbyz.df_chk_col_na(df=model_data_raw)    
     chk = cbyz.df_chk_col_na(df=model_data)
 
     
+
+
 
 
 
