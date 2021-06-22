@@ -161,46 +161,19 @@ def get_buy_signal(data, hold_stocks=None):
 
 
 
-def get_model_data(lag=7):
+def get_model_data():
     
-    
-    print('Worklist，把lag用ma的算法代替')
-    print('Bug，這裡的日期有點混亂，會造成lag中有na，導致normalize出錯')
     
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end, predict_period
-    
-    today = cbyz.get_time_serial(to_int=True)
-    
-    if today < data_end:
-        msg = "sam.get_model_data - " + str(data_end) + ' exceed today.'
-        print(msg)
-        return msg
+    global stock_symbol
     
     
     # ......
-    global stock_symbol
     stock_symbol = cbyz.conv_to_list(stock_symbol)
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, 'str')
 
-    
-    # 為了避免執行df_add_shift_data，data_begin變成NA而被刪除，先將data_begin往前推
-    # N天，且為了避免遇到假日，再往前推20天。
-    temp_data_begin = cbyz.date_cal(data_begin,
-                                    amount=-predict_period-30,
-                                    unit='d')
 
-
-    shift_head_begin, shift_head_end, \
-            data_begin, data_end, predict_begin, predict_end = \
-                cbyz.date_get_period(data_begin=temp_data_begin, 
-                                    data_end=data_end, 
-                                    data_period=None,
-                                    predict_begin=predict_begin,
-                                    predict_end=predict_end, 
-                                    predict_period=None)
-
-    
     # Date ......
     predict_date = cbyz.date_get_seq(begin_date=predict_begin,
                                      seq_length=predict_period,
@@ -220,7 +193,7 @@ def get_model_data(lag=7):
     # Load Data ----------
     
     # Historical Data ...
-    loc_data_raw = sam_load_data(data_begin=shift_head_begin,
+    loc_data_raw = sam_load_data(data_begin=shift_begin,
                                  data_end=data_end,
                                  stock_symbol=stock_symbol)  
     
@@ -228,17 +201,10 @@ def get_model_data(lag=7):
     loc_data = loc_data_raw['DATA']
     loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
                 .reset_index(drop=True)
-    
+
 
     # Add K line
-    print("Update, add 'K_LINE_COLOR', 'K_LINE_TYPE', then execute one-hot-encoding")
-    print('Bug, PRICE_CHANGE_RATIO會有NA')
-    
     loc_data = stk.add_k_line(loc_data)
-    # k_line_vars = ['PRICE_CHANGE_RATIO', 'TOP_SHADOW', 'BOTTOM_SHADOW',
-    #                'BAR', 'PRICE_CHANGE_LEVEL']
-
-    # k_line_vars = ['TOP_SHADOW', 'BOTTOM_SHADOW']    
     
      
     # Calendar ...
@@ -258,6 +224,21 @@ def get_model_data(lag=7):
                                           on='WORK_DATE')
     
     
+    # One Hot Encoding ......
+    data_types = loc_predict_df.dtypes
+    data_types = pd.DataFrame(data_types, columns=['TYPE']).reset_index()
+    
+    obj_cols = data_types[(data_types['TYPE']=='object') \
+                            & (data_types['index']!='STOCK_SYMBOL')]
+        
+    obj_cols = obj_cols['index'].tolist()
+    
+    # Assign columns munually
+    obj_cols = obj_cols + ['K_LINE_TYPE']
+    loc_predict_df = cbyz.df_get_dummies(loc_predict_df, cols=obj_cols, 
+                                         expand_col_name=True)    
+    
+    
     # Shift ......
     shift_cols = \
         cbyz.df_get_cols_except(df=loc_predict_df,
@@ -265,10 +246,6 @@ def get_model_data(lag=7):
                                               'YEAR', 'MONTH', 'WEEKDAY', 
                                               'WEEK_NUM'])
          
-    # shift_cols = ['OPEN', 'HIGH', 'CLOSE', 'LOW', 
-    #               'VOLUME', 'PRICE_CHANGE']
-        
-        
     loc_data_shift, lag_cols = cbyz.df_add_shift(df=loc_predict_df, 
                                                   cols=shift_cols, 
                                                   shift=predict_period,
@@ -276,38 +253,42 @@ def get_model_data(lag=7):
                                                   suffix='_LAG', 
                                                   remove_na=False)
     
-    
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     model_x = lag_cols + var_cols
     model_y = ['CLOSE']
 
     
-    # Model Data
-    print('Bug, 有許多data row都有NA')
-    loc_model_data = loc_data_shift.dropna(subset=model_x)
+    # Model Data ......
+    # loc_model_data = loc_data_shift.dropna(subset=model_x)
     loc_model_data = loc_data_shift[loc_data_shift['WORK_DATE']>=data_begin] \
                         .reset_index(drop=True)
 
 
+    # Check - X裡面不應該有na，但Y的預測區間會是na ......
+    chk = loc_model_data[model_x]
+    chk = cbyz.df_chk_col_na(df=chk, positive_only=True)
+
+    if len(chk) > 0:
+        msg = 'get_model_data - loc_model_data[model_x]中有na'
+        print(msg)
+
+
     # Normalize ......
     norm_cols = cbyz.li_join_flatten(model_x, model_y) 
-    
-    print("bug, df_normalize, 是不是na造成以下錯誤")
-    print('檢查modex_x中是否有na')
-    # '<=' not supported between instances of 'float' and 'str'    
-    
     loc_model_data_norm = cbyz.df_normalize(df=loc_model_data,
                                             cols=norm_cols,
                                             groupby=['STOCK_SYMBOL'])
+    
+    
+    loc_model_data_raw = loc_model_data_norm[0]
+    
+    identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
+    loc_model_data = loc_model_data_raw[norm_cols + identify_cols] \
+                        .dropna(subset=model_x)
+    
 
-    
-    
-    chk = loc_model_data[norm_cols]
-    chk = cbyz.df_chk_col_na(df=chk)
-    
-    
-    
-    export_dict = {'MODEL_DATA':loc_model_data_norm[0],
+    export_dict = {'MODEL_DATA_RAW':loc_model_data_raw,
+                   'MODEL_DATA':loc_model_data,
                    # 'PRECIDT_DATA':predict_data,
                    'PRECIDT_DATE':predict_date_list,
                    'MODEL_X':model_x,
@@ -318,6 +299,7 @@ def get_model_data(lag=7):
                    'NORM_GROUP':loc_model_data_norm[2]}
     
     return export_dict
+
 
 
 # ...............
@@ -640,21 +622,19 @@ def master(_predict_begin, _predict_end=None,
     '''
     
     
-    # data_period = 180
-    # _predict_begin = 20210601
-    # _predict_end = None
-    # _predict_period = 15
-    # _stock_type = 'tw'
-    # _stock_symbol = ['2301', '2474', '1714', '2385']
+    data_period = 180
+    _predict_begin = 20210601
+    _predict_end = None
+    _predict_period = 15
+    _stock_type = 'tw'
+    _stock_symbol = ['2301', '2474', '1714', '2385']
+
+
 
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end, predict_period
     predict_period = _predict_period
     
-    
-    
-    Bug, shift_begin - shift_end的區間應該要大於_predict_period
-    add shift amount
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_begin, predict_end = \
@@ -663,7 +643,8 @@ def master(_predict_begin, _predict_end=None,
                                        data_period=data_period,
                                        predict_begin=_predict_begin,
                                        predict_end=_predict_end, 
-                                       predict_period=_predict_period)        
+                                       predict_period=_predict_period,
+                                       shift=None)  
             
     
     global stock_symbol, stock_type
@@ -674,12 +655,15 @@ def master(_predict_begin, _predict_end=None,
 
 
     # ......
-    data_raw = get_model_data(lag=7)
-    # print(data_raw)
+    print('Worklist，把lag用ma的算法代替')
+    print('Bug, PRICE_CHANGE_RATIO會有NA')    
+    data_raw = get_model_data()
     
     
-    global model_data, predict_date, model_x, model_y, model_addt_vars
+    global model_data_raw, model_data, predict_date, model_x, model_y, model_addt_vars
     global norm_orig, norm_group
+    
+    model_data_raw = data_raw['MODEL_DATA_RAW']
     model_data = data_raw['MODEL_DATA']
     predict_date = data_raw['PRECIDT_DATE']
     model_x = data_raw['MODEL_X']
@@ -705,6 +689,18 @@ if __name__ == '__main__':
     report = master(_predict_begin=20210601, _predict_end=None, 
            _predict_period=15, data_period=360, 
            _stock_symbol=['2301', '2474', '1714', '2385'])
+
+
+
+
+def check():
+    
+    chk = cbyz.df_chk_col_na(df=model_data_raw)    
+    chk = cbyz.df_chk_col_na(df=model_data)
+
+    
+
+
 
 
 
