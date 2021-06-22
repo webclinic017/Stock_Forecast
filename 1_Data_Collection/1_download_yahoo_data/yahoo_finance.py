@@ -46,7 +46,6 @@ import arsenal_stock as stk
 
 
 
-
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
  
@@ -180,16 +179,13 @@ def master():
     ar.db_execute(sql, local=True, fetch=False)
     
     
-    stock_list = [2520, 2605, 6116, 6191, 3481, 2409]
-    
-    # Total stock symbol - 19167
-    
+    # stock_list = [2520, 2605, 6116, 6191, 3481, 2409]
     
     # hist_data
     
     # download_data(stock_list)
     download_data(stock_list=[], chunk_begin=None, chunk_end=None, 
-                  upload=False)
+                  upload=True)
     
     
     stock_list = stk.get_list(stock_type=stock_type)    

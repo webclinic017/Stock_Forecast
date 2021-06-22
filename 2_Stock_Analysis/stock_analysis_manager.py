@@ -113,11 +113,17 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     
 
     if lite == True:
-        lite_data = stk.get_data(data_begin=data_begin, 
+        
+        # Shift one day forward to get complete PRICE_CHANGE_RATIO
+        new_begin = cbyz.date_cal(data_begin, -1, 'd')
+        lite_data = stk.get_data(data_begin=new_begin, 
                                  data_end=data_end, 
                                  stock_type=stock_type, 
                                  stock_symbol=stock_symbol, 
                                  local=local)
+        
+        lite_data = lite_data[~lite_data['PRICE_CHANGE_RATIO'].isna()]
+        
     else:
         lite_data = pd.DataFrame()    
     
@@ -161,7 +167,7 @@ def get_buy_signal(data, hold_stocks=None):
 
 
 
-def get_model_data():
+def get_model_data(ma_values=[5,20]):
     
     
     global shift_begin, shift_end, data_begin, data_end
@@ -244,8 +250,13 @@ def get_model_data():
 
     loc_main, ma_cols = stk.add_ma(df=loc_main, cols=shift_cols, 
                                    key=['STOCK_SYMBOL'], 
-                          date='WORK_DATE', values=[5,20])
+                          date='WORK_DATE', values=ma_values)
+    
 
+    if predict_period > min(ma_values):
+        print('get_model_data - predict_period is longer than ma values, ' \
+              + 'and it will cause na.')
+        del loc_main
 
     # loc_data_shift, lag_cols = cbyz.df_add_shift(df=loc_predict_df, 
     #                                               cols=shift_cols, 
@@ -268,12 +279,8 @@ def get_model_data():
 
     # Check - X裡面不應該有na，但Y的預測區間會是na ......
     chk = loc_main[model_x]
-    chk = cbyz.df_chk_col_na(df=chk, positive_only=True)
-
-
-    if len(chk) > 0:
-        msg = 'get_model_data - loc_main[model_x]中有na'
-        print(msg)
+    cbyz.df_chk_col_na(df=chk, positive_only=True, return_obj=False,
+                       alert=True, alert_obj='loc_main')
 
 
     # Normalize ......
@@ -282,12 +289,17 @@ def get_model_data():
                                             cols=norm_cols,
                                             groupby=['STOCK_SYMBOL'])
     
-    
     loc_model_data_raw = loc_main_norm[0]
     
     identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
     loc_model_data = loc_model_data_raw[norm_cols + identify_cols] \
                         .dropna(subset=model_x)
+            
+                
+    if len(loc_model_data_raw) != len(loc_model_data):
+        print('get_model_data - the length of loc_model_data_raw and ' \
+              + 'loc_model_data are different.' )
+        del loc_model_data
     
 
     export_dict = {'MODEL_DATA_RAW':loc_model_data_raw,
@@ -316,7 +328,7 @@ def split_data(symbol=None):
     # Model Data ......
     if symbol == None:
         cur_model_data = model_data[model_data['WORK_DATE']<predict_date[0]] \
-        .reset_index(drop=True)
+                        .reset_index(drop=True)
         
         # Predict Data ......
         cur_predict_data = model_data[model_data['WORK_DATE']>=predict_date[0]]
@@ -413,11 +425,13 @@ def model_3(remove_none=True):
     global X_train, X_test, y_train, y_test, X_predict
     global X_train_lite, X_test_lite, y_train_lite, y_test_lite, X_predict_lite
     
-    
-
         
     reg = LinearRegression().fit(X_train_lite,
                                  y_train_lite)
+    
+    
+    features = pd.DataFrame({'FEATURES':list(X_train_lite.columns),
+                             'IMPORTANCE':list(reg.coef_)})
     # reg.score(x, y)
     # reg.coef_
     # reg.intercept_
@@ -444,7 +458,7 @@ def model_3(remove_none=True):
     
     # Reorganize ------
     return_dict = {'RESULTS':results,
-                   'FEATURES':pd.DataFrame(),
+                   'FEATURES':features,
                    'RMSE':rmse} 
 
     return return_dict
@@ -467,19 +481,16 @@ def model_4(remove_none=True):
     global stock_symbol, model_x, model_y, model_data, predict_date
 
 
-    global X_train, X_test, y_train, y_test, X_predict
+    global X_train, y_train, X_test, y_test, X_predict
     global X_train_lite, X_test_lite, y_train_lite, y_test_lite, X_predict_lite
     
 
     # ......
     results = pd.DataFrame()
     features = pd.DataFrame()
-    rmse_li = []
-    
         
     # Dataset
     split_data(symbol=None)
-    
         
     regressor = xgb.XGBRegressor(
         n_estimators=100,
@@ -488,8 +499,6 @@ def model_4(remove_none=True):
         max_depth=3
     )
     
-    
-
     regressor.fit(X_train_lite, y_train_lite)
         
         
@@ -509,7 +518,6 @@ def model_4(remove_none=True):
 
     # Prediction ......
     preds = regressor.predict(X_predict_lite)
-
 
 
     # Results ......
@@ -564,7 +572,7 @@ def predict():
     model_list = get_model_list()
     results = pd.DataFrame()
     rmse = pd.DataFrame()    
-    # error_msg = []    
+    features = pd.DataFrame()    
     
     
     for i in range(0, len(model_list)):
@@ -586,16 +594,22 @@ def predict():
         model_name = cur_model.__name__
         
         
-        # Buy Signal
+        # Results ......
         temp_results = model_results_raw['RESULTS']
         temp_results['MODEL'] = model_name
+        results = results.append(temp_results)
+        
+        
+        # Features ......
+        new_features = model_results_raw['FEATURES']
+        new_features['MODEL'] = model_name
+        features = features.append(new_features)
         
         # RMSE ......
         new_rmse = model_results_raw['RMSE']
         new_rmse['MODEL'] = model_name
         rmse = rmse.append(new_rmse)
         
-        results = results.append(temp_results)
         
     
     # buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
@@ -605,10 +619,6 @@ def predict():
     results = cbyz.df_normalize_restore(df=results, 
                                         original=norm_orig,
                                         groupby=norm_group)
-    
-    export_dict = {'RESULTS':results, 
-                   'RMSE':rmse}
-    
     
     return results, rmse
 
@@ -625,10 +635,10 @@ def master(_predict_begin, _predict_end=None,
     '''
     
     
-    data_period = 180
+    data_period = 360
     _predict_begin = 20210601
     _predict_end = None
-    _predict_period = 15
+    _predict_period = 5
     _stock_type = 'tw'
     _stock_symbol = ['2301', '2474', '1714', '2385']
 
@@ -658,10 +668,9 @@ def master(_predict_begin, _predict_end=None,
 
 
     # ......
-    print('Worklist，把lag用ma的算法代替')
-    print('Bug, PRICE_CHANGE_RATIO會有NA')    
     # 移動平均線加權weight?
-    data_raw = get_model_data()
+    ma不管怎麼樣都會有na，或是ma算完要再lag？
+    data_raw = get_model_data(ma_values=[5,20])
     
     
     global model_data_raw, model_data, predict_date, model_x, model_y, model_addt_vars
