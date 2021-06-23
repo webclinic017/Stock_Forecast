@@ -137,6 +137,32 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 
 
 
+
+
+
+def get_buy_signal(data, hold_stocks=None):
+    
+    loc_data = data.copy()
+    loc_data['SIGNAL_THRESHOLD'] = loc_data.groupby('STOCK_SYMBOL')['CLOSE'] \
+        .transform('max')
+
+    loc_data['SIGNAL_THRESHOLD'] = loc_data['SIGNAL_THRESHOLD'] * 0.95        
+        
+    loc_data['PREV_PRICE'] = loc_data \
+                            .groupby(['STOCK_SYMBOL'])['CLOSE'] \
+                            .shift(-1) \
+                            .reset_index(drop=True)        
+        
+        
+    loc_data.loc[loc_data['PREV_PRICE'] > loc_data['SIGNAL_THRESHOLD'], 
+                 'SIGNAL'] = True
+    
+    loc_data = loc_data[loc_data['SIGNAL']==True] \
+            .reset_index(drop=True)
+    
+    return loc_data
+
+
 # ..............
 
 
@@ -244,9 +270,7 @@ def get_model_data(ma_values=[5,20]):
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     # model_x = lag_cols + var_cols
     model_x = lag_cols + var_cols
-    # model_y = ['HIGH']
-    # model_y = ['CLOSE']
-    model_y = ['HIGH', 'LOW']
+    model_y = ['CLOSE']
 
     
     # Model Data ......
@@ -342,354 +366,41 @@ def split_data(symbol=None):
     X_predict_lite = X_predict.drop(model_addt_vars, axis=1)   
     
     
-    # y_train_lite = y_train[model_y[0]]
-    # y_test_lite = y_test[model_y[0]]    
-    y_train_lite = []
-    y_test_lite = []    
-    
-    for i in range(len(model_y)):
-        y_train_lite.append(y_train[model_y[i]])
-        y_test_lite.append(y_test[model_y[i]])        
+    y_train_lite = y_train['CLOSE']
+    y_test_lite = y_test['CLOSE']    
     
     
+    # return X_train, X_test, y_train, y_test, X_predict
+
+
+
+# def split_data_20210621(symbol):
+    
+#     global model_data, model_x, model_y, predict_date
+    
+#     # Model Data ......
+#     cur_model_data = model_data[(model_data['STOCK_SYMBOL']==symbol) \
+#             & (model_data['WORK_DATE']<predict_date[0])] \
+#         .reset_index(drop=True)
+    
+    
+#     # Predict Data ......
+#     cur_predict_data = model_data[
+#         (model_data['STOCK_SYMBOL']==symbol) \
+#             & (model_data['WORK_DATE']>=predict_date[0])]
+        
+#     X_predict = cur_predict_data[model_x]
+    
+    
+#     # Traning And Test
+#     X = cur_model_data[model_x]
+#     y = cur_model_data[model_y]      
+#     X_train, X_test, y_train, y_test = train_test_split(X, y)    
+    
+#     return X_train, X_test, y_train, y_test, X_predict
+
+
 # ..............
-
-
-def model_5(remove_none=True):
-    '''
-    Flatten Linear regression
-    '''
-    
-    from sklearn.linear_model import LinearRegression
-    global stock_symbol, model_x, model_y, model_addt_vars
-    global model_data, predict_date
-
-    
-    # Model ........
-    model_info = pd.DataFrame()
-    results = pd.DataFrame()
-    rmse = pd.DataFrame()
-    rmse_li = []
-    
-    
-    # Dataset
-    # split_data(symbol=None)        
-        
-    
-    global X_train, X_test, y_train, y_test, X_predict
-    global X_train_lite, X_test_lite, y_train_lite, y_test_lite, X_predict_lite
-    
-    
-    
-    # Predict ......
-    features = pd.DataFrame()
-    results = pd.DataFrame()
-    rmse = pd.DataFrame()    
-    
-    
-    for i in range(len(model_y)):
-        
-        
-        reg = LinearRegression().fit(X_train_lite,
-                                     y_train_lite[i])
-        
-        features_new = pd.DataFrame({'FEATURES':list(X_train_lite.columns),
-                                     'IMPORTANCE':list(reg.coef_)})
-        features_new['Y'] = model_y[i]
-        features = features.append(features_new)
-        # reg.score(x, y)
-        # reg.coef_
-        # reg.intercept_
-        
-    
-        # RMSE ......
-        preds_test = reg.predict(X_test_lite)
-        rmse_new = np.sqrt(mean_squared_error(y_test_lite[i], preds_test))
-        rmse_new = pd.DataFrame(data=[rmse_new], columns=['RMSE'])
-        rmse_new['Y'] = model_y[i]
-        rmse = rmse.append(rmse_new)
-    
-    
-        # Predict ......      
-        preds = reg.predict(X_predict_lite).tolist()
-        preds = cbyz.li_join_flatten(preds)
-        
-        results_new = X_predict[model_addt_vars].reset_index(drop=True)
-        results_new['VALUES'] = preds
-        results_new['Y'] = model_y[i]        
-        results = results.append(results_new)
-
-    
-    # Reorganize ------
-    return_dict = {'RESULTS':results,
-                   'FEATURES':features,
-                   'RMSE':rmse} 
-
-    return return_dict
-
-
-
-# ................
-    
-
-
-
-
-def model_6(remove_none=True):
-    '''
-    XGBoost flatten
-    https://www.datacamp.com/community/tutorials/xgboost-in-python
-    '''
-    
-    import xgboost as xgb    
-    global stock_symbol, model_x, model_y, model_data, predict_date
-
-
-    global X_train, y_train, X_test, y_test, X_predict
-    global X_train_lite, X_test_lite, y_train_lite, y_test_lite, X_predict_lite
-    
-
-    # Predict ......
-    features = pd.DataFrame()
-    results = pd.DataFrame()
-    rmse = pd.DataFrame()    
-    
-    
-    for i in range(len(model_y)):
-        
-        # Dataset
-        split_data(symbol=None)
-            
-        regressor = xgb.XGBRegressor(
-            n_estimators=100,
-            reg_lambda=1,
-            gamma=0,
-            max_depth=3
-        )
-        
-        regressor.fit(X_train_lite, y_train_lite[i])
-
-        
-        # Feature Importance ......
-        features_new = {'FEATURES':list(X_train_lite.columns),
-                           'IMPORTANCE':regressor.feature_importances_}
-        
-        features_new = pd.DataFrame(features_new)            
-        features_new['Y'] = model_y[i]
-        features = features.append(features_new)        
-
-    
-        # RMSE ......
-        preds_test = regressor.predict(X_test_lite)
-        rmse_new = np.sqrt(mean_squared_error(y_test_lite[i], preds_test))
-        rmse_new = pd.DataFrame(data=[rmse_new], columns=['RMSE'])
-        rmse_new['Y'] = model_y[i]
-        rmse = rmse.append(rmse_new)
-
-    
-        # Results ......
-        preds = regressor.predict(X_predict_lite)
-        results_new = X_predict[model_addt_vars].reset_index(drop=True)
-        results_new['VALUES'] = preds
-        results_new['Y'] = model_y[i]
-        results = results.append(results_new)
-        
-    
-    return_dict = {'RESULTS':results,
-                   'FEATURES':features,
-                    'RMSE':rmse
-                   } 
-
-    return return_dict
-
-
-
-
-
-# ................
-
-
-def get_model_list(status=[0,1]):
-    '''
-    List all analysis here
-    '''    
-
-    # (1) List manually
-    # (2) List by model historic performance
-    # (3) List by function pattern
-    
-    function_list = [model_5, model_6]
-    # function_list = [model_1, model_2, model_3, model_4]
-    # function_list = [model_1]
-
-    return function_list
-
-
-# ...............
-
-
-def predict():
-    
-    global shift_begin, shift_end, data_begin, data_end
-    global predict_begin, predict_end    
-    global model_data, predict_date, model_x, model_y, norm_orig, norm_group
-    
-   
-    split_data(symbol=None)
-    
-   
-    # Model ......
-    model_list = get_model_list()
-    results = pd.DataFrame()
-    rmse = pd.DataFrame()    
-    features = pd.DataFrame()    
-    
-    
-    for i in range(0, len(model_list)):
-
-        cur_model = model_list[i]
-        
-        # Model results .......
-        # (1) Update, should deal with multiple signal issues.
-        #     Currently, only consider the first signal.
-        
-        # global model_results_raw
-        model_results_raw = cur_model(remove_none=True)      
-        
-        
-        if len(model_results_raw['RESULTS']) == 0:
-            continue
-        
-        
-        model_name = cur_model.__name__
-        
-        
-        # Results ......
-        temp_results = model_results_raw['RESULTS']
-        temp_results['MODEL'] = model_name
-        results = results.append(temp_results)
-        
-        
-        # Features ......
-        new_features = model_results_raw['FEATURES']
-        new_features['MODEL'] = model_name
-        features = features.append(new_features)
-        
-        # RMSE ......
-        new_rmse = model_results_raw['RMSE']
-        new_rmse['MODEL'] = model_name
-        rmse = rmse.append(new_rmse)
-        
-    
-    # buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
-    rmse = rmse.reset_index(drop=True)
-    
-    
-    results = cbyz.df_normalize_restore(df=results, 
-                                        original=norm_orig,
-                                        groupby=norm_group)
-    
-    return results, rmse
-
-
-
-
-# %% Master ------
-
-def master(_predict_begin, _predict_end=None, 
-           _predict_period=15, data_period=150, 
-           _stock_symbol=None, _stock_type='tw', ma_values=[5,20]):
-    '''
-    主工作區
-    '''
-    
-    
-    data_period = 360
-    _predict_begin = 20210601
-    _predict_end = None
-    _predict_period = 5
-    _stock_type = 'tw'
-    _stock_symbol = ['2301', '2474', '1714', '2385']
-    ma_values = [5,20]
-
-
-
-    # Worklist .....
-    # 移動平均線加權weight?
-
-
-    global shift_begin, shift_end, data_begin, data_end
-    global predict_begin, predict_end, predict_period
-    
-    predict_period = _predict_period
-    data_shift = -(max(ma_values) * 2)
-    
-    
-    shift_begin, shift_end, \
-            data_begin, data_end, predict_begin, predict_end = \
-                cbyz.date_get_period(data_begin=None,
-                                       data_end=None, 
-                                       data_period=data_period,
-                                       predict_begin=_predict_begin,
-                                       predict_end=_predict_end, 
-                                       predict_period=predict_period,
-                                       shift=data_shift)  
-            
-    
-    global stock_symbol, stock_type
-    stock_type = _stock_type
-    stock_symbol = _stock_symbol
-    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
-
-
-    # ......
-    data_raw = get_model_data(ma_values=ma_values)
-    
-    
-    global model_data_raw, model_data, predict_date, model_x, model_y, model_addt_vars
-    global norm_orig, norm_group
-    
-    model_data_raw = data_raw['MODEL_DATA_RAW']
-    model_data = data_raw['MODEL_DATA']
-    predict_date = data_raw['PRECIDT_DATE']
-    model_x = data_raw['MODEL_X']
-    model_y = data_raw['MODEL_Y']    
-    norm_orig = data_raw['NORM_ORIG']
-    norm_group = data_raw['NORM_GROUP']
-    model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']
-    
-    
-    global predict_results
-    predict_results = predict()
-    predict_results
-    
-    
-    return predict_results
-
-
-
-
-if __name__ == '__main__':
-    
-    # master()
-
-    report = master(_predict_begin=20210601, _predict_end=None, 
-           _predict_period=15, data_period=360, 
-           _stock_symbol=['2301', '2474', '1714', '2385'])
-
-
-
-
-def check():
-    chk = cbyz.df_chk_col_na(df=model_data_raw)    
-    chk = cbyz.df_chk_col_na(df=model_data)
-
-    
-
-
-
-
-# %% V2 Flatten Model ......
 
 
 def model_3(remove_none=True):
@@ -829,6 +540,184 @@ def model_4(remove_none=True):
 
 
 
+
+# ................
+
+
+def get_model_list(status=[0,1]):
+    '''
+    List all analysis here
+    '''    
+
+    # (1) List manually
+    # (2) List by model historic performance
+    # (3) List by function pattern
+    
+    function_list = [model_3, model_4]
+    # function_list = [model_1, model_2, model_3, model_4]
+    # function_list = [model_1]
+
+    return function_list
+
+
+# ...............
+
+
+def predict():
+    
+    global shift_begin, shift_end, data_begin, data_end
+    global predict_begin, predict_end    
+    global model_data, predict_date, model_x, model_y, norm_orig, norm_group
+    
+   
+    # Model ......
+    model_list = get_model_list()
+    results = pd.DataFrame()
+    rmse = pd.DataFrame()    
+    features = pd.DataFrame()    
+    
+    
+    for i in range(0, len(model_list)):
+
+        cur_model = model_list[i]
+        
+        # Model results .......
+        # (1) Update, should deal with multiple signal issues.
+        #     Currently, only consider the first signal.
+        
+        # global model_results_raw
+        model_results_raw = cur_model(remove_none=True)      
+        
+        
+        if len(model_results_raw['RESULTS']) == 0:
+            continue
+        
+        
+        model_name = cur_model.__name__
+        
+        
+        # Results ......
+        temp_results = model_results_raw['RESULTS']
+        temp_results['MODEL'] = model_name
+        results = results.append(temp_results)
+        
+        
+        # Features ......
+        new_features = model_results_raw['FEATURES']
+        new_features['MODEL'] = model_name
+        features = features.append(new_features)
+        
+        # RMSE ......
+        new_rmse = model_results_raw['RMSE']
+        new_rmse['MODEL'] = model_name
+        rmse = rmse.append(new_rmse)
+        
+        
+    
+    # buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
+    rmse = rmse.reset_index(drop=True)
+    
+    
+    results = cbyz.df_normalize_restore(df=results, 
+                                        original=norm_orig,
+                                        groupby=norm_group)
+    
+    return results, rmse
+
+
+
+
+# %% Master ------
+
+def master(_predict_begin, _predict_end=None, 
+           _predict_period=15, data_period=150, 
+           _stock_symbol=None, _stock_type='tw', ma_values=[5,20]):
+    '''
+    主工作區
+    '''
+    
+    
+    data_period = 360
+    _predict_begin = 20210601
+    _predict_end = None
+    _predict_period = 5
+    _stock_type = 'tw'
+    _stock_symbol = ['2301', '2474', '1714', '2385']
+    ma_values = [5,20]
+
+
+
+    # Worklist .....
+    # 移動平均線加權weight?
+
+
+    global shift_begin, shift_end, data_begin, data_end
+    global predict_begin, predict_end, predict_period
+    
+    predict_period = _predict_period
+    data_shift = -(max(ma_values) * 2)
+    
+    
+    shift_begin, shift_end, \
+            data_begin, data_end, predict_begin, predict_end = \
+                cbyz.date_get_period(data_begin=None,
+                                       data_end=None, 
+                                       data_period=data_period,
+                                       predict_begin=_predict_begin,
+                                       predict_end=_predict_end, 
+                                       predict_period=predict_period,
+                                       shift=data_shift)  
+            
+    
+    global stock_symbol, stock_type
+    stock_type = _stock_type
+    stock_symbol = _stock_symbol
+    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
+
+
+    # ......
+    data_raw = get_model_data(ma_values=ma_values)
+    
+    
+    global model_data_raw, model_data, predict_date, model_x, model_y, model_addt_vars
+    global norm_orig, norm_group
+    
+    model_data_raw = data_raw['MODEL_DATA_RAW']
+    model_data = data_raw['MODEL_DATA']
+    predict_date = data_raw['PRECIDT_DATE']
+    model_x = data_raw['MODEL_X']
+    model_y = data_raw['MODEL_Y']    
+    norm_orig = data_raw['NORM_ORIG']
+    norm_group = data_raw['NORM_GROUP']
+    model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']
+    
+    
+    global predict_results
+    predict_results = predict()
+    predict_results
+    
+    
+    return predict_results
+
+
+
+
+if __name__ == '__main__':
+    
+    # master()
+
+    report = master(_predict_begin=20210601, _predict_end=None, 
+           _predict_period=15, data_period=360, 
+           _stock_symbol=['2301', '2474', '1714', '2385'])
+
+
+
+
+def check():
+    chk = cbyz.df_chk_col_na(df=model_data_raw)    
+    chk = cbyz.df_chk_col_na(df=model_data)
+
+    
 
 
 
@@ -996,28 +885,6 @@ def model_2(remove_none=True):
     return return_dict
 
 
-
-def get_buy_signal(data, hold_stocks=None):
-    
-    loc_data = data.copy()
-    loc_data['SIGNAL_THRESHOLD'] = loc_data.groupby('STOCK_SYMBOL')['CLOSE'] \
-        .transform('max')
-
-    loc_data['SIGNAL_THRESHOLD'] = loc_data['SIGNAL_THRESHOLD'] * 0.95        
-        
-    loc_data['PREV_PRICE'] = loc_data \
-                            .groupby(['STOCK_SYMBOL'])['CLOSE'] \
-                            .shift(-1) \
-                            .reset_index(drop=True)        
-        
-        
-    loc_data.loc[loc_data['PREV_PRICE'] > loc_data['SIGNAL_THRESHOLD'], 
-                 'SIGNAL'] = True
-    
-    loc_data = loc_data[loc_data['SIGNAL']==True] \
-            .reset_index(drop=True)
-    
-    return loc_data
 
 
 
