@@ -258,16 +258,18 @@ def get_model_data(ma_values=[5,20]):
               + 'and it will cause na.')
         del loc_main
 
-    # loc_data_shift, lag_cols = cbyz.df_add_shift(df=loc_predict_df, 
-    #                                               cols=shift_cols, 
-    #                                               shift=predict_period,
-    #                                               group_key=['STOCK_SYMBOL'],
-    #                                               suffix='_LAG', 
-    #                                               remove_na=False)
+    
+    # Add lag, or there will be na in the predict period
+    loc_main, lag_cols = cbyz.df_add_shift(df=loc_main, 
+                                           cols=ma_cols, 
+                                           shift=predict_period,
+                                           group_key=['STOCK_SYMBOL'],
+                                           suffix='_LAG', 
+                                           remove_na=False)
     
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     # model_x = lag_cols + var_cols
-    model_x = ma_cols + var_cols
+    model_x = lag_cols + var_cols
     model_y = ['CLOSE']
 
     
@@ -629,7 +631,7 @@ def predict():
 
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, data_period=150, 
-           _stock_symbol=None, _stock_type='tw'):
+           _stock_symbol=None, _stock_type='tw', ma_values=[5,20]):
     '''
     主工作區
     '''
@@ -641,12 +643,19 @@ def master(_predict_begin, _predict_end=None,
     _predict_period = 5
     _stock_type = 'tw'
     _stock_symbol = ['2301', '2474', '1714', '2385']
+    ma_values = [5,20]
 
+
+
+    # Worklist .....
+    # 移動平均線加權weight?
 
 
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end, predict_period
+    
     predict_period = _predict_period
+    data_shift = -(max(ma_values) * 2)
     
     
     shift_begin, shift_end, \
@@ -656,21 +665,18 @@ def master(_predict_begin, _predict_end=None,
                                        data_period=data_period,
                                        predict_begin=_predict_begin,
                                        predict_end=_predict_end, 
-                                       predict_period=_predict_period,
-                                       shift=None)  
+                                       predict_period=predict_period,
+                                       shift=data_shift)  
             
     
     global stock_symbol, stock_type
-    
     stock_type = _stock_type
     stock_symbol = _stock_symbol
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
 
 
     # ......
-    # 移動平均線加權weight?
-    ma不管怎麼樣都會有na，或是ma算完要再lag？
-    data_raw = get_model_data(ma_values=[5,20])
+    data_raw = get_model_data(ma_values=ma_values)
     
     
     global model_data_raw, model_data, predict_date, model_x, model_y, model_addt_vars
@@ -688,6 +694,7 @@ def master(_predict_begin, _predict_end=None,
     
     global predict_results
     predict_results = predict()
+    predict_results
     
     
     return predict_results
