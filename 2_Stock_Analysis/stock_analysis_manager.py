@@ -228,6 +228,7 @@ def get_model_data(ma_values=[5,20]):
     
 
     if predict_period > min(ma_values):
+        # Update, raise error here
         print('get_model_data - predict_period is longer than ma values, ' \
               + 'and it will cause na.')
         del loc_main
@@ -275,6 +276,7 @@ def get_model_data(ma_values=[5,20]):
             
                 
     if len(loc_model_data_raw) != len(loc_model_data):
+        print('這裡在回測的時候會出錯')
         print('get_model_data - the length of loc_model_data_raw and ' \
               + 'loc_model_data are different.' )
         del loc_model_data
@@ -604,13 +606,13 @@ def master(_predict_begin, _predict_end=None,
     '''
     
     
-    data_period = 360
-    _predict_begin = 20210601
-    _predict_end = None
-    _predict_period = 5
-    _stock_type = 'tw'
-    _stock_symbol = ['2301', '2474', '1714', '2385']
-    ma_values = [5,20]
+    # data_period = 360
+    # _predict_begin = 20210601
+    # _predict_end = None
+    # _predict_period = 5
+    # _stock_type = 'tw'
+    # _stock_symbol = ['2301', '2474', '1714', '2385']
+    # ma_values = [5,20]
 
 
 

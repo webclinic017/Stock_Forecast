@@ -121,7 +121,6 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 def backtest_predict(bt_last_date, predict_period, interval, 
                      bt_times, data_period):
     
-    
     global stock_symbol, stock_type
     bt_seq = cbyz.date_get_seq(begin_date=bt_last_date,
                                seq_length=bt_times,
@@ -132,9 +131,10 @@ def backtest_predict(bt_last_date, predict_period, interval,
     
     
     # Work area ----------
-    global bt_results, bt_rmse, model_y
-    bt_results_raw = pd.DataFrame()
+    global bt_results, bt_rmse
+    bt_results = pd.DataFrame()
     bt_rmse = pd.DataFrame()
+    # actions = pd.DataFrame()
     
     
     # Predict ......
@@ -143,10 +143,10 @@ def backtest_predict(bt_last_date, predict_period, interval,
         begin = bt_seq_list[i]
         
         results_raw = sam.master(_predict_begin=begin, 
-                                 _predict_end=None, 
-                                 _predict_period=predict_period,
-                                 data_period=data_period, 
-                                 _stock_symbol=stock_symbol)
+                                       _predict_end=None, 
+                                       _predict_period=predict_period,
+                                       data_period=data_period, 
+                                       _stock_symbol=stock_symbol)
 
 
         new_results = results_raw[0]
@@ -155,18 +155,9 @@ def backtest_predict(bt_last_date, predict_period, interval,
         new_rmse = results_raw[1]
         new_rmse['BACKTEST_ID'] = i
         
-        bt_results_raw = bt_results_raw.append(new_results)
+        bt_results = bt_results.append(new_results)
         bt_rmse = bt_rmse.append(new_rmse)
 
-
-    bt_results = bt_results_raw \
-                .pivot_table(index=['STOCK_SYMBOL', 'WORK_DATE', 
-                                    'MODEL', 'BACKTEST_ID'],
-                             columns='Y',
-                             values='VALUES') \
-                .reset_index()
-                
-    model_y = bt_results_raw['Y'].unique().tolist()
        
         
         # last_date = cbyz.date_cal(loc_time_seq[i], -1, 'd')
@@ -306,20 +297,18 @@ def backtest_verify(begin_date, actions, stock_symbol, stock_type='tw',
 def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15):
     
     global predict_period
-    global bt_results, bt_rmse, btm_main, actions, model_y
+    global bt_results, bt_rmse, btm_main, actions
     global stock_symbol, stock_type
 
 
-    print('Bug, data_begin and data_end should follow the backtest range')
-    today = cbyz.date_get_today()
+    # Update, data_begin and data_end should follow the backtest range
     hist_data = stk.get_data(data_begin=20160101, 
-                             data_end=today, 
+                             data_end=20210601, 
                              stock_type=stock_type, 
                              stock_symbol=stock_symbol, 
                              local=local)  
     
-    hist_data = hist_data[['WORK_DATE', 'STOCK_SYMBOL'] + model_y]
-
+    hist_data = hist_data[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']]
 
     # ....        
     date_prev = hist_data[['WORK_DATE']].drop_duplicates()
@@ -331,25 +320,15 @@ def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15):
     date_prev.columns = ['WORK_DATE', 'LAST_DATE']
     
     
-    # Organize columns names ......
-    y_cols = [i + '_x' for i in model_y]
-    y_cols = y_cols + [i + '_y' for i in model_y]
-    y_cols = y_cols + model_y
-    
-    y_cols_rename = [i + '_PREDICT' for i in model_y]
-    y_cols_rename = y_cols_rename + [i + '_HIST' for i in model_y]
-    y_cols_rename = y_cols_rename + [i + '_LAST' for i in model_y]
-    
-    rename_dict = cbyz.li_to_dict(y_cols, y_cols_rename)
-    
 
-    # Add last price and historical price .....    
+    # Add last price and historical price .....
     main_data = bt_results.merge(date_prev, how='left', on='WORK_DATE')
     main_data['LAST_DATE_MIN'] = main_data \
                         .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['LAST_DATE'] \
                         .transform('min')
                         
     main_data['LAST_DATE'] = main_data['LAST_DATE_MIN']
+
     main_data = main_data.merge(hist_data, how='left', 
                               on=['WORK_DATE', 'STOCK_SYMBOL'])
 
@@ -358,26 +337,24 @@ def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15):
                                 right_on=['WORK_DATE', 'STOCK_SYMBOL'])
 
 
-    main_data = main_data[['BACKTEST_ID', 'STOCK_SYMBOL', 'MODEL', 
-                           'WORK_DATE_x', 'LAST_DATE'] + y_cols]
+    main_data = main_data[['BACKTEST_ID', 'STOCK_SYMBOL', 'MODEL',
+                         'WORK_DATE_x', 'CLOSE_x', 'CLOSE_y',
+                         'LAST_DATE', 'CLOSE']]
 
-    main_data = main_data.rename(columns=rename_dict)
-
-
+    main_data.columns = ['BACKTEST_ID', 'STOCK_SYMBOL', 'MODEL',
+                        'WORK_DATE', 'CLOSE_PREDICT', 'CLOSE_HIST',
+                        'LAST_DATE', 'CLOSE_LAST']
     
-    
-    # Fill na in hist data ......
-    # 是不是需要一個向前補，一個向後補？
+    # Fill CLOSE_HIST NA ......
     for i in range(predict_period):
         
-        for j in model_y:
-            main_data.loc[main_data[j + '_HIST'].isna(), j + '_HIST'] = \
-                main_data.groupby(['BACKTEST_ID', 'STOCK_SYMBOL', 
-                                  'MODEL'])[j+'_HIST'] \
-                .shift(1)        
+        main_data.loc[main_data['CLOSE_HIST'].isna(), 'CLOSE_HIST'] = \
+            main_data.groupby(['BACKTEST_ID', 'STOCK_SYMBOL', 
+                              'MODEL'])['CLOSE_HIST'] \
+            .shift(1)
         
+                 
     
-    Bug, 這裡還沒換成multiple y
     btm_main, actions = \
         stk.gen_predict_action(df=main_data, rmse=bt_rmse,
                                   date='WORK_DATE', 
@@ -402,10 +379,10 @@ def master(bt_last_date, predict_period=14, interval=360, bt_times=5,
     
     
     # Parameters
-    bt_last_date = 20210601
-    predict_period = 5
+    bt_last_date = 20210501 # Update, 改成today？
+    predict_period = 14
     interval = 60
-    bt_times = 2
+    bt_times = 5
     data_period = 30
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
     _stock_type = 'tw'
@@ -417,6 +394,7 @@ def master(bt_last_date, predict_period=14, interval=360, bt_times=5,
     
     stock_type = _stock_type    
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
+    
 
     
     # full_data = sam.sam_load_data(data_begin=None, data_end=None, 
