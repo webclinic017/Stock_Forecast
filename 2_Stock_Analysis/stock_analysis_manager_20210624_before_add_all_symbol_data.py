@@ -87,60 +87,53 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None, 
-                  stock_symbol=None, full_data=False):
+                  stock_symbol=None, lite=True, full=False):
     '''
     讀取資料及重新整理
     '''
     
-    # Shift one day forward to get complete PRICE_CHANGE_RATIO
-    loc_begin = cbyz.date_cal(data_begin, -1, 'd')
+    
+    if stock_symbol == None:
+        target = stk.get_list(stock_type='tw', stock_info=False, 
+                              update=False, local=local)
+        # Dev
+        target = target.iloc[0:10, :]
+        stock_symbol = target['STOCK_SYMBOL'].tolist()
     
     
-    
-    if full_data:
-        data = stk.get_data(data_begin=loc_begin, 
-                                 data_end=data_end, 
+    if full == True:
+        full_data = stk.get_data(data_begin=None, 
+                                 data_end=None, 
                                  stock_type=stock_type, 
-                                 stock_symbol=None, 
+                                 stock_symbol=stock_symbol, 
                                  local=local)
     else:
-        data = stk.get_data(data_begin=loc_begin, 
+        full_data = pd.DataFrame()
+        
+    
+
+    if lite == True:
+        
+        # Shift one day forward to get complete PRICE_CHANGE_RATIO
+        new_begin = cbyz.date_cal(data_begin, -1, 'd')
+        lite_data = stk.get_data(data_begin=new_begin, 
                                  data_end=data_end, 
                                  stock_type=stock_type, 
                                  stock_symbol=stock_symbol, 
                                  local=local)
         
+        lite_data = lite_data[~lite_data['PRICE_CHANGE_RATIO'].isna()]
         
-    # Exclude the symbols shorter than begin_date ......
-    date_min = data['WORK_DATE'].min()
-    data['MIN_DATE'] = data \
-                        .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
-                        .transform('min')
-
-    data = data[data['MIN_DATE']==date_min] \
-            .drop('MIN_DATE', axis=1)
-
-
-    # Merge Other Data ......        
-    if full_data:        
-        
-        # Stock Info ...
-        stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
-                                           file_name=None, path=path_temp)
-        
-        stock_info = stock_info[['STOCK_SYMBOL', 'CAPITAL_LEVEL',
-                                 'ESTABLISH_DAYS', 'LISTING_DAYS', 
-                                 'INDUSTRY_ONE_HOT']]
-        
-        stock_info = cbyz.df_get_dummies(df=stock_info, 
-                                         cols='INDUSTRY_ONE_HOT')
-        
-        # Merge Data ......
-        data = data.merge(stock_info, how='left', on='STOCK_SYMBOL')
-        data = data[~data['ESTABLISH_DAYS'].isna()].reset_index(drop=True)
+    else:
+        lite_data = pd.DataFrame()    
     
     
-    return data
+
+    export_dict = {'DATA':lite_data,
+                   'FULL_DATA':full_data}    
+    
+    
+    return export_dict
 
 
 
@@ -151,7 +144,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 def get_model_data(ma_values=[5,20]):
     
     
-    global shift_begin, shift_end, data_begin, data_end, full_data
+    global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end, predict_period
     global stock_symbol
     
@@ -172,29 +165,23 @@ def get_model_data(ma_values=[5,20]):
     predict_date_list = predict_date['WORK_DATE'].tolist()
     
     
-    # Load Historical Data ......
-    loc_data = sam_load_data(data_begin=shift_begin,
-                                 data_end=data_end,
-                                 stock_symbol=stock_symbol, 
-                                 full_data=full_data) 
+    # Predict DataFrame ......
+    stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
+    predict_df = cbyz.df_cross_join(stock_symbol_df, predict_date)
     
+    
+    # Load Historical Data ......
+    loc_data_raw = sam_load_data(data_begin=shift_begin,
+                                 data_end=data_end,
+                                 stock_symbol=stock_symbol)  
+    
+    loc_data = loc_data_raw['DATA']
     loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
                 .reset_index(drop=True)
 
     # Add K line
     loc_data = stk.add_k_line(loc_data)
     
-
-    # Predict Symbols ......
-    if full_data:
-        all_symbols = loc_data['STOCK_SYMBOL'].unique().tolist()
-        stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':all_symbols})
-    
-    else:
-        stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
-        
-    predict_df = cbyz.df_cross_join(stock_symbol_df, predict_date)
-
      
     # Calendar ......
     calendar = ar.get_calendar(simplify=True)
@@ -266,41 +253,17 @@ def get_model_data(ma_values=[5,20]):
                         .reset_index(drop=True)
 
 
-    # Remove all data with na values ......
-    na_df = loc_main[model_x + ['STOCK_SYMBOL']]
-    na_df = na_df[na_df.isna().any(axis=1)]
-    symbols_removed = na_df['STOCK_SYMBOL'].unique().tolist()
-    loc_main = loc_main[~loc_main['STOCK_SYMBOL'].isin(symbols_removed)] \
-                .reset_index(drop=True)
-
-
     # Check - X裡面不應該有na，但Y的預測區間會是na ......
     chk = loc_main[model_x]
-    chk_na = cbyz.df_chk_col_na(df=chk, positive_only=True, return_obj=True,
-                                alert=True, alert_obj='loc_main')
-    
-    
-    # 由於有些股票剛上市，或是有特殊原因，導致資料不齊全，全部排除處理
-    # if full_data:
-    #     na_col = chk_na \
-    #                 .sort_values(by='NA_COUNT', ascending=False) \
-    #                 .reset_index(drop=True)
-                    
-    #     na_col = na_col.loc[0, 'COLUMN']
-    #     symbols_removed = loc_main[loc_main[na_col].isna()]
-    #     symbols_removed = symbols_removed['STOCK_SYMBOL'].unique().tolist()
-        
-    #     loc_main = loc_main[~loc_main['STOCK_SYMBOL'].isin(symbols_removed)] \
-    #                 .reset_index(drop=True)
+    cbyz.df_chk_col_na(df=chk, positive_only=True, return_obj=False,
+                       alert=True, alert_obj='loc_main')
 
-    
-    
+
     # Normalize ......
     norm_cols = cbyz.li_join_flatten(model_x, model_y) 
     loc_main_norm = cbyz.df_normalize(df=loc_main,
-                                      cols=norm_cols,
-                                      groupby=['STOCK_SYMBOL'],
-                                      show_progress=True)
+                                            cols=norm_cols,
+                                            groupby=['STOCK_SYMBOL'])
     
     loc_model_data_raw = loc_main_norm[0]
     
@@ -308,8 +271,9 @@ def get_model_data(ma_values=[5,20]):
     loc_model_data = loc_model_data_raw[norm_cols + identify_cols] \
                         .dropna(subset=model_x)
             
-            
+                
     if len(loc_model_data_raw) != len(loc_model_data):
+        print('這裡在回測的時候會出錯')
         print('Err01. get_model_data - the length of loc_model_data_raw and ' \
               + 'loc_model_data are different.' )
         del loc_model_data
@@ -337,7 +301,6 @@ def get_model_data(ma_values=[5,20]):
 def split_data(symbol=None):
     
     global model_data, model_x, model_y, model_addt_vars, predict_date
-    global stock_symbol
     
     # Model Data ......
     if symbol == None:
@@ -365,7 +328,6 @@ def split_data(symbol=None):
             
     # Predict            
     X_predict = cur_predict_data[model_x + model_addt_vars]
-    # X_predict = X_predict[X_predict['STOCK_SYMBOL'].isin(stock_symbol)]
  
     
     # Traning And Test
@@ -403,8 +365,19 @@ def model_5(remove_none=True):
 
     
     # Model ........
+    model_info = pd.DataFrame()
+    results = pd.DataFrame()
+    rmse = pd.DataFrame()
+    rmse_li = []
+    
+    
+    # Dataset
+    # split_data(symbol=None)        
+        
+    
     global X_train, X_test, y_train, y_test, X_predict
     global X_train_lite, X_test_lite, y_train_lite, y_test_lite, X_predict_lite
+    
     
     
     # Predict ......
@@ -414,6 +387,7 @@ def model_5(remove_none=True):
     
     
     for i in range(len(model_y)):
+        
         
         reg = LinearRegression().fit(X_train_lite,
                                      y_train_lite[i])
@@ -437,7 +411,7 @@ def model_5(remove_none=True):
     
         # Predict ......      
         preds = reg.predict(X_predict_lite).tolist()
-        # preds = cbyz.li_join_flatten(preds)
+        preds = cbyz.li_join_flatten(preds)
         
         results_new = X_predict[model_addt_vars].reset_index(drop=True)
         results_new['VALUES'] = preds
@@ -497,7 +471,7 @@ def model_6(remove_none=True):
         
         # Feature Importance ......
         features_new = {'FEATURES':list(X_train_lite.columns),
-                        'IMPORTANCE':regressor.feature_importances_}
+                           'IMPORTANCE':regressor.feature_importances_}
         
         features_new = pd.DataFrame(features_new)            
         features_new['Y'] = model_y[i]
@@ -544,6 +518,8 @@ def get_model_list(status=[0,1]):
     # (3) List by function pattern
     
     function_list = [model_5, model_6]
+    # function_list = [model_1, model_2, model_3, model_4]
+    # function_list = [model_1]
 
     return function_list
 
@@ -626,44 +602,33 @@ def predict():
 
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, data_period=180, 
-           _stock_symbol=None, _stock_type='tw', ma_values=[5,20],
-           _full_data=False):
+           _stock_symbol=None, _stock_type='tw', ma_values=[5,20]):
     '''
     主工作區
     '''
     
-    # data_period = 90
-    # data_period = 720
-    # _predict_begin = 20210611
+    
+    print('sam master - predict_begin + ' + str(_predict_begin))
+    
+    # data_period = 360
+    # _predict_begin = 20210601
+    # _predict_begin = 20210211    
     # _predict_end = None
     # _predict_period = 5
     # _stock_type = 'tw'
-    # ma_values = [5,20]
-    # _full_data = False
     # _stock_symbol = ['2301', '2474', '1714', '2385']
-
-
-    # target_symbols = pd.read_csv(path_export \
-    #                              + '/target_symbols_20210624_212851.csv')
-
-    # _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()
-
-
-    # Process ......
-    # 1. Full data to select symbols
-
+    # ma_values = [5,20]
 
 
     # Worklist .....
     # 移動平均線加權weight?
     # rmse by model and symbol?
 
-    global shift_begin, shift_end, data_begin, data_end, full_data
+    global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end, predict_period
     
     predict_period = _predict_period
     data_shift = -(max(ma_values) * 3)
-    full_data = _full_data
     
     
     shift_begin, shift_end, \
@@ -687,8 +652,7 @@ def master(_predict_begin, _predict_end=None,
     data_raw = get_model_data(ma_values=ma_values)
     
     
-    global model_data_raw, model_data, predict_date
-    global model_x, model_y, model_addt_vars
+    global model_data_raw, model_data, predict_date, model_x, model_y, model_addt_vars
     global norm_orig, norm_group
     
     model_data_raw = data_raw['MODEL_DATA_RAW']
@@ -705,8 +669,6 @@ def master(_predict_begin, _predict_end=None,
     predict_results = predict()
     predict_results
     
-    
-    print('sam master - predict_begin + ' + str(_predict_begin))    
     
     return predict_results
 
@@ -725,115 +687,13 @@ if __name__ == '__main__':
 
 
 def check():
-    
     chk = cbyz.df_chk_col_na(df=model_data_raw)    
     chk = cbyz.df_chk_col_na(df=model_data)
 
+
     # Err01
-    chk = loc_main[model_x]
-    chk_na = cbyz.df_chk_col_na(df=chk, positive_only=True, return_obj=True,
-                                alert=True, alert_obj='loc_main')
-    
     chk = loc_main[loc_main['OPEN_MA_20_LAG'].isna()]
     
-
-
-
-# %% Stock Selection ------
-
-
-def find_target(data_begin, data_end):
-
-
-    # Select Rules
-    # 1. 先找百元以下的，才有資金可以買一整張
-    # 2. 不要找疫情後才爆漲到歷史新高的
-
-
-    # data_begin = 20210301
-    # data_end = 20210623       
-
-
-    # Stock info
-    stock_info = stk.tw_get_stock_info()
-
-
-    # 挑選中大型股 ......
-    level3_symbom = stock_info[stock_info['CAPITAL_LEVEL']>=2]
-    level3_symbom = level3_symbom['STOCK_SYMBOL'].tolist()
-    
-    
-    # Stock Data ......
-    data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
-                            stock_symbol=level3_symbom, 
-                            shift=0, stock_type='tw', local=True)
-    
-    data_raw = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbom)]
-    
-    
-    # Calculation ......
-    data, cols_pre = cbyz.df_add_shift(df=data_raw, 
-                                       group_by=['STOCK_SYMBOL'], 
-                                       cols=['CLOSE'], shift=5,
-                                       remove_na=False)
-    
-    results_raw = data[data['CLOSE'] - data['CLOSE_PRE']>=10] \
-                    .reset_index(drop=True)
-    
-    summary = results_raw \
-                .groupby(['STOCK_SYMBOL']) \
-                .size() \
-                .reset_index(name='COUNT')
-                
-    
-    # Select Symboles ......
-    target_symbols = results_raw.copy()
-    target_symbols = cbyz.df_add_size(df=target_symbols,
-                                      group_by='STOCK_SYMBOL',
-                                      col_name='TIMES')
-        
-    target_symbols = target_symbols \
-                    .groupby(['STOCK_SYMBOL']) \
-                    .agg({'CLOSE':'mean',
-                          'TIMES':'mean'}) \
-                    .reset_index()
-    
-    target_symbols = target_symbols.merge(stock_info, how='left', 
-                                          on='STOCK_SYMBOL')
-    
-    target_symbols = target_symbols \
-                        .sort_values(by=['TIMES', 'CLOSE'],
-                                     ascending=[False, True]) \
-                        .reset_index(drop=True)
-                        
-    target_symbols = target_symbols[target_symbols['CLOSE']<=100] \
-                            .reset_index(drop=True)
-
-
-    time_serial = cbyz.get_time_serial(with_time=True)
-    target_symbols.to_csv(path_export + '/target_symbols_' \
-                          + time_serial + '.csv',
-                          index=False, encoding='utf-8-sig')
-
-
-
-
-
-    # Export ......
-    time_serial = cbyz.get_time_serial()
-    target_symbols.to_excel(path_export + '/target_symbols_' \
-                            + time_serial + '.xlsx',
-                            index=False)
-
-    # Plot ......       
-    # plot_data = results.melt(id_vars='PROFIT')
-
-    # cbyz.plotly(df=plot_data, x='PROFIT', y='value', groupby='variable', 
-    #             title="", xaxes="", yaxes="", mode=1)
-
-    
-    return results_raw, stock_info
-
 
 
 

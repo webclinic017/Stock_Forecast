@@ -144,7 +144,10 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     model_y = cbyz.df_get_cols_except(df=bt_results, 
                                       except_cols=['STOCK_SYMBOL', 'WORK_DATE', 
                                                    'MODEL', 'BACKTEST_ID'])
-       
+
+    bt_rmse = bt_rmse \
+        .sort_values(by=['MODEL', 'Y']) \
+        .reset_index(drop=True)
     
 
 # ............
@@ -366,15 +369,21 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     # Parameters
-    _bt_last_begin = 20210611
+    _bt_last_begin = 20210621
     # bt_last_begin = 20210211
     predict_period = 5
     interval = 60
     bt_times = 5
-    data_period = 360
-    _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409]
+    data_period = 720
+    _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_type = 'tw'
-    
+
+
+    path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/2_Stock_Analysis/Export'
+    target_symbols = pd.read_csv(path_sam \
+                                 + '/target_symbols_20210624_212851.csv')
+
+    _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()    
 
     
     global stock_symbol, bt_last_begin
@@ -401,6 +410,9 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      interval=interval,
                      bt_times=bt_times,
                      data_period=data_period)
+
+    view = bt_results[bt_results['STOCK_SYMBOL']=='2603']
+    view
     
     
     # Profit ------    
@@ -411,27 +423,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global bt_main, actions    
     cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.10)
     actions = actions[actions['MODEL']=='model_6']
-    
+    actions
 
-    # Worlist
-    # 1. Add 一周、兩周、三周、四周後的獲利狀況
-    # 2. Query full data
-    # 3, how to generate action?
-    # 4, record rate of win    
-    
-    
-
-    
-
-    # # Update 2
-    # # 00:28 Lien 連祥宇 我剛剛想了一下 目前有個小問題。公式可能需要設一下時間差。台股一天漲幅
-    # # 最大10啪 如果漲停 按你的公式 他會回跌2趴的時候出場。可是如果只有漲2趴 回跌0.4趴的時候
-    # # 你的公式就會出場賣出 可是一般同日買賣 0.4啪算是很平常的小波動。又如當日2啪跌到1啪
-    # # 是很正常的波動範圍 可是2啪跌到1啪已經是回檔5成了
-    # # 00:29 Lien 連祥宇 所以我在想是否兩最高價之間需要設立時間差？ 
-    # # 如每日計算一次之類的（我個人覺得每日還算太頻繁）否著你會過度交易 一天進出買賣100次之類的 手續費會直接讓你賠大錢
-    
-    
 
     
     
