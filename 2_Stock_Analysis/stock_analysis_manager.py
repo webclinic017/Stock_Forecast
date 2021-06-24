@@ -238,15 +238,12 @@ def get_model_data(ma_values=[5,20]):
     loc_main, lag_cols = cbyz.df_add_shift(df=loc_main, 
                                            cols=ma_cols, 
                                            shift=predict_period,
-                                           group_key=['STOCK_SYMBOL'],
+                                           group_by=['STOCK_SYMBOL'],
                                            suffix='_LAG', 
                                            remove_na=False)
     
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
-    # model_x = lag_cols + var_cols
     model_x = lag_cols + var_cols
-    # model_y = ['HIGH']
-    # model_y = ['CLOSE']
     model_y = ['HIGH', 'LOW']
 
     
@@ -277,7 +274,7 @@ def get_model_data(ma_values=[5,20]):
                 
     if len(loc_model_data_raw) != len(loc_model_data):
         print('這裡在回測的時候會出錯')
-        print('get_model_data - the length of loc_model_data_raw and ' \
+        print('Err01. get_model_data - the length of loc_model_data_raw and ' \
               + 'loc_model_data are different.' )
         del loc_model_data
     
@@ -583,11 +580,16 @@ def predict():
         rmse = rmse.append(new_rmse)
         
     
-    # buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
+    # Organize ......
     rmse = rmse.reset_index(drop=True)
     
+    results_pivot = results \
+                    .pivot_table(index=['STOCK_SYMBOL', 'WORK_DATE', 'MODEL'],
+                                 columns='Y',
+                                 values='VALUES') \
+                    .reset_index()
     
-    results = cbyz.df_normalize_restore(df=results, 
+    results = cbyz.df_normalize_restore(df=results_pivot, 
                                         original=norm_orig,
                                         groupby=norm_group)
     
@@ -599,15 +601,18 @@ def predict():
 # %% Master ------
 
 def master(_predict_begin, _predict_end=None, 
-           _predict_period=15, data_period=150, 
+           _predict_period=15, data_period=180, 
            _stock_symbol=None, _stock_type='tw', ma_values=[5,20]):
     '''
     主工作區
     '''
     
     
+    print('sam master - predict_begin + ' + str(_predict_begin))
+    
     # data_period = 360
     # _predict_begin = 20210601
+    # _predict_begin = 20210211    
     # _predict_end = None
     # _predict_period = 5
     # _stock_type = 'tw'
@@ -615,16 +620,15 @@ def master(_predict_begin, _predict_end=None,
     # ma_values = [5,20]
 
 
-
     # Worklist .....
     # 移動平均線加權weight?
-
+    # rmse by model and symbol?
 
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end, predict_period
     
     predict_period = _predict_period
-    data_shift = -(max(ma_values) * 2)
+    data_shift = -(max(ma_values) * 3)
     
     
     shift_begin, shift_end, \
@@ -686,6 +690,9 @@ def check():
     chk = cbyz.df_chk_col_na(df=model_data_raw)    
     chk = cbyz.df_chk_col_na(df=model_data)
 
+
+    # Err01
+    chk = loc_main[loc_main['OPEN_MA_20_LAG'].isna()]
     
 
 
