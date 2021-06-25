@@ -70,6 +70,9 @@ def download_data(stock_list=[], chunk_begin=None, chunk_end=None,
     '''
    
     global stock_type
+    
+    
+    Bug, 用這個方法會抓不到ETF，像是0050, 0056
 
     
     # Get stock list

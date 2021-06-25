@@ -74,7 +74,7 @@ from urllib.parse import parse_qs
 # 設定工作目錄 .....
 
 local = False
-# local = True
+local = True
 
 
 if local == True:
@@ -97,13 +97,14 @@ for i in path_codebase:
 
 
 import arsenal as ar
+import arsenal_stock as stk
 import codebase_yz as cbyz
 
 
 # from app_master import app
 import app_master as ms
-import desktop_app_v2_5_2
-import mobile_app_v2_5_2
+import desktop_app
+import mobile_app
 
 
 # # 手動設定區 -------

@@ -27,7 +27,7 @@ load_cache = False
 
 
 dev = False
-dev = True
+# dev = True
 
 
 
@@ -84,8 +84,6 @@ def load_data():
     '''
     讀取資料及重新整理
     '''
-
-    global main_data, main_data_lite
     
     # Historical Data .....
     # 20210625 - Remove this? 
@@ -113,15 +111,8 @@ def load_data():
                                  local=local)
         
     else:
-        # main_data = get_stock_data(begin_date_3y, end_date, 
-        #                             stock_type=stock_type)        
-
-
-        main_data = stk.get_data(data_begin=begin_date_3y, 
-                                 data_end=end_date, shift=0,
-                                 stock_type=stock_type, 
-                                 stock_symbol=[], 
-                                 local=local)        
+        main_data = get_stock_data(begin_date_3y, end_date, 
+                                    stock_type=stock_type)        
 
     
     # Stock Name .....
@@ -138,7 +129,7 @@ def load_data():
 
 
     # Work Area -------------
-    
+    global main_data, main_data_lite
     
     main_data = main_data \
                 .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
@@ -185,48 +176,51 @@ def load_data():
 # %% Inner Function -------
 
 
-# 20210625 - Removed 
-# def get_stock_data(begin_date=None, end_date=None, 
-#                    stock_type='tw', stock_symbol=[]):
+def get_stock_data(begin_date=None, end_date=None, 
+                   stock_type='tw', stock_symbol=[]):
     
     
-#     if stock_type == 'tw':
-#         stock_tb = 'stock_data_tw'
-#     elif stock_type == 'us':
-#         stock_tb = 'stock_data_us'
+    if stock_type == 'tw':
+        stock_tb = 'stock_data_tw'
+    elif stock_type == 'us':
+        stock_tb = 'stock_data_us'
     
 
-#     # Convert stock to list
-#     stock_li = [stock_symbol]
-#     stock_li = cbyz.li_flatten(stock_li)    
+    # Convert stock to list
+    stock_li = [stock_symbol]
+    stock_li = cbyz.li_flatten(stock_li)    
     
     
-#     if begin_date != None and end_date != None:
+    if begin_date != None and end_date != None:
         
-#         if len(stock_symbol) > 0:
-#             sql_stock = cbyz.li_add_quote(stock_li, "'")
-#             sql_stock = ', '.join(sql_stock)
-#             sql_stock = ' and stock_symbol in (' + sql_stock + ')'
-#         else:
-#             sql_stock = ''
+        if len(stock_symbol) > 0:
+            sql_stock = cbyz.li_add_quote(stock_li, "'")
+            sql_stock = ', '.join(sql_stock)
+            sql_stock = ' and stock_symbol in (' + sql_stock + ')'
+        else:
+            sql_stock = ''
             
-#         sql_cond = (" where date_format(work_date, '%Y%m%d') between " + str(begin_date) + " and " + str(end_date) +
-#                     sql_stock)
+        sql_cond = (" where date_format(work_date, '%Y%m%d') between " + str(begin_date) + " and " + str(end_date) +
+                    sql_stock)
         
-#     else:
-#         sql_stock = cbyz.li_add_quote(stock_li, "'")
-#         sql_stock = ', '.join(sql_stock)
-#         sql_cond = ' where stock_symbol in (' + sql_stock + ')'
+    else:
+        sql_stock = cbyz.li_add_quote(stock_li, "'")
+        sql_stock = ', '.join(sql_stock)
+        sql_cond = ' where stock_symbol in (' + sql_stock + ')'
     
 
-#     sql = ( "select date_format(work_date, '%Y%m%d') work_date, " 
-#     + " stock_symbol, high, close, low "
-#     + " from " + stock_tb + " "
-#     + sql_cond
-#     )
+    sql = ( "select date_format(work_date, '%Y%m%d') work_date, " 
+    + " stock_symbol, high, close, low "
+    + " from " + stock_tb + " "
+    + sql_cond
+    )
+    
+    
+
+    
         
-#     results = ar.db_query(sql, local=local)
-#     return results
+    results = ar.db_query(sql, local=local)
+    return results
 
 
 
