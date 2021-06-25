@@ -257,7 +257,7 @@ def get_model_data(ma_values=[5,20]):
     
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     model_x = lag_cols + var_cols
-    model_y = ['HIGH', 'LOW']
+    model_y = ['HIGH', 'LOW', 'CLOSE']
 
     
     # Model Data ......
@@ -632,8 +632,10 @@ def master(_predict_begin, _predict_end=None,
     主工作區
     '''
     
+    # date_period為10年的時候會出錯
+    
     # data_period = 90
-    # data_period = 720
+    # data_period = 365 * 5
     # _predict_begin = 20210611
     # _predict_end = None
     # _predict_period = 5
@@ -641,10 +643,11 @@ def master(_predict_begin, _predict_end=None,
     # ma_values = [5,20]
     # _full_data = False
     # _stock_symbol = ['2301', '2474', '1714', '2385']
+    
 
 
     # target_symbols = pd.read_csv(path_export \
-    #                              + '/target_symbols_20210624_212851.csv')
+    #                               + '/target_symbols_20210624_212851.csv')
 
     # _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()
 
@@ -657,6 +660,8 @@ def master(_predict_begin, _predict_end=None,
     # Worklist .....
     # 移動平均線加權weight?
     # rmse by model and symbol?
+    # 建長期投資的基本面模型
+    
 
     global shift_begin, shift_end, data_begin, data_end, full_data
     global predict_begin, predict_end, predict_period

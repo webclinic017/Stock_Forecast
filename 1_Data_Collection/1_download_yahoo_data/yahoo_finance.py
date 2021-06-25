@@ -179,10 +179,6 @@ def master():
     ar.db_execute(sql, local=True, fetch=False)
     
     
-    # stock_list = [2520, 2605, 6116, 6191, 3481, 2409]
-    
-    # hist_data
-    
     # download_data(stock_list)
     download_data(stock_list=[], chunk_begin=None, chunk_end=None, 
                   upload=True)

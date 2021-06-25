@@ -368,13 +368,16 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     '''
     
     
+    # 4106, 2009
+    
+    
     # Parameters
-    _bt_last_begin = 20210621
+    _bt_last_begin = 20210625
     # bt_last_begin = 20210211
     predict_period = 5
     interval = 60
     bt_times = 5
-    data_period = 720
+    data_period = 360 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_type = 'tw'
 
@@ -411,9 +414,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      bt_times=bt_times,
                      data_period=data_period)
 
-    view = bt_results[bt_results['STOCK_SYMBOL']=='2603']
-    view
-    
     
     # Profit ------    
     # price_thld = 2
@@ -423,10 +423,14 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global bt_main, actions    
     cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.10)
     actions = actions[actions['MODEL']=='model_6']
-    actions
+    actions = actions.drop('ROWS', axis=1)
+    actions = cbyz.df_add_size(df=actions, group_by='STOCK_SYMBOL',
+                               col_name='ROWS')
 
+    time_serial = cbyz.get_time_serial(with_time=True)
+    actions.to_excel(path_export + '/actions' + time_serial + '.xlsx', 
+                     index=False, encoding='utf-8-sig')
 
-    
     
     # # Predictions -----
     # predict_date = cbyz.date_gat_calendar(begin_date=20210406, 
