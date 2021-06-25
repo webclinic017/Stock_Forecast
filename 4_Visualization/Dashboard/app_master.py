@@ -109,7 +109,8 @@ def load_data():
         main_data['WORK_DATE'] = main_data['WORK_DATE'].apply(ar.ymd)
         main_data_lite = main_data[main_data['WORK_DATE']>=ar.ymd(begin_date_6m)]
     
-
+    
+        # new_data['x'] = new_data['x'].apply(lambda x: x.strftime('%Y-%m-%d'))
     
     
     # Stock List ......

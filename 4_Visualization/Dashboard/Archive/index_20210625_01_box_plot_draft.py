@@ -51,7 +51,6 @@ import dash_html_components as html
 import dash_daq as daq
 from dash.dependencies import Input, Output
 import plotly.express as px
-import plotly.graph_objs as go
 # import dash_bootstrap_components as dbc
 
 
@@ -216,9 +215,66 @@ figure_style = {
 
 
 
+
+
+# https://community.plotly.com/t/how-to-make-boxplot/7436/2
+import plotly.graph_objs as go
+
+trace0 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+       8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "All Points",
+    jitter = 0.3,
+    pointpos = -1.8,
+    boxpoints = 'all',
+)
+
+trace1 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+        8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "Only Whiskers",
+    boxpoints = False,
+)
+
+trace2 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+        8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "Suspected Outliers",
+    boxpoints = 'suspectedoutliers',
+)
+
+trace3 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+        8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "Whiskers and Outliers",
+    boxpoints = 'outliers',
+)
+
+data = [trace0,trace1,trace2,trace3]
+
+layout = go.Layout(
+    title = "Box Plot Styling Outliers"
+)
+
+fig = go.Figure(data=data,layout=layout)
+
+# dcc.Graph(figure=fig, id='box-plot-2')
+
+
+
+
+
+
+
+
+
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='url_debug'),
+    
+    dcc.Graph(figure=fig, id='box-plot-2'),
+    
+
     html.Div([
         dcc.Dropdown(
             id='stk_selector',
@@ -241,8 +297,6 @@ app.layout = html.Div([
     
     html.Div(id='app_main', 
              style=app_main_style),
-    
-    dcc.Graph(id="graph"),
     
     ]
 )
@@ -292,8 +346,6 @@ def get_url(url, style):
 
 # Output(component_id='line_chart', component_property='children'),
 # Output(component_id='debug', component_property='children')
-# Output(component_id='app_main', component_property='children'),
-# Output(component_id='graph', component_property='figure'),
 
 @app.callback(
     Output(component_id='app_main', component_property='children'),
@@ -303,6 +355,43 @@ def get_url(url, style):
 
 
 def update_output(dropdown_value, time_switch_value):
+    
+    
+    # Temp used
+    new_data = ms.main_data[['WORK_DATE', 'HIGH', 'LOW', 
+                             'OPEN', 'CLOSE', 'STOCK_SYMBOL']]
+    
+    
+    new_data = new_data.melt(id_vars=['STOCK_SYMBOL', 'WORK_DATE'])
+    new_data = new_data[['WORK_DATE', 'value', 'STOCK_SYMBOL']]
+    new_data.columns = ['x', 'y', 'name']
+    new_data['type'] = 'line'
+    new_data = new_data[['x', 'y', 'type', 'name']]
+
+        
+        
+    data1 = [{'x': new_data[new_data['name'] == s]['x'],
+              'y': new_data[new_data['name'] == s]['y'],
+              'type': 'line',
+              'name': s,
+              } for s in dropdown_value]
+               
+    
+    # selected_list = ['1101 台泥', '1102 亞泥']
+    
+    # symbols = [i.split(' ')[0] for i in selected_list]
+    # new_data = ms.main_data[ms.main_data['STOCK_SYMBOL'].isin(symbols)]
+    
+
+
+    # data1 = []
+
+    # for s in symbols:
+    #     temp = new_data[new_data['STOCK_SYMBOL']==s] 
+    #     temp = temp.to_dict('series')
+    #     data1.append(temp)                
+        
+        
 
     layout = {'plot_bgcolor': colors['background'],
               'paper_bgcolor': colors['background'],
@@ -314,6 +403,7 @@ def update_output(dropdown_value, time_switch_value):
               'yaxis':{'title':'收盤價',
                        'fixedrange':True},
               }
+    
 
 
     # Legend Layout ......
@@ -346,38 +436,141 @@ def update_output(dropdown_value, time_switch_value):
 
 
     
-
-
-
-    # Worklist 
-    # 2. add legend name
-
-    # https://plotly.com/python/candlestick-charts/
-
-    fig = go.Figure()
+    # results = dcc.Graph(
+    #             id='main_graph',
+    #             figure={
+    #                 'data': data1,
+    #                 'layout': layout,
+    #             },
+    #             style=graph_style
+    #         )
     
-    for i in range(len(dropdown_value)):
-
-        s = dropdown_value[i]  
-        df = ms.main_data[ms.main_data['STOCK_SYMBOL']==s] \
-            .reset_index(drop=True)        
+    
+    import plotly.graph_objs as go
+    
 
         
-        trace = go.Candlestick(
-            x=df['WORK_DATE'],
-            open=df['OPEN'],
-            high=df['HIGH'],
-            low=df['LOW'],
-            close=df['CLOSE'],
-            name=s
-        )
+    data1 = [{'x': new_data[new_data['name'] == s]['x'],
+              'y': new_data[new_data['name'] == s]['y'],
+              'type': 'line',
+              'name': s,
+              } for s in dropdown_value]
+
+
+
+    data = []
+    # dropdown_value = ['1101', '2603']
+    # ['#ff0000', '#00ff00'] * 21
+
+    # for s in dropdown_value:
+
+
+    #     print(len(new_data[new_data['name'] == s]['x']))        
         
-        fig.add_trace(trace)
+    #     total = len(new_data[new_data['name'] == s]['x'])
+    #     # color = ['red', 'green'] * int(total)
+        
+    #     color = ['red'] * int(total)
+
+    #     trace = go.Box(
+    #         x=new_data[new_data['name'] == s]['x'],
+    #         y=new_data[new_data['name'] == s]['y'],
+    #         fillcolor=color,
+    #         name = s,
+    #         # jitter = 0.3,
+    #         # pointpos = -1.8,
+    #         # boxpoints = 'all',
+    #     )        
+        
+    #     data.append(trace)
+        
 
 
-    fig.layout = dict(xaxis=dict(type="category", 
-                                  categoryorder='category ascending'))
+
+    for j in range(len(dropdown_value)):
+
+        s = dropdown_value[j]        
+
+        temp_data = new_data[new_data['name'] == s].reset_index(drop=True)
+        unique_data = temp_data['x'].unique().tolist()
+        
+        for i in range(len(unique_data)):
+            
+            
+            if i % 2 == 0:
+                color = 'red'
+            else:
+                color = 'green'
+
+            box_data = temp_data[temp_data['x']==unique_data[i]]
+            
+            
+            if i == 0:
+                show_legend = True
+            else:
+                show_legend = False
+
+
+            trace = go.Box(
+                x=box_data['x'].tolist(),
+                y=box_data['y'].tolist(),
+                fillcolor=color,
+                name=s,
+                legendgroup=j,
+                showlegend=show_legend,
+                marker_color='black',
+                # marker_size=1,
+                line_width=0.5,
+                # jitter = 0.3,
+                # pointpos = -1.8,
+                # boxpoints = 'all',
+            )        
+            
+            data.append(trace)
+                   
+        
     
+    # trace0 = go.Box(
+    #     y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+    #        8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    #     name = "All Points",
+    #     jitter = 0.3,
+    #     pointpos = -1.8,
+    #     boxpoints = 'all',
+    # )
+    
+    # trace1 = go.Box(
+    #     y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+    #         8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    #     name = "Only Whiskers",
+    #     boxpoints = False,
+    # )
+    
+    # trace2 = go.Box(
+    #     y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+    #         8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    #     name = "Suspected Outliers",
+    #     boxpoints = 'suspectedoutliers',
+    # )
+    
+    # trace3 = go.Box(
+    #     y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+    #         8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    #     name = "Whiskers and Outliers",
+    #     boxpoints = 'outliers',
+    # )
+    
+    # data = [trace0,trace1,trace2,trace3]
+    
+    # layout = go.Layout(
+    #     title = "Box Plot Styling Outliers"
+    # )
+    
+    fig = go.Figure(data=data)
+    
+    # dcc.Graph(figure=fig, id='box-plot-2')
+    
+
 
     results = dcc.Graph(
                 id='main_graph',
@@ -385,13 +578,13 @@ def update_output(dropdown_value, time_switch_value):
                 style=graph_style
             )
     
+    
 
     return results
 
 
 
 if __name__ == '__main__':
-    
     app.run_server()
     # app.run_server(debug=True)
 
