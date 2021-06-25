@@ -179,19 +179,21 @@ title_style = {
 stk_selector_style = {
     'width': '100%', 
     'padding-top': '40px', 
-    'display': 'block'
+    'display': 'block',
     }
 
 stk_selector_style_desktop = {
     'width': '70%', 
-    'padding-top': '40px', 
-    'display': 'block'
+    # 'padding-top': '40px', 
+    'display': 'block',
+    'height': 'auto',
     }
 
 stk_selector_style_mobile = {
     'width': '100%', 
-    'padding-top': '40px', 
-    'display': 'block'
+    # 'padding-top': '40px', 
+    'display': 'block',
+    'height': 'auto',
     }
 
 
@@ -203,10 +205,6 @@ btn_max_style = {
     'padding-top': '10px',
     }
 
-debug_style = {
-    'display': 'none',
-    }
-
 
 figure_style = {
     # 'transform': 'scale(1.1)'
@@ -216,11 +214,85 @@ figure_style = {
 
 
 
+
+
+
+import plotly.graph_objs as go
+
+trace0 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+       8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "All Points",
+    jitter = 0.3,
+    pointpos = -1.8,
+    boxpoints = 'all',
+    marker = dict(
+        color = 'rgb(7,40,89)'),
+    line = dict(
+        color = 'rgb(7,40,89)')
+)
+
+trace1 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+        8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "Only Whiskers",
+    boxpoints = False,
+    marker = dict(
+        color = 'rgb(9,56,125)'),
+    line = dict(
+        color = 'rgb(9,56,125)')
+)
+
+trace2 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+        8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "Suspected Outliers",
+    boxpoints = 'suspectedoutliers',
+    marker = dict(
+        color = 'rgb(8,81,156)',
+        outliercolor = 'rgba(219, 64, 82, 0.6)',
+        line = dict(
+            outliercolor = 'rgba(219, 64, 82, 0.6)',
+            outlierwidth = 2)),
+    line = dict(
+        color = 'rgb(8,81,156)')
+)
+
+trace3 = go.Box(
+    y = [0.75, 5.25, 5.5, 6, 6.2, 6.6, 6.80, 7.0, 7.2, 7.5, 7.5, 7.75, 8.15, 
+        8.15, 8.65, 8.93, 9.2, 9.5, 10, 10.25, 11.5, 12, 16, 20.90, 22.3, 23.25],
+    name = "Whiskers and Outliers",
+    boxpoints = 'outliers',
+    marker = dict(
+        color = 'rgb(107,174,214)'),
+    line = dict(
+        color = 'rgb(107,174,214)')
+)
+
+data = [trace0,trace1,trace2,trace3]
+
+layout = go.Layout(
+    title = "Box Plot Styling Outliers"
+)
+
+fig = go.Figure(data=data,layout=layout)
+
+dcc.Graph(figure=fig, id='box-plot-2')
+
+
+
+
+
+
+
+
+
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='url_debug'),
-    html.Div(id='debug'),    
-
+    
+    dcc.Graph(figure=fig, id='box-plot-2'),
+    
 
     html.Div([
         dcc.Dropdown(
@@ -253,7 +325,6 @@ app.layout = html.Div([
 @app.callback(
     # Output(component_id='app_main', component_property='children'),
     Output(component_id='stk_selector', component_property='style'),
-    # Output(component_id='debug', component_property='children'),
     Input(component_id='url', component_property='search'),
     Input(component_id='stk_selector', component_property='style')
 )
@@ -317,32 +388,74 @@ def update_output(dropdown_value, time_switch_value):
     
     
 
-    global stock_list_pre
-    selected_list = ms.stock_list_pre[
-        ms.stock_list_pre['STOCK_SYMBOL'].isin(dropdown_value)] \
-                    .reset_index(drop=True)
+    # selected_list = ms.stock_list_raw[ms.stock_list_raw['STOCK_SYMBOL'] \
+    #                                   .isin(dropdown_value)] \
+    #                 .reset_index(drop=True)
+
+
+    # symbols = selected_list['']
+
+    # for (key, value) in ms.stock_list:
+        
+    #     print(value)
+        
+    #     if value in dropdown_value:
+    #         symbols.append(value)
+            
+    # selected_symbols = ms.stock_list[ms.stock_list['STOCK_SYMBOL'] \
+    #                                   .isin(dropdown_value)] \
+    #                 .reset_index(drop=True)
     
 
 
-    if time_switch_value == True and time_switch_value == True:
-        plot_data = ms.main_data
-    else:
-        plot_data = ms.main_data_lite
+    # if time_switch_value == True and time_switch_value == True:
+    #     plot_data = ms.main_data
+    # else:
+    #     plot_data = ms.main_data_lite
 
 
         
+    # data1 = [{'x': plot_data[(plot_data['STOCK_SYMBOL'] == \
+    #                           selected_list['STOCK_SYMBOL'][i]) & \
+    #                   (plot_data['TYPE'] == 'HISTORICAL')]['WORK_DATE'],
+    #           'y': plot_data[(plot_data['STOCK_SYMBOL'] == \
+    #                           selected_list['STOCK_SYMBOL'][i]) & \
+    #                   (plot_data['TYPE'] == 'HISTORICAL')]['CLOSE'],
+    #           'type': 'line',
+    #           'name': selected_list['STOCK'][i],
+    #           } for i in range(0, len(selected_list))]
+
+
+    # Temp used
+    new_data = ms.main_data[['WORK_DATE', 'CLOSE', 'STOCK_SYMBOL']]
+    new_data.columns = ['x', 'y', 'name']
+    new_data['type'] = 'line'
+    new_data = new_data[['x', 'y', 'type', 'name']]
+
         
-    data1 = [{'x': plot_data[(plot_data['STOCK_SYMBOL'] == \
-                              selected_list['STOCK_SYMBOL'][i]) & \
-                      (plot_data['TYPE'] == 'HISTORICAL')]['WORK_DATE'],
-              'y': plot_data[(plot_data['STOCK_SYMBOL'] == \
-                              selected_list['STOCK_SYMBOL'][i]) & \
-                      (plot_data['TYPE'] == 'HISTORICAL')]['CLOSE'],
+        
+    data1 = [{'x': new_data[new_data['name'] == s]['x'],
+              'y': new_data[new_data['name'] == s]['y'],
               'type': 'line',
-              'name': selected_list['STOCK'][i],
-              } for i in range(0, len(selected_list))]
-        
+              'name': s,
+              } for s in dropdown_value]
+               
+    
+    # selected_list = ['1101 台泥', '1102 亞泥']
+    
+    # symbols = [i.split(' ')[0] for i in selected_list]
+    # new_data = ms.main_data[ms.main_data['STOCK_SYMBOL'].isin(symbols)]
+    
 
+
+    # data1 = []
+
+    # for s in symbols:
+    #     temp = new_data[new_data['STOCK_SYMBOL']==s] 
+    #     temp = temp.to_dict('series')
+    #     data1.append(temp)                
+        
+        
 
     layout = {'plot_bgcolor': colors['background'],
               'paper_bgcolor': colors['background'],
@@ -355,7 +468,6 @@ def update_output(dropdown_value, time_switch_value):
                        'fixedrange':True},
               }
     
-
 
 
     # Legend Layout ......
@@ -373,18 +485,18 @@ def update_output(dropdown_value, time_switch_value):
         
 
 
-        mobile_layout = {'legend':legend_style,
-                          'margin':{'l':36, 'r':36, 't':80, 'b':80},
-                          'padding':{'l':0, 'r':0, 't':20, 'b':20}
-                          }
-        
-        layout.update(mobile_layout)
-        
-        # Graph Style
-        graph_style = {'border': 'solid 1px #b0b0b0',
-                       'height': 300
-                       }
-        graph_style.update(graph_style)
+    mobile_layout = {'legend':legend_style,
+                      'margin':{'l':36, 'r':36, 't':80, 'b':80},
+                      'padding':{'l':0, 'r':0, 't':20, 'b':20}
+                      }
+    
+    layout.update(mobile_layout)
+    
+    # Graph Style
+    graph_style = {'border': 'solid 1px #b0b0b0',
+                   'height': 300
+                   }
+    graph_style.update(graph_style)
 
 
 
