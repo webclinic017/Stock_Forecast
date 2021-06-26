@@ -82,15 +82,16 @@ def load_data():
     '''
 
 
-
     # Historical Data .....
+    
+    # Three year data and half year data
     global main_data, main_data_lite
     
     if 'main_data_lite' not in globals():
         
         if dev:
-            begin_date_3y = cbyz.date_cal(end_date, -60, 'd')
-            main_data = stk.get_data(data_begin=begin_date_3y, 
+            loc_begin = cbyz.date_cal(end_date, -60, 'd')
+            main_data = stk.get_data(data_begin=loc_begin, 
                                      data_end=end_date, shift=0,
                                      stock_type=stock_type, 
                                      stock_symbol=[], 
@@ -104,38 +105,31 @@ def load_data():
                                      local=local)           
 
         # Organize ......    
-        # Is it essential to separate main_data and main_data_list?
         main_data = main_data \
                     .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
                     .reset_index(drop=True)
         
-        main_data = main_data[main_data['WORK_DATE']>=begin_date_6m]
         main_data = cbyz.df_ymd(df=main_data, cols='WORK_DATE')
-
-        # Calendar ......
-        calendar = ar.get_calendar(begin_date=begin_date_3y, 
-                                   end_date=end_date, simplify=True)
         
-        # calendar = calendar[['WORK_DATE', 'WEEKDAY']]
-        # calendar['WORK_DATE_STR'] = calendar['WORK_DATE']
-        # calendar = cbyz.df_ymd(df=calendar, cols='WORK_DATE_STR')
-        
-        # calendar['WORK_DATE_STR'] = calendar['WORK_DATE_STR'] \
-        #                             .apply(lambda x: x.strftime('%Y-%m-%d'))
-    
-        # calendar['WORK_DATE_STR'] = np.where(calendar['WEEKDAY']==1,
-        #                                      calendar['WORK_DATE_STR'], '')
-    
-        # calendar = calendar.drop('WEEKDAY', axis=1)
-    
-
-        # Merge ......
-        # main_data = main_data.merge(calendar, how='left', on='WORK_DATE')
-        # main_data = main_data \
-        #             .drop('WORK_DATE', axis=1) \
-        #             .rename(columns={'WORK_DATE_STR':'WORK_DATE'})
+        main_data_lite = \
+            main_data[main_data['WORK_DATE']>=cbyz.ymd(begin_date_6m)]
+            
+            
+        main_data['WORK_DATE'] = main_data['WORK_DATE'] \
+                                .dt.strftime('%Y/%m/%d')          
+                                
+        main_data_lite['WORK_DATE'] = main_data_lite['WORK_DATE'] \
+                                        .dt.strftime('%Y/%m/%d')
 
     
+        # Used for x axis of figure
+        global first_date, first_date_lite
+        first_date = main_data['WORK_DATE'].min()
+        first_date_lite = main_data_lite['WORK_DATE'].min()
+
+
+
+
     
     # Stock List ......
     global stock_list_raw, stock_list

@@ -111,41 +111,26 @@ import desktop_app
 import mobile_app
 
 
-# # 手動設定區 -------
-# global begin_date, end_date
-# end_date = datetime.datetime.now()
-# end_date = cbyz.date_simplify(end_date)
-
-# begin_date_6m = cbyz.date_cal(end_date, amount=-6, unit='m')
-# begin_date_3y = cbyz.date_cal(end_date, amount=-3, unit='y')
-
-
+# 手動設定區 -------
 
 # stock_type = 'us'
 # stock_type = 'tw'
 
 global device
+global tick0, dtick
 
-# # 自動設定區 -------
+tick0 = ms.first_date_lite
+dtick = 20
+
+
+# 自動設定區 -------
 pd.set_option('display.max_columns', 30)
-
-
-
-
-def check():
-    '''
-    資料驗證
-    '''        
-    
-    return ''
 
 
 
 # %% Application ----
 
-# app = dash.Dash(__name__, suppress_callback_exceptions=True)
 app = dash.Dash()
-
 
 
 if local == False:
@@ -218,7 +203,6 @@ figure_style = {
 
 
 
-
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='url_debug'),
@@ -245,7 +229,7 @@ app.layout = html.Div([
     html.Div(id='app_main', 
              style=app_main_style),
     
-    dcc.Graph(id="graph"),
+    # dcc.Graph(id="graph"),
     
     ]
 )
@@ -333,7 +317,6 @@ def update_output(dropdown_value, time_switch_value):
         )
         
 
-
     mobile_layout = {'legend':legend_style,
                       'margin':{'l':36, 'r':36, 't':80, 'b':80},
                       'padding':{'l':0, 'r':0, 't':20, 'b':20}
@@ -343,30 +326,37 @@ def update_output(dropdown_value, time_switch_value):
     
     # Graph Style
     graph_style = {'border': 'solid 1px #b0b0b0',
-                   'height': 300
+                   # 'height': 300
                    }
-    graph_style.update(graph_style)
 
 
-    
-
-
-
-    # Worklist 
-    # 1. Hide some date
-    # 2. add legend name
-    # 3. Add peak
-
-    # https://plotly.com/python/candlestick-charts/
 
     fig = go.Figure()
     
     for i in range(len(dropdown_value)):
 
         s = dropdown_value[i]  
-        df = ms.main_data[ms.main_data['STOCK_SYMBOL']==s] \
-            .reset_index(drop=True)        
-
+        name = ms.stock_list_raw[ms.stock_list_raw['STOCK_SYMBOL']==s]
+        name = name['STOCK'].tolist()[0]
+        
+        
+        # Filter Data ......
+        global tick0, dtick
+        
+        if time_switch_value:
+            df = ms.main_data[ms.main_data['STOCK_SYMBOL']==s] \
+                .reset_index(drop=True) 
+                
+            tick0 = ms.first_date
+            dtick = 20
+                
+        else:
+            df = ms.main_data_lite[ms.main_data_lite['STOCK_SYMBOL']==s] \
+                .reset_index(drop=True)    
+                
+            tick0 = ms.first_date_lite
+            dtick = 60
+        
         
         trace = go.Candlestick(
             x=df['WORK_DATE'],
@@ -374,20 +364,26 @@ def update_output(dropdown_value, time_switch_value):
             high=df['HIGH'],
             low=df['LOW'],
             close=df['CLOSE'],
-            name=s
+            name=name
         )
         
         fig.add_trace(trace)
 
 
-    # fig.layout = dict(xaxis=dict(type="category", 
-    #                               categoryorder='category ascending'))
-
-
-    fig.layout = dict(xaxis=dict(tickmode='linear',
-                                  tick0=ms.begin_date_6m,
-                                  dtick=7))
     
+    # 1. In plotly, there are rangebreaks to prevent showing weekends and 
+    #    holidays, but the weekends and holidays may be different in Taiwan. 
+    #    As a results, the alternative way to show it is to show as category
+    
+    fig.layout = dict(xaxis={'type':"category", 
+                            'categoryorder':'category ascending',
+                            'tickmode':'linear',
+                            'tick0':tick0,
+                            'dtick':20,
+                            })
+
+    fig.update_layout(xaxis_rangeslider_visible=False)
+
 
     results = dcc.Graph(
                 id='main_graph',
