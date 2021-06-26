@@ -42,7 +42,6 @@ Solution: add sample chart
 import os
 
 import pandas as pd
-import numpy as np
 import sys, arrow
 import datetime
 
@@ -75,10 +74,8 @@ from urllib.parse import parse_qs
 
 # 設定工作目錄 .....
 
-
 local = False
 local = True
-
 
 
 if local == True:
@@ -353,9 +350,7 @@ def update_output(dropdown_value, time_switch_value):
 
 
     # Worklist 
-    # 1. Hide some date
     # 2. add legend name
-    # 3. Add peak
 
     # https://plotly.com/python/candlestick-charts/
 
@@ -380,13 +375,8 @@ def update_output(dropdown_value, time_switch_value):
         fig.add_trace(trace)
 
 
-    # fig.layout = dict(xaxis=dict(type="category", 
-    #                               categoryorder='category ascending'))
-
-
-    fig.layout = dict(xaxis=dict(tickmode='linear',
-                                  tick0=ms.begin_date_6m,
-                                  dtick=7))
+    fig.layout = dict(xaxis=dict(type="category", 
+                                  categoryorder='category ascending'))
     
 
     results = dcc.Graph(

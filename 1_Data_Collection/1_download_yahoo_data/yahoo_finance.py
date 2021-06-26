@@ -71,17 +71,16 @@ def download_data(stock_list=[], chunk_begin=None, chunk_end=None,
    
     global stock_type
     
-    
-    Bug, 用這個方法會抓不到ETF，像是0050, 0056
 
-    
     # Get stock list
     if len(stock_list) > 0:
         stock_list = pd.DataFrame({'STOCK_SYMBOL':stock_list})
         stock_list['STOCK_SYMBOL'] = stock_list['STOCK_SYMBOL'].astype(str)
     else:
         # stock_list = stk.get_list(stock_type=stock_type)
-        stock_list = stk.tw_get_company_info()
+        # stock_list = stk.tw_get_company_info()
+        stock_list = stk.twse_get_data(upload=False)
+        stock_list = stock_list[['STOCK_SYMBOL', 'NAME']].drop_duplicates()
     
     
     # Split as chunk ......

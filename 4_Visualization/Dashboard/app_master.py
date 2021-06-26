@@ -8,9 +8,9 @@ Created on Thu Mar 25 23:09:54 2021
 
 
 import os
-
 import pandas as pd
-import sys, arrow
+import numpy as np
+import sys
 import datetime
 import dash
 import h5py
@@ -81,6 +81,8 @@ def load_data():
     讀取資料及重新整理
     '''
 
+
+
     # Historical Data .....
     global main_data, main_data_lite
     
@@ -100,17 +102,39 @@ def load_data():
                                      stock_type=stock_type, 
                                      stock_symbol=[], 
                                      local=local)           
-    
+
+        # Organize ......    
+        # Is it essential to separate main_data and main_data_list?
         main_data = main_data \
                     .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
                     .reset_index(drop=True)
         
+        main_data = main_data[main_data['WORK_DATE']>=begin_date_6m]
+        main_data = cbyz.df_ymd(df=main_data, cols='WORK_DATE')
+
+        # Calendar ......
+        calendar = ar.get_calendar(begin_date=begin_date_3y, 
+                                   end_date=end_date, simplify=True)
         
-        main_data['WORK_DATE'] = main_data['WORK_DATE'].apply(ar.ymd)
-        main_data_lite = main_data[main_data['WORK_DATE']>=ar.ymd(begin_date_6m)]
+        # calendar = calendar[['WORK_DATE', 'WEEKDAY']]
+        # calendar['WORK_DATE_STR'] = calendar['WORK_DATE']
+        # calendar = cbyz.df_ymd(df=calendar, cols='WORK_DATE_STR')
+        
+        # calendar['WORK_DATE_STR'] = calendar['WORK_DATE_STR'] \
+        #                             .apply(lambda x: x.strftime('%Y-%m-%d'))
     
+        # calendar['WORK_DATE_STR'] = np.where(calendar['WEEKDAY']==1,
+        #                                      calendar['WORK_DATE_STR'], '')
     
-        # new_data['x'] = new_data['x'].apply(lambda x: x.strftime('%Y-%m-%d'))
+        # calendar = calendar.drop('WEEKDAY', axis=1)
+    
+
+        # Merge ......
+        # main_data = main_data.merge(calendar, how='left', on='WORK_DATE')
+        # main_data = main_data \
+        #             .drop('WORK_DATE', axis=1) \
+        #             .rename(columns={'WORK_DATE_STR':'WORK_DATE'})
+
     
     
     # Stock List ......
