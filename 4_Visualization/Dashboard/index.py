@@ -64,7 +64,7 @@ from urllib.parse import parse_qs
 
 # 設定工作目錄 .....
 local = False
-local = True
+# local = True
 
 
 if local == True:
@@ -269,16 +269,23 @@ def get_url(url, device, style):
 @app.callback(
     Output('tick0', 'value'),
     Output('dtick', 'value'),
-    Input('data_period', 'value')      
+    Input('device', 'value'),
+    Input('data_period', 'value')
 )
 
-def update_tick_attr(data_period):
+def update_tick_attr(device, data_period):
 
     # Update, different settings for desktop and mobile    
-    if data_period:
-        return ms.first_date, 240
+    if device == 0:
+        if data_period:
+            return ms.first_date, 240
+        else:
+            return ms.first_date_lite, 60
     else:
-        return ms.first_date_lite, 60
+        if data_period:
+            return ms.first_date, 240
+        else:
+            return ms.first_date_lite, 100       
 
 
 # ................
