@@ -40,45 +40,31 @@ Solution: add sample chart
 
 
 import os
-
 import pandas as pd
 import numpy as np
-import sys, arrow
-import datetime
+import sys
+
 
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_daq as daq
 from dash.dependencies import Input, Output
-import plotly.express as px
 import plotly.graph_objs as go
-# import dash_bootstrap_components as dbc
-
-
-#import re
-#import numpy as np
-# from flask import Flask, request
 from flask_caching import Cache
 
-import flask_caching
-
-
-# Parse url
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
 
 
 # Worklist
-# (1) Convert get_stock_data
-# (2) stock_get_list, upload to database
+# 1. Plot color, 國外的常用顏色和台灣相反，綠是漲，紅是跌
+
+
 
 # 設定工作目錄 .....
-
-
 local = False
 local = True
-
 
 
 if local == True:
@@ -116,11 +102,6 @@ import mobile_app
 # stock_type = 'us'
 # stock_type = 'tw'
 
-global device
-global tick0, dtick
-
-tick0 = ms.first_date_lite
-dtick = 20
 
 
 # 自動設定區 -------
@@ -128,7 +109,7 @@ pd.set_option('display.max_columns', 30)
 
 
 
-# %% Application ----
+# %% Layout ----
 
 app = dash.Dash()
 
@@ -186,7 +167,7 @@ stk_selector_style_mobile = {
     }
 
 
-btn_max_style = {
+data_period_style = {
     # 'width': '100px', 
     'display': 'flex',
     'justify-content': 'left',
@@ -195,17 +176,20 @@ btn_max_style = {
     }
 
 
-figure_style = {
-    # 'transform': 'scale(1.1)'
-    }
 
-
-
+# %% Application ----
 
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='url_debug'),
+    
+    # Settings
+    dcc.Input(id="device", type='hidden', value=0),    
+    dcc.Input(id="tick0", type='hidden', value=ms.first_date_lite),    
+    dcc.Input(id="dtick", type='hidden', value=20),
+    
+    
     html.Div([
         dcc.Dropdown(
             id='stk_selector',
@@ -218,39 +202,40 @@ app.layout = html.Div([
     html.Div([
         html.P('半年資料'),
         daq.ToggleSwitch(
-            id='btn_max',
+            id='data_period',
             value=False,
             style={'padding':'0 10px'}
         ),
         html.P('三年資料'),
-    ], style=btn_max_style),      
+    ], style=data_period_style),      
 
     
-    html.Div(id='app_main', 
-             style=app_main_style),
+    # html.Div(id='app_main', 
+    #          style=app_main_style),
     
-    # dcc.Graph(id="graph"),
+    dcc.Graph(id="graph"),
     
     ]
 )
 
 
 
+# %% Callback ----
+
+# Output(component_id='stk_selector', component_property='style'),
+# Input(component_id='url', component_property='search'),
+
 @app.callback(
-    # Output(component_id='app_main', component_property='children'),
-    Output(component_id='stk_selector', component_property='style'),
-    Input(component_id='url', component_property='search'),
-    Input(component_id='stk_selector', component_property='style')
+    Output('stk_selector', 'style'),
+    Output('device', 'value'),    
+    Input('url', 'search'),
+    Input('device', 'value'),
+    Input('stk_selector', 'style')
 )
 
 
-def get_url(url, style):
+def get_url(url, device, style):
 
-    
-    # Bug, 有兩個id=stk_selector
-    
-    global device
-    
 
     if url == '':
         device = 'desktop'
@@ -263,34 +248,87 @@ def get_url(url, style):
     
     
     if int(width) < 992:
-        device = 'mobile'
+        device = 1
         loc_style = stk_selector_style_mobile
+        print('mobile width')
         # return mobile_app.layout
     else:
-        device = 'desktop'
+        device = 0
         loc_style = stk_selector_style_desktop
+        print('desktop width')
         # return desktop_app.layout
         
 
     # return ''
-    return loc_style
+    return loc_style, device
         
     
+# ................
 
-# Output(component_id='line_chart', component_property='children'),
-# Output(component_id='debug', component_property='children')
-# Output(component_id='app_main', component_property='children'),
-# Output(component_id='graph', component_property='figure'),
 
 @app.callback(
-    Output(component_id='app_main', component_property='children'),
-    Input(component_id='stk_selector', component_property='value'),
-    Input(component_id='btn_max', component_property='value')  
+    Output('tick0', 'value'),
+    Output('dtick', 'value'),
+    Input('data_period', 'value')      
 )
 
+def update_tick_attr(data_period):
 
-def update_output(dropdown_value, time_switch_value):
+    # Update, different settings for desktop and mobile    
+    if data_period:
+        return ms.first_date, 240
+    else:
+        return ms.first_date_lite, 60
 
+
+# ................
+
+
+@app.callback(
+    Output('graph', 'figure'),
+    Input('device', 'value'),
+    Input('stk_selector', 'value'),
+    Input('data_period', 'value'),
+    Input('tick0', 'value'),
+    Input('dtick', 'value'),    
+)
+
+def update_output(device, dropdown_value, data_period, tick0, dtick):
+
+
+    # Figure ......
+    fig = go.Figure()
+    
+    for i in range(len(dropdown_value)):
+
+        s = dropdown_value[i]  
+        name = ms.stock_list_raw[ms.stock_list_raw['STOCK_SYMBOL']==s]
+        name = name['STOCK'].tolist()[0]
+        
+        
+        # Filter Data ......
+        if data_period:
+            df = ms.main_data[ms.main_data['STOCK_SYMBOL']==s] \
+                .reset_index(drop=True) 
+        else:
+            df = ms.main_data_lite[ms.main_data_lite['STOCK_SYMBOL']==s] \
+                .reset_index(drop=True)    
+                
+        trace = go.Candlestick(
+            x=df['WORK_DATE'],
+            open=df['OPEN'],
+            high=df['HIGH'],
+            low=df['LOW'],
+            close=df['CLOSE'],
+            name=name
+        )
+        
+        fig.add_trace(trace)
+
+
+
+    # Layout ------
+    
     layout = {'plot_bgcolor': colors['background'],
               'paper_bgcolor': colors['background'],
               'font': {
@@ -304,9 +342,8 @@ def update_output(dropdown_value, time_switch_value):
 
 
     # Legend Layout ......
-    if device == 'desktop':
+    if device == 0:
         legend_style = dict()    
-        graph_style = {}
     else:
         legend_style = dict(
             orientation="h",
@@ -317,60 +354,6 @@ def update_output(dropdown_value, time_switch_value):
         )
         
 
-    mobile_layout = {'legend':legend_style,
-                      'margin':{'l':36, 'r':36, 't':80, 'b':80},
-                      'padding':{'l':0, 'r':0, 't':20, 'b':20}
-                      }
-    
-    layout.update(mobile_layout)
-    
-    # Graph Style
-    graph_style = {'border': 'solid 1px #b0b0b0',
-                   # 'height': 300
-                   }
-
-
-
-    fig = go.Figure()
-    
-    for i in range(len(dropdown_value)):
-
-        s = dropdown_value[i]  
-        name = ms.stock_list_raw[ms.stock_list_raw['STOCK_SYMBOL']==s]
-        name = name['STOCK'].tolist()[0]
-        
-        
-        # Filter Data ......
-        global tick0, dtick
-        
-        if time_switch_value:
-            df = ms.main_data[ms.main_data['STOCK_SYMBOL']==s] \
-                .reset_index(drop=True) 
-                
-            tick0 = ms.first_date
-            dtick = 20
-                
-        else:
-            df = ms.main_data_lite[ms.main_data_lite['STOCK_SYMBOL']==s] \
-                .reset_index(drop=True)    
-                
-            tick0 = ms.first_date_lite
-            dtick = 60
-        
-        
-        trace = go.Candlestick(
-            x=df['WORK_DATE'],
-            open=df['OPEN'],
-            high=df['HIGH'],
-            low=df['LOW'],
-            close=df['CLOSE'],
-            name=name
-        )
-        
-        fig.add_trace(trace)
-
-
-    
     # 1. In plotly, there are rangebreaks to prevent showing weekends and 
     #    holidays, but the weekends and holidays may be different in Taiwan. 
     #    As a results, the alternative way to show it is to show as category
@@ -379,22 +362,22 @@ def update_output(dropdown_value, time_switch_value):
                             'categoryorder':'category ascending',
                             'tickmode':'linear',
                             'tick0':tick0,
-                            'dtick':20,
+                            'dtick':dtick,
                             })
 
+    # Plotly doesn't have padding?
+    # 'padding':{'l':0, 'r':0, 't':20, 'b':20}
+
+    mobile_layout = {'legend':legend_style,
+                     'margin':{'l':36, 'r':36, 't':80, 'b':80}
+                     }
+
+    fig.update_layout(mobile_layout)
     fig.update_layout(xaxis_rangeslider_visible=False)
 
 
-    results = dcc.Graph(
-                id='main_graph',
-                figure=fig,
-                style=graph_style
-            )
-    
 
-    return results
-
-
+    return fig
 
 if __name__ == '__main__':
     
