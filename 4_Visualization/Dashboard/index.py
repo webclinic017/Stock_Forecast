@@ -49,7 +49,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_daq as daq
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 from flask_caching import Cache
 
@@ -229,8 +229,8 @@ app.layout = html.Div([
     Output('stk_selector', 'style'),
     Output('device', 'value'),    
     Input('url', 'search'),
-    Input('device', 'value'),
-    Input('stk_selector', 'style')
+    State('device', 'value'),
+    State('stk_selector', 'style')
 )
 
 
@@ -269,8 +269,8 @@ def get_url(url, device, style):
 @app.callback(
     Output('tick0', 'value'),
     Output('dtick', 'value'),
-    Input('device', 'value'),
-    Input('data_period', 'value')
+    Input('data_period', 'value'),
+    State('device', 'value')
 )
 
 def update_tick_attr(device, data_period):
@@ -293,15 +293,15 @@ def update_tick_attr(device, data_period):
 
 @app.callback(
     Output('graph', 'figure'),
-    Input('device', 'value'),
     Input('stk_selector', 'value'),
-    Input('data_period', 'value'),
-    Input('tick0', 'value'),
-    Input('dtick', 'value'),    
+    State('data_period', 'value'),
+    State('tick0', 'value'),
+    State('dtick', 'value'),    
+    State('device', 'value')
 )
 
-def update_output(device, dropdown_value, data_period, tick0, dtick):
 
+def update_output(dropdown_value, data_period, tick0, dtick, device):
 
     # Figure ......
     fig = go.Figure()
