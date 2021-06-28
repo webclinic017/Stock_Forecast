@@ -16,14 +16,14 @@ import MySQLdb
 # 如果價錢和前一天完全一樣就不更新
 
 
-db = MySQLdb.connect(
-    host = 'aronhack.mysql.pythonanywhere-services.com',
-    user = 'aronhack',
-    passwd = 'pythonmysql2020',
-    db = 'aronhack$aronhack_dashboard',
-    charset = 'utf8')
+# db = MySQLdb.connect(
+#     host = 'aronhack.mysql.pythonanywhere-services.com',
+#     user = 'aronhack',
+#     passwd = 'pythonmysql2020',
+#     db = 'aronhack$aronhack_dashboard',
+#     charset = 'utf8')
 
-cursor = db.cursor()
+# cursor = db.cursor()
 
 
 
