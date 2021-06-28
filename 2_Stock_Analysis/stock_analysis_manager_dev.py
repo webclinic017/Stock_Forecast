@@ -47,7 +47,8 @@ stock_type = 'tw'
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/2_Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Foreceast/2_Stock_Analysis'
+    
 else:
     path = '/home/aronhack/stock_predict/2_Stock_Analysis'
 
@@ -114,6 +115,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
         
         
     # Exclude the symbols shorter than begin_date ......
+    # Update, 是不是要移到function裡面
     date_min = data['WORK_DATE'].min()
     data['MIN_DATE'] = data \
                         .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
@@ -856,4 +858,11 @@ def find_target(data_begin, data_end):
 
 
 
+# %% Dev ------
 
+
+
+    
+
+
+    
