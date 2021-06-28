@@ -47,7 +47,7 @@ stock_type = 'tw'
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/2_Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis'
 else:
     path = '/home/aronhack/stock_predict/2_Stock_Analysis'
 

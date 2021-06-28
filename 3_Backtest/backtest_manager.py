@@ -52,8 +52,8 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/3_Backtest'
-    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/3_Backtest'
+    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast'
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
