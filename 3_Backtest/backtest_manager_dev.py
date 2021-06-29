@@ -52,8 +52,8 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/3_Backtest'
-    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/3_Backtest'
+    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast'
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
@@ -373,7 +373,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     # Parameters
-    _bt_last_begin = 20210626
+    _bt_last_begin = 20210629
     # bt_last_begin = 20210211
     predict_period = 5
     interval = 60
@@ -383,9 +383,9 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_type = 'tw'
 
 
-    path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/2_Stock_Analysis/Export'
+    path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Export'
     target_symbols = pd.read_csv(path_sam \
-                                 + '/target_symbols_20210627_230214.csv')
+                                 + '/target_symbols_20210628_232037.csv')
 
     _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()    
 
@@ -422,11 +422,14 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # rmse_thld = 0.15
     
     global bt_main, actions    
-    cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.10)
+    cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.1)    
+    # cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.2)
+    
     actions = actions[actions['MODEL']=='model_6']
     actions = actions.drop('ROWS', axis=1)
     actions = cbyz.df_add_size(df=actions, group_by='STOCK_SYMBOL',
                                col_name='ROWS')
+
 
     time_serial = cbyz.get_time_serial(with_time=True)
     actions.to_excel(path_export + '/actions_' + time_serial + '.xlsx', 

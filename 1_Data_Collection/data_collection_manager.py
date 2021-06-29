@@ -11,6 +11,7 @@ Created on Sat Nov 14 17:22:57 2020
 import pandas as pd
 import numpy as np
 import sys, time, os, gc
+import yfinance as yf
 
 
 local = False
@@ -19,7 +20,7 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Foreceast/1_Data_Collection'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection'
 else:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
@@ -55,8 +56,7 @@ pd.set_option('display.max_columns', 30)
 
 # Load Data ----------------
 
-def yahoo_download_data(stock_list=[], chunk_begin=None, chunk_end=None, 
-                  upload=False):
+def yahoo_download_data(stock_list=[], chunk_begin=None, chunk_end=None):
     '''
     讀取資料及重新整理
     '''
@@ -71,7 +71,7 @@ def yahoo_download_data(stock_list=[], chunk_begin=None, chunk_end=None,
     else:
         # stock_list = stk.get_list(stock_type=stock_type)
         # stock_list = stk.tw_get_company_info()
-        stock_list = stk.twse_get_data(upload=False)
+        stock_list = stk.twse_get_data()
         stock_list = stock_list[['STOCK_SYMBOL', 'NAME']].drop_duplicates()
     
     
@@ -140,7 +140,7 @@ def yahoo_download_data(stock_list=[], chunk_begin=None, chunk_end=None,
     
     hist_data = hist_data[['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
                            'HIGH', 'LOW', 'CLOSE', 'VOLUME']]
-    
+
     
     # Upload ......
     # if upload:
@@ -228,13 +228,18 @@ def master(overwrite=False, upload=True):
         if len(chk_main) == 0:
             return ''
         
-   
+        
+   # Update，如tmse的transaction
     data = data[['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
                  'HIGH', 'LOW', 'CLOSE', 'VOLUME']]
+    
+    
+    cbyz.df_chk_col_na(df=data)    
     
 
     # Upload ------
     if upload:
+        
         if stock_type == 'tw':
             ar.db_upload(data=data, 
                          table_name='stock_data_tw',

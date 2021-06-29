@@ -253,7 +253,8 @@ def backtest_verify(begin_date, actions, stock_symbol, stock_type='tw',
 
 
 
-def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15):
+def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15, 
+               export_file=True, load_file=False, path=None, file_name=None):
     
     
     global predict_period, bt_last_begin
@@ -302,7 +303,7 @@ def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15):
                                      group_by=['STOCK_SYMBOL'], suffix='_LAST', 
                                      remove_na=False)
 
-    # Add predict rmse
+    # Update, Add predict rmse
 
 
     # Prepare columns ......
@@ -330,6 +331,7 @@ def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15):
                                 np.nan, main_data[i])
 
     # Check na ......
+    # 這裡有na是合理的，因為hist都是na？
     chk = cbyz.df_chk_col_na(df=main_data, positive_only=True)
     
     if len(chk) > len(model_y):
@@ -342,7 +344,10 @@ def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15):
                                   last_date='LAST_DATE', 
                                   y=model_y, y_last=last_cols,
                                   price_thld=price_thld, time_thld=time_thld,
-                                  rmse_thld=rmse_thld)
+                                  rmse_thld=rmse_thld, 
+                                  export_file=export_file, 
+                                  load_file=load_file, file_name=file_name,
+                                  path=path)
 
     # df = main_data.copy()
     # rmse = bt_rmse.copy()
@@ -373,24 +378,29 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     # Parameters
-    _bt_last_begin = 20210626
+    _bt_last_begin = 20210630
     # bt_last_begin = 20210211
-    predict_period = 5
+    predict_period = 3
     interval = 60
     bt_times = 1
-    data_period = 360 * 7
+    data_period = 360 * 5
+    # data_period = 360 * 7    
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_type = 'tw'
 
 
-    path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/2_Stock_Analysis/Export'
+    # Read Files From SAM
+    path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Export'
     target_symbols = pd.read_csv(path_sam \
-                                 + '/target_symbols_20210627_230214.csv')
+                                 + '/target_symbols_20210629_224443.csv')
+        
+    # target_symbols_20210629_230911
 
     _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()    
 
-    
-    global stock_symbol, bt_last_begin
+
+    # ......    
+    global stock_symbol, bt_last_begin, stock_type
     stock_symbol = _stock_symbol
     bt_last_begin = _bt_last_begin
     
@@ -422,11 +432,18 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # rmse_thld = 0.15
     
     global bt_main, actions    
-    cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.10)
+    cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.1,
+               export_file=True, load_file=True, path=path_temp,
+               file_name=None) 
+    
+    # cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.2)        
+
+    
     actions = actions[actions['MODEL']=='model_6']
     actions = actions.drop('ROWS', axis=1)
     actions = cbyz.df_add_size(df=actions, group_by='STOCK_SYMBOL',
                                col_name='ROWS')
+
 
     time_serial = cbyz.get_time_serial(with_time=True)
     actions.to_excel(path_export + '/actions_' + time_serial + '.xlsx', 
@@ -467,6 +484,15 @@ def check():
     
     return ''
 
+
+def check_price():
+    
+    
+    chk = bt_results[bt_results['STOCK_SYMBOL']=='2029']
+    chk
+
+    chk = bt_results[bt_results['STOCK_SYMBOL']=='1471']
+    chk
 
 
 if __name__ == '__main__':
