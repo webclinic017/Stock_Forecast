@@ -18,20 +18,6 @@ Created on Sat Nov 14 17:23:08 2020
 
 
 
-# 2301 光寶科
-# 2474可成
-# 1714和桐
-# 2385群光
-
-
-
-
-# Dashboard，只跑三年資料
-# Process, select target > analyze > backtest
-# Filter with 股本 and 成交量
-
-
-
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -259,7 +245,8 @@ def get_model_data(ma_values=[5,20]):
     
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     model_x = lag_cols + var_cols
-    model_y = ['OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # model_y = ['OPEN', 'HIGH', 'LOW', 'CLOSE']
+    model_y = ['PRICE_CHANGE']
 
     
     # Model Data ......
@@ -636,15 +623,15 @@ def master(_predict_begin, _predict_end=None,
     
     # date_period為10年的時候會出錯
     
-    # data_period = 90
-    # data_period = 365 * 5
-    # _predict_begin = 20210611
-    # _predict_end = None
-    # _predict_period = 5
-    # _stock_type = 'tw'
-    # ma_values = [5,20]
-    # _full_data = False
-    # _stock_symbol = ['2301', '2474', '1714', '2385']
+    data_period = 90
+    data_period = 365 * 5
+    _predict_begin = 20210611
+    _predict_end = None
+    _predict_period = 5
+    _stock_type = 'tw'
+    ma_values = [5,20]
+    _full_data = False
+    _stock_symbol = ['2301', '2474', '1714', '2385']
     
 
 
@@ -868,6 +855,11 @@ def find_target(data_begin, data_end):
 
     
     return results_raw, stock_info
+
+
+
+chk_data = stk.get_data(stock_symbol=['2029'])
+chk_data['HIGH'].max()
 
 
 

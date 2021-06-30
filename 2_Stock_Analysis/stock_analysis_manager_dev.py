@@ -18,20 +18,6 @@ Created on Sat Nov 14 17:23:08 2020
 
 
 
-# 2301 光寶科
-# 2474可成
-# 1714和桐
-# 2385群光
-
-
-
-
-# Dashboard，只跑三年資料
-# Process, select target > analyze > backtest
-# Filter with 股本 and 成交量
-
-
-
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -47,8 +33,7 @@ stock_type = 'tw'
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Foreceast/2_Stock_Analysis'
-    
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis'
 else:
     path = '/home/aronhack/stock_predict/2_Stock_Analysis'
 
@@ -115,7 +100,6 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
         
         
     # Exclude the symbols shorter than begin_date ......
-    # Update, 是不是要移到function裡面
     date_min = data['WORK_DATE'].min()
     data['MIN_DATE'] = data \
                         .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
@@ -261,7 +245,8 @@ def get_model_data(ma_values=[5,20]):
     
     var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     model_x = lag_cols + var_cols
-    model_y = ['HIGH', 'LOW', 'CLOSE']
+    # model_y = ['OPEN', 'HIGH', 'LOW', 'CLOSE']
+    model_y = ['PRICE_CHANGE']
 
     
     # Model Data ......
@@ -638,15 +623,15 @@ def master(_predict_begin, _predict_end=None,
     
     # date_period為10年的時候會出錯
     
-    # data_period = 90
-    # data_period = 365 * 5
-    # _predict_begin = 20210611
-    # _predict_end = None
-    # _predict_period = 5
-    # _stock_type = 'tw'
-    # ma_values = [5,20]
-    # _full_data = False
-    # _stock_symbol = ['2301', '2474', '1714', '2385']
+    data_period = 90
+    data_period = 365 * 5
+    _predict_begin = 20210611
+    _predict_end = None
+    _predict_period = 5
+    _stock_type = 'tw'
+    ma_values = [5,20]
+    _full_data = False
+    _stock_symbol = ['2301', '2474', '1714', '2385']
     
 
 
@@ -684,7 +669,6 @@ def master(_predict_begin, _predict_end=None,
                                        predict_end=_predict_end, 
                                        predict_period=predict_period,
                                        shift=data_shift)  
-            
     
     global stock_symbol, stock_type
     stock_type = _stock_type
@@ -759,41 +743,57 @@ def find_target(data_begin, data_end):
     # 2. 不要找疫情後才爆漲到歷史新高的
 
 
-    data_end = 20210625       
+    data_end = cbyz.date_get_today()
     data_begin = cbyz.date_cal(data_end, -1, 'm')
 
 
     # Stock info
-    stock_info = stk.tw_get_stock_info()
+    stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
+                                       file_name=None, path=path_temp)
     
     
-    # 挑選中大型股 ......
-    level3_symbom = stock_info[stock_info['CAPITAL_LEVEL']>=2]
-    level3_symbom = level3_symbom['STOCK_SYMBOL'].tolist()
+    # Section 1. 資本額大小 ------
     
-
+    # 1-1. 挑選中大型股 ......
+    level3_symbol = stock_info[stock_info['CAPITAL_LEVEL']>=2]
+    level3_symbol = level3_symbol['STOCK_SYMBOL'].tolist()
     
-    # Stock Data ......
     data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
-                            stock_symbol=level3_symbom, 
+                            stock_symbol=level3_symbol, 
                             price_change=True,
                             shift=0, stock_type='tw', local=True)
     
-    data = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbom)]
+    data = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbol)]
+    
+
+    # 1-2. 不排除 ......
+    data = stk.get_data(data_begin=data_begin, data_end=data_end, 
+                            stock_symbol=[], 
+                            price_change=True,
+                            shift=0, stock_type='tw', local=True)
     
     
+    # Section 2. 依價格篩選 ......
+    
+    # 2-1. 不篩選 .....
+    target_symbols = data[['STOCK_SYMBOL']] \
+                    .drop_duplicates() \
+                    .reset_index(drop=True)
     
     
+    # 2-2. 低價股全篩 .....
+    # 目前排除80元以上
+    last_date = data['WORK_DATE'].max()
+    last_price = data[data['WORK_DATE']==last_date]
+    last_price = last_price[last_price['CLOSE']>80]
+    last_price = last_price[['STOCK_SYMBOL']].drop_duplicates()
     
-    # Method 1 - 低價股全篩 .....
-    target_symbols = data[data['CLOSE']<=80]
+    
+    target_symbols = cbyz.df_anti_merge(data, last_price, on='STOCK_SYMBOL')
     target_symbols = target_symbols[['STOCK_SYMBOL']].drop_duplicates()
     
     
-    
-    # Method 2 .....
-    # Calculation ......
-    # 3天漲超過10%
+    # 2-3. 3天漲超過10%  .....
     data, cols_pre = cbyz.df_add_shift(df=data, 
                                        group_by=['STOCK_SYMBOL'], 
                                        cols=['CLOSE'], shift=3,
@@ -843,9 +843,9 @@ def find_target(data_begin, data_end):
                           + time_serial + '.csv',
                           index=False, encoding='utf-8-sig')
 
-    target_symbols.to_excel(path_export + '/target_symbols_' \
-                            + time_serial + '.xlsx',
-                            index=False)
+    # target_symbols.to_excel(path_export + '/target_symbols_' \
+    #                         + time_serial + '.xlsx',
+    #                         index=False)
 
     # Plot ......       
     # plot_data = results.melt(id_vars='PROFIT')
@@ -858,10 +858,9 @@ def find_target(data_begin, data_end):
 
 
 
-# %% Dev ------
+chk_data = stk.get_data(stock_symbol=['2029'])
+chk_data['HIGH'].max()
 
 
 
 
-
-    
