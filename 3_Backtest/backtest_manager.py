@@ -253,8 +253,9 @@ def backtest_verify(begin_date, actions, stock_symbol, stock_type='tw',
 
 
 
-def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15, 
+def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, 
                export_file=True, load_file=False, path=None, file_name=None):
+    
     
     
     global predict_period, bt_last_begin
@@ -269,6 +270,7 @@ def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15,
                                  data_end=loc_end, 
                                  stock_type=stock_type, 
                                  stock_symbol=stock_symbol, 
+                                 price_change=True,
                                  local=local)
     
     hist_data_raw = hist_data_raw[['WORK_DATE', 'STOCK_SYMBOL'] + model_y]
@@ -343,7 +345,7 @@ def cal_profit(price_thld=2, time_thld=10, rmse_thld=0.15,
                                   date='WORK_DATE', 
                                   last_date='LAST_DATE', 
                                   y=model_y, y_last=last_cols,
-                                  price_thld=price_thld, time_thld=time_thld,
+                                  y_thld=y_thld, time_thld=time_thld,
                                   rmse_thld=rmse_thld, 
                                   export_file=export_file, 
                                   load_file=load_file, file_name=file_name,
@@ -376,11 +378,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     '''
     
     
-    
     # Parameters
-    _bt_last_begin = 20210630
+    _bt_last_begin = 20210701
     # bt_last_begin = 20210211
-    predict_period = 3
+    predict_period = 2
     interval = 60
     bt_times = 1
     data_period = 360 * 5
@@ -432,7 +433,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # rmse_thld = 0.15
     
     global bt_main, actions    
-    cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.1,
+    cal_profit(y_thld=0.2, time_thld=predict_period, rmse_thld=0.1,
                export_file=True, load_file=True, path=path_temp,
                file_name=None) 
     
@@ -488,10 +489,10 @@ def check():
 def check_price():
     
     
-    chk = bt_results[bt_results['STOCK_SYMBOL']=='2029']
+    chk = bt_results[bt_results['STOCK_SYMBOL']=='4967']
     chk
 
-    chk = bt_results[bt_results['STOCK_SYMBOL']=='1471']
+    chk = bt_results[bt_results['STOCK_SYMBOL']=='2702']
     chk
 
 

@@ -172,12 +172,7 @@ def get_model_data(ma_values=[5,20]):
     # Add K line
     loc_data = stk.add_k_line(loc_data)
     
-    
-    # Add Support Resistance
-    loc_data, suppot_resist_cols = \
-        stk.add_support_resistance(df=loc_data, cols='CLOSE', 
-                                   rank_thld=10, prominence=1)
-    
+
     # Predict Symbols ......
     if full_data:
         all_symbols = loc_data['STOCK_SYMBOL'].unique().tolist()
@@ -196,13 +191,14 @@ def get_model_data(ma_values=[5,20]):
     
     # Add predict Data ......
     loc_main = loc_data.merge(predict_df, how='outer',
-                              on=['STOCK_SYMBOL', 'WORK_DATE'])
+                                    on=['STOCK_SYMBOL', 'WORK_DATE'])
     
     loc_main = loc_main \
-                .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
-                .reset_index(drop=True)
+                        .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+                        .reset_index(drop=True)
     
-    loc_main = loc_main.merge(calendar, how='left', on='WORK_DATE')
+    loc_main = loc_main.merge(calendar, how='left', 
+                                          on='WORK_DATE')
     
     
     # One Hot Encoding ......
@@ -220,11 +216,13 @@ def get_model_data(ma_values=[5,20]):
                                          expand_col_name=True)    
     
     # Shift ......
-    except_cols = ['WORK_DATE', 'STOCK_SYMBOL', 'YEAR', 'MONTH', 
-                   'WEEKDAY', 'WEEK_NUM']
-    except_cols = except_cols + suppot_resist_cols
-    shift_cols = cbyz.df_get_cols_except(df=loc_main, except_cols=except_cols)
+    shift_cols = \
+        cbyz.df_get_cols_except(df=loc_main,
+                                except_cols=['WORK_DATE', 'STOCK_SYMBOL',
+                                             'YEAR', 'MONTH', 'WEEKDAY', 
+                                             'WEEK_NUM'])
          
+
     loc_main, ma_cols = stk.add_ma(df=loc_main, cols=shift_cols, 
                                    key=['STOCK_SYMBOL'], 
                           date='WORK_DATE', values=ma_values)
@@ -245,11 +243,7 @@ def get_model_data(ma_values=[5,20]):
                                            suffix='_LAG', 
                                            remove_na=False)
     
-    loc_main = cbyz.df_conv_na(df=loc_main, cols=suppot_resist_cols)
-    
-    
-    # Variables ......
-    var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM'] + suppot_resist_cols
+    var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM']
     model_x = lag_cols + var_cols
     model_y = ['OPEN', 'HIGH', 'LOW', 'CLOSE']  # rmse 0.05
     # model_y = ['PRICE_CHANGE_RATIO']          # rmse 0.11
@@ -265,7 +259,6 @@ def get_model_data(ma_values=[5,20]):
     na_df = loc_main[model_x + ['STOCK_SYMBOL']]
     na_df = na_df[na_df.isna().any(axis=1)]
     symbols_removed = na_df['STOCK_SYMBOL'].unique().tolist()
-    
     loc_main = loc_main[~loc_main['STOCK_SYMBOL'].isin(symbols_removed)] \
                 .reset_index(drop=True)
 
@@ -539,8 +532,7 @@ def get_model_list(status=[0,1]):
     # (2) List by model historic performance
     # (3) List by function pattern
     
-    # function_list = [model_5, model_6]
-    function_list = [model_6]
+    function_list = [model_5, model_6]
 
     return function_list
 
@@ -632,7 +624,7 @@ def master(_predict_begin, _predict_end=None,
     # date_period為10年的時候會出錯
     
     # data_period = 90
-    # data_period = 365
+    # data_period = 365 * 5
     # _predict_begin = 20210611
     # _predict_end = None
     # _predict_period = 5

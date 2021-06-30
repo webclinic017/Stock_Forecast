@@ -173,8 +173,8 @@ def master(overwrite=False, upload=True):
     
     # 檢查兩筆，如果數字都一樣的話就不更新
     if stock_type == 'tw':
-        # repre_symbols = ['0050', '0056']
-        repre_symbols = ['1101', '1102']        
+        repre_symbols = ['0050', '0056']
+        # repre_symbols = ['1101', '1102']        
     
 
     
@@ -218,11 +218,9 @@ def master(overwrite=False, upload=True):
         hist_data = hist_data.melt(id_vars=['WORK_DATE', 'STOCK_SYMBOL'])
         
         
-        chk_main = chk_data.merge(hist_data, 
-                                  on=['STOCK_SYMBOL', 'WORK_DATE', 'variable'])
-        
+        chk_main = chk_data.merge(hist_data, on=['STOCK_SYMBOL', 'variable'])
         chk_main['DIFF'] = chk_main['value_x'] - chk_main['value_y']
-        chk_main = chk_main[chk_main['DIFF']!=0]
+        chk_main = chk_main[chk_main['DIFF']==0]
         
         
         if len(chk_main) == 0:
