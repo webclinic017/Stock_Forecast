@@ -162,6 +162,7 @@ def yahoo_download_data(stock_list=[], chunk_begin=None, chunk_end=None):
 
 
 
+
 def master(overwrite=False, upload=True):
     '''
     主工作區
@@ -171,9 +172,13 @@ def master(overwrite=False, upload=True):
     stock_type = 'tw'
     
     
+    overwrite=False
+    upload=True    
+    
+    
     # 檢查兩筆，如果數字都一樣的話就不更新
     if stock_type == 'tw':
-        repre_symbols = ['0050', '0056']
+        repre_symbols = ['2330', '3008']
         # repre_symbols = ['1101', '1102']        
     
 
@@ -232,7 +237,7 @@ def master(overwrite=False, upload=True):
                  'HIGH', 'LOW', 'CLOSE', 'VOLUME']]
     
     
-    cbyz.df_chk_col_na(df=data)    
+    cbyz.df_chk_col_na(df=data)
     
 
     # Upload ------
@@ -253,14 +258,8 @@ def master(overwrite=False, upload=True):
 
 
 
-
-
-
 if __name__ == '__main__':
     master(overwrite=False, upload=True)
-
-
-
 
 
 
@@ -269,6 +268,9 @@ def check():
     '''
     資料驗證
     '''    
+    
+    chk = stk.get_data(data_begin=20210630)
+    
     return ''
 
 

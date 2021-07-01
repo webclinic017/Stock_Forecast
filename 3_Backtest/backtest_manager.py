@@ -98,7 +98,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
     
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
-                     bt_times, data_period):
+                     bt_times, data_period, full_data):
     
     
     global stock_symbol, stock_type
@@ -111,21 +111,22 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Work area ----------
-    global bt_results, bt_rmse, model_y
+    global bt_results, rmse, features, model_y
     bt_results_raw = pd.DataFrame()
-    bt_rmse = pd.DataFrame()
-    
+    rmse = pd.DataFrame()
+    features = pd.DataFrame()
     
     # Predict ......
     for i in range(0, len(bt_seq_list)):
         
         begin = bt_seq_list[i]
-        
+
         results_raw = sam.master(_predict_begin=begin, 
                                  _predict_end=None, 
                                  _predict_period=predict_period,
                                  data_period=data_period, 
-                                 _stock_symbol=stock_symbol)
+                                 _stock_symbol=stock_symbol,
+                                 _full_data=full_data)
 
 
         new_results = results_raw[0]
@@ -134,8 +135,12 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         new_rmse = results_raw[1]
         new_rmse['BACKTEST_ID'] = i
         
+        new_features = results_raw[2]
+        new_features['BACKTEST_ID'] = i
+        
         bt_results_raw = bt_results_raw.append(new_results)
-        bt_rmse = bt_rmse.append(new_rmse)
+        rmse = rmse.append(new_rmse)
+        features = features.append(new_features)
 
 
     # Organize ......
@@ -145,7 +150,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                                       except_cols=['STOCK_SYMBOL', 'WORK_DATE', 
                                                    'MODEL', 'BACKTEST_ID'])
 
-    bt_rmse = bt_rmse \
+    rmse = rmse \
         .sort_values(by=['MODEL', 'Y']) \
         .reset_index(drop=True)
     
@@ -154,120 +159,21 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
 
-def backtest_verify(begin_date, actions, stock_symbol, stock_type='tw', 
-                    stop_loss=0.8, buffer_days=7):
-    
-    
-    # Historic Data
-    hist_data = stk.get_data(data_begin=begin_date, data_end=None,
-                             stock_symbol=stock_symbol,
-                             stock_type=stock_type,
-                             shift=0)
-    
-    
-    bt_results = pd.DataFrame()
-    for i in range(len(actions)):
-
-        action_date = actions.loc[i, 'WORK_DATE']
-        action_symbol = actions.loc[i, 'STOCK_SYMBOL']
-        
-        
-        
-        cur_data = hist_data[(hist_data['WORK_DATE']>action_date) \
-                             & (hist_data['STOCK_SYMBOL']==action_symbol)] \
-                        .reset_index(drop=True)
-
-        cur_data['SELL_SIGNAL'] = False
-                        
-            
-        # Buy Price
-        buy_price =  hist_data[(hist_data['WORK_DATE']==action_date) \
-                             & (hist_data['STOCK_SYMBOL']==action_symbol)] \
-                        .reset_index(drop=True)
-    
-        buy_price = buy_price.loc[0, 'CLOSE']
-        
-        # Highest Prices
-        highest_price = buy_price
-    
-
-        # Wrap This as function
-        for j in range(len(cur_data)):
-
-            
-            cur_price = cur_data.loc[i, 'CLOSE']
-
-            
-            if cur_price > highest_price:
-                highest_price = cur_price
-            
-            
-            # Get Sell Signal
-            if (j > buffer_days) \
-                and ((highest_price - cur_price) \
-                     >= (highest_price - buy_price) * (1 - stop_loss)):
-                    
-                    
-                new_results = cur_data.loc[j, :]
-                new_results['BUY_PRICE'] = buy_price
-                new_results['HIGHEST_PRICE'] = highest_price
-                new_results['SELL_DATE'] = cur_data.loc[j, 'WORK_DATE']
-                new_results['BUY_DATE'] = action_date
-                new_results['SELL_SIGNAL'] = True
-                
-                bt_results = bt_results.append(new_results)
-                break
-            
-            # Not Get Sell Signal
-            if j == len(cur_data) - 1:
-                
-                new_results = cur_data.loc[j, :]
-                new_results['BUY_PRICE'] = buy_price
-                new_results['HIGHEST_PRICE'] = highest_price
-                new_results['SELL_DATE'] = np.nan
-                new_results['BUY_DATE'] = action_date
-                new_results['SELL_SIGNAL'] = False
-            
-                bt_results = bt_results.append(new_results)
-
-
-    # I don't know why SELL_SIGNAL in bt_results will convert to 0/1 from 
-    # True/False automatically.
-    bt_results = bt_results \
-        .rename(columns={'WORK_DATE':'LAST_DATE'}) \
-        .reset_index(drop=True)
-        
-        
-    bt_results['PROFIT'] = bt_results['CLOSE'] - bt_results['BUY_PRICE']     
-    bt_results['ROI'] = bt_results['PROFIT'] / bt_results['BUY_PRICE']
-        
-        
-    bt_results = bt_results[['STOCK_SYMBOL', 'BUY_DATE', 'BUY_PRICE',
-                             'SELL_SIGNAL', 'SELL_DATE', 'HIGHEST_PRICE',
-                             'LAST_DATE', 'HIGH', 'CLOSE', 'LOW', 'VOLUME',
-                             'PROFIT', 'ROI']]
-
-    
-    return bt_results
-
-
-
-
 def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, 
                export_file=True, load_file=False, path=None, file_name=None):
-    
-    
+    '''
+    應用場景有可能全部作回測，而不做任何預測，因為data_end直接設為bt_last_begin
+    '''
     
     global predict_period, bt_last_begin
-    global bt_results, bt_rmse, bt_main, actions, model_y
+    global bt_results, rmse, bt_main, actions, model_y
     global stock_symbol, stock_type
 
 
     print('Bug, data_begin and data_end should follow the backtest range')
-    loc_begin = 20160101
-    loc_end = cbyz.date_cal(bt_last_begin, -1, 'd')
+    loc_begin = 20180101
     hist_data_raw = stk.get_data(data_begin=loc_begin, 
-                                 data_end=loc_end, 
+                                 data_end=bt_last_begin, 
                                  stock_type=stock_type, 
                                  stock_symbol=stock_symbol, 
                                  price_change=True,
@@ -290,7 +196,14 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     date_prev.columns = ['WORK_DATE', 'LAST_DATE']
     date_prev = date_prev.reset_index(drop=True)
     
-    symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
+    
+    if len(stock_symbol) > 0:
+        symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
+    else:
+        temp_symbol = hist_data_raw['STOCK_SYMBOL'].unique().tolist()
+        symbol_df = pd.DataFrame({'STOCK_SYMBOL':temp_symbol})        
+        
+        
     hist_data = cbyz.df_cross_join(date_prev, symbol_df)
     hist_data = hist_data.merge(hist_data_raw, how='left', 
                                 on=['WORK_DATE', 'STOCK_SYMBOL'])
@@ -298,7 +211,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     # Merge hist data
     hist_data = cbyz.df_shift_fill_na(df=hist_data, 
                                       loop_times=predict_period+1, 
-                                 cols=model_y, group_by=['STOCK_SYMBOL'])
+                                      cols=model_y, group_by=['STOCK_SYMBOL'])
 
     # Add last price
     hist_data, _ = cbyz.df_add_shift(df=hist_data, cols=model_y, shift=1,
@@ -313,14 +226,12 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     hist_cols_dict = cbyz.li_to_dict(model_y, hist_cols)
     hist_data = hist_data.rename(columns=hist_cols_dict)
 
-
     last_cols = [i + '_LAST' for i in model_y]
-    last_cols_dict = cbyz.li_to_dict(model_y, last_cols)
     
     
     # Organize ......
     main_data = bt_results.merge(hist_data, how='left', 
-                              on=['WORK_DATE', 'STOCK_SYMBOL'])
+                                 on=['WORK_DATE', 'STOCK_SYMBOL'])
 
 
     main_data = main_data[['BACKTEST_ID', 'STOCK_SYMBOL', 'MODEL', 
@@ -329,19 +240,22 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
 
     # Fill na in the prediction period.
     for i in hist_cols:
-        main_data[i] = np.where(main_data['WORK_DATE'] >= bt_last_begin,
+        main_data[i] = np.where(main_data['WORK_DATE'] > bt_last_begin,
                                 np.nan, main_data[i])
 
     # Check na ......
-    # 這裡有na是合理的，因為hist都是na？
+    # 這裡有na是合理的，因為hist都是na
     chk = cbyz.df_chk_col_na(df=main_data, positive_only=True)
+    
+    last_cols = [i + '_LAST' for i in model_y]
+    main_data = main_data.dropna(subset=last_cols)
     
     if len(chk) > len(model_y):
         print('Err01. cal_profit - main_data has na in columns.')
 
 
     bt_main, actions = \
-        stk.gen_predict_action(df=main_data, rmse=bt_rmse,
+        stk.gen_predict_action(df=main_data, rmse=rmse,
                                   date='WORK_DATE', 
                                   last_date='LAST_DATE', 
                                   y=model_y, y_last=last_cols,
@@ -350,23 +264,63 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                                   export_file=export_file, 
                                   load_file=load_file, file_name=file_name,
                                   path=path)
-
-    # df = main_data.copy()
-    # rmse = bt_rmse.copy()
-    # date = 'WORK_DATE' 
-    # last_date = 'LAST_DATE'
-    # y = model_y
-    # y_last = last_cols
+    
+    # Rearrange Columns ......            
+    if 'CLOSE' in model_y:
+        profit_cols = ['CLOSE_PROFIT_PREDICT', 'CLOSE_PROFIT_RATIO_PREDICT']
         
-    # price_thld = 1
-    # time_thld = predict_period
-    # rmse_thld = 0.15    
+    cols_1 = ['BACKTEST_ID', 'STOCK_SYMBOL', 'STOCK_NAME', 
+              'MODEL', 'WORK_DATE', 'LAST_DATE']
+
+    model_y_last = [s + '_LAST' for s in model_y]
+    model_y_hist = [s + '_HIST' for s in model_y]    
+    cols_2 = ['RMSE_MEAN']
+    
+    new_cols = cols_1 + profit_cols + model_y + model_y_last \
+                + model_y_hist + cols_2
+                
+    actions = actions[new_cols]
+    
+    
+    # MAPE ......
+    global mape, mape_group, mape_extreme
+    mape = pd.DataFrame()
+    mape_group = pd.DataFrame()
+    mape_extreme = pd.DataFrame()
+    mape_main = bt_main[bt_main['BACKTEST_ID']>0]
+    
+    for y in model_y:
+        
+        mape_main['MAPE'] = abs(mape_main[y] \
+                                - mape_main[y + '_HIST']) \
+                            / mape_main['CLOSE_HIST']
+                            
+        mape_main['OVERESTIMATE'] = \
+            np.where(mape_main[y] > mape_main[y + '_HIST'], 1, 0)
+                 
+        # MAPE
+        new_mape = cbyz.summary(df=mape_main, group_by=[], cols='MAPE')
+        new_mape['Y'] = y        
+        mape = mape.append(new_mape)
+        
+        # MAPE2
+        new_mape = cbyz.summary(df=mape_main, group_by='OVERESTIMATE', 
+                                 cols='MAPE')
+        new_mape['Y'] = y
+        mape_group = mape_group.append(new_mape)
+        
+        
+        # MAPE Extreme
+        new_mape = mape_main[mape_main['MAPE'] > 0.1]
+        new_mape = cbyz.summary(df=new_mape, 
+                                group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
+                                cols='MAPE')
+        new_mape['Y'] = y
+        mape_extreme = mape_extreme.append(new_mape)
+        
 
 
-    # return bt_main, actions
-
-
-
+# ..........
 
 
 def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5, 
@@ -382,22 +336,30 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _bt_last_begin = 20210701
     # bt_last_begin = 20210211
     predict_period = 2
-    interval = 60
-    bt_times = 1
-    data_period = 360 * 5
+    interval = 90
+    bt_times = 3
+    data_period = 360 * 2
+    # data_period = 360 * 5
     # data_period = 360 * 7    
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    _stock_symbol = [] # 為空的empty時，在cal_profit的地方會出錯
     _stock_type = 'tw'
+    full_data = True
+    # full_data = False
+
+
+    # Worklist
+
+
+    # 如果可以把stock_symbol設為[]，是不是真的還需要full_data
 
 
     # Read Files From SAM
-    path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Export'
-    target_symbols = pd.read_csv(path_sam \
-                                 + '/target_symbols_20210629_224443.csv')
+    # path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Export'
+    # target_symbols = pd.read_csv(path_sam \
+    #                               + '/target_symbols_20210629_224443.csv')
         
-    # target_symbols_20210629_230911
-
-    _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()    
+    # _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()    
 
 
     # ......    
@@ -418,30 +380,37 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # full_data = full_data['FULL_DATA']
     
     
+    # 算回測precision的時候，可以低估，但不可以高估
+    
     # Predict ------
-    global bt_results, bt_rmse
+    global bt_results, rmse, features
     backtest_predict(bt_last_begin=bt_last_begin, 
                      predict_period=predict_period, 
                      interval=interval,
                      bt_times=bt_times,
-                     data_period=data_period)
+                     data_period=data_period,
+                     full_data=full_data)
 
     
     # Profit ------    
-    # price_thld = 2
-    # time_thld = 10
-    # rmse_thld = 0.15
+    # Update, 需把Y為close和Y為price_change的情況分開處理
     
-    global bt_main, actions    
-    cal_profit(y_thld=0.2, time_thld=predict_period, rmse_thld=0.1,
+    # y_thld=0.2
+    # time_thld=predict_period
+    # rmse_thld=0.1
+    # export_file=True
+    # load_file=False
+    # path=None
+    # file_name=None    
+    
+    
+    global bt_main, actions, mape, mape_group, mape_extreme
+    cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                export_file=True, load_file=True, path=path_temp,
                file_name=None) 
     
-    # cal_profit(price_thld=1, time_thld=predict_period, rmse_thld=0.2)        
-
     
     actions = actions[actions['MODEL']=='model_6']
-    actions = actions.drop('ROWS', axis=1)
     actions = cbyz.df_add_size(df=actions, group_by='STOCK_SYMBOL',
                                col_name='ROWS')
 
@@ -450,23 +419,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     actions.to_excel(path_export + '/actions_' + time_serial + '.xlsx', 
                      index=False, encoding='utf-8-sig')
 
-    
-    # # Predictions -----
-    # predict_date = cbyz.date_gat_calendar(begin_date=20210406, 
-    #                                       end_date=20210420)
-    
-    # predict_date = predict_date[['WORK_DATE']]
-    # predict_date['PREDICT'] = True
-    
-    # predict_date_list = predict_date['WORK_DATE'].tolist()
-
-    
-    
-    # predict_full_data = full_data.merge(predict_date, how='outer',
-    #                               on='WORK_DATE')
-    
-
-        
     
     return ''
 
@@ -560,750 +512,3 @@ def get_stock_fee():
 
 
 # %% Archive ------
-
-def backtest_master(predict_begin=20200801, predict_period=15,
-                    interval=30,
-                volume=1000, budget=None, 
-                stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
-                stock_type='tw',
-                backtest_times=14,
-                signal_thld=0.03, stop_loss=0.8, buffer_days=7, lag=7, debug=False):
-    
-    
-    pred_results, actions = \
-        backtest_predict(begin=20190801, predict_period=15,
-                         interval=30, data_period=360, 
-                        volume=1000, budget=None, 
-                         stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
-                         stock_type='tw',
-                         backtest_times=5,
-                         signal_thld=0.03, lag=7, debug=False)    
-
-    
-    
-    bt_results = backtest_verify(begin_date=begin_date, actions=actions, 
-                                 stock_symbol=stock_symbol, 
-                                 stop_loss=stop_loss,
-                                 buffer_days=buffer_days)
-    
-    
-    
-    return pred_results, actions, bt_results
-
-
-
-def btm_predict_backup20210428(begin_date, data_period=360, interval=30,
-                volume=1000, budget=None, 
-                stock_symbol=[2520, 2605, 6116, 6191, 3481, 2409],
-                stock_type='tw',
-                predict_period=15, backtest_times=5,
-                signal_thld=0.03, stop_loss=0.8, lag=7, debug=False):
-    
-    '''
-    interval : int. Backest interval
-    
-    '''
-    
-
-    # .......
-    loc_time_seq = cbyz.date_get_seq(begin_date=begin_date,
-                                     periods=backtest_times,
-                                     unit='d', skip=interval,
-                                     simplify_date=True)
-    
-    loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
-
-    
-    # Work area ----------
-    model_list = sam.get_model_list()
-    buy_signal = pd.DataFrame()
-    rmse = pd.DataFrame()    
-    error_msg = []
-    
-    
-    # Date .........
-    for i in range(0, len(loc_time_seq)):
-        
-        
-        last_date = cbyz.date_cal(loc_time_seq[i], -1, 'd')
-        
-        # Last price ......
-        last_price = stk.get_data(data_begin=last_date,
-                                  data_end=last_date,
-                                  stock_symbol=stock_symbol,
-                                  stock_type=stock_type,
-                                  shift=1)
-        
-        last_price = last_price[['STOCK_SYMBOL', 'CLOSE']] \
-                        .rename(columns={'CLOSE':'LAST_CLOSE'})
-        
-        # Predict ......
-        results_raw, rmse = sam.master(data_period=150, predict_end=None, 
-                                       predict_period=15,
-                                       stock_symbol=stock_symbol, 
-                                       today=None, hold_stocks=None, 
-                                       limit=90)
-        
-         # Merge Data ......   
-        results = results_raw.merge(last_price, on=['STOCK_SYMBOL'])
-        results['INCREASE'] = (results['CLOSE'] - results['LAST_CLOSE']) \
-                                / results['LAST_CLOSE']
-        
-        
-        # Decision ......
-        results.loc[results['INCREASE']>=signal_thld, 'BUY_SIGNAL'] = 1
-        results = cbyz.df_conv_na(df=results, cols='BUY_SIGNAL', value=0)
-        
-        
-        actions = results \
-                    .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
-                    .drop_duplicates(subset='STOCK_SYMBOL') \
-                    .reset_index(drop=True)
-        
-        
-        下面還沒改
-
-        # Buy Price ......
-        # Bug, 檢查這一段邏輯有沒有錯
-        # BUG，BUY_PRICE可能有0
-        
-        # Bug, end_date可能沒有開盤，導致buy_price為空值
-        # real_data = btm_load_data(begin_date=data_begin,
-        #                           end_date=data_end)
-        
-        # real_data = real_data.drop(['HIGH', 'LOW'], axis=1)            
-        buy_price = model_data[model_data['WORK_DATE']==data_begin] \
-                    .rename(columns={'CLOSE':'BUY_PRICE'}) 
-            
-            
-        buy_price = buy_price[['STOCK_SYMBOL', 'BUY_PRICE']] \
-                    .reset_index(drop=True)
-    
-    
-        if len(buy_price) == 0:
-            print(str(data_begin) + ' without data.')
-            continue
-
-
-        
-    
-    if len(buy_signal) == 0:
-        print('bt_buy_signal return 0 row.')
-        return pd.DataFrame()
-    
-    
-    buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
-    rmse = rmse.reset_index(drop=True)
-    
-    
-    # Add dynamic ROI -------
-    predict_roi_pre = cbyz.df_add_rank(buy_signal, 
-                               value='WORK_DATE',
-                               group_key=['STOCK_SYMBOL', 'BACKTEST_ID'])
-            
-
-    predict_roi = pd.DataFrame()
-    
-    
-    for i in range(0, len(loc_time_seq)):
-    
-        df_lv1 = predict_roi_pre[predict_roi_pre['BACKTEST_ID']==i]
-        unique_symbol = df_lv1['STOCK_SYMBOL'].unique()
-        
-        
-        for j in range(0, len(unique_symbol)):
-            
-            df_lv2 = df_lv1[df_lv1['STOCK_SYMBOL']==unique_symbol[j]] \
-                        .reset_index(drop=True)
-            
-            for k in range(0, len(df_lv2)):
-                
-                if k == 0:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'BUY_PRICE']
-                    continue
-                    
-                if df_lv2.loc[k, 'FORECAST_CLOSE'] >= df_lv2.loc[k-1, 'MAX_PRICE']:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'FORECAST_CLOSE']
-                else:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k-1, 'MAX_PRICE']
-                            
-            predict_roi = predict_roi.append(df_lv2)
-    
-    # ............
-    predict_results = predict_roi.copy()
-    predict_results.loc[predict_results['MAX_PRICE'] * stop_loss \
-                        >= predict_results['FORECAST_CLOSE'], \
-                        'SELL_SIGNAL'] = True
-    
-    predict_results = cbyz.df_conv_na(predict_results,
-                                cols='SELL_SIGNAL',
-                                value=False)
- 
-    predict_results['GRP_SELL_SIGNAL'] = predict_results \
-        .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['SELL_SIGNAL'] \
-        .transform(max)
-    
-    
-    
-    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==True) \
-                   & (predict_results['SELL_SIGNAL']==False), \
-                   'REMOVE'] = True
-    
-    
-    # Remove for GRP_SELL_SIGNAL == NA ......
-    # Bug, 移除在period內完全沒碰到停損點的還沒判斷        
-    predict_results['MAX_RANK'] = predict_results \
-                    .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['RANK'] \
-                    .transform(max)
-
-    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==False) \
-                   & (predict_results['RANK']<predict_results['MAX_RANK']), \
-                   'REMOVE'] = True
-      
-        
-    if debug == False:
-        predict_results = predict_results[predict_results['REMOVE'].isna()] \
-                            .drop(['REMOVE', 'MAX_RANK'], axis=1)   
-    
-    predict_results = predict_results.reset_index(drop=True)
-
-
-    predict_dict = {'RESULTS':predict_results, \
-                    'RMSE':rmse}
-    
-    return predict_dict
-
-
-
-def btm_predict_backup_20210426(begin_date, data_period=360, interval=30,
-                volume=1000, budget=None, 
-                predict_period=15, backtest_times=5,
-                roi_base=0.03, stop_loss=0.8, lag=7, debug=False):
-    
-    '''
-    interval : int. Backest interval
-    
-    '''
-    
-
-    # .......
-    loc_time_seq = cbyz.date_get_seq(begin_date=begin_date,
-                                     periods=backtest_times,
-                                     unit='d', skip=interval,
-                                     simplify_date=True)
-    
-    loc_time_seq = loc_time_seq['WORK_DATE'].tolist()
-
-    
-    # Work area ----------
-    model_list = sam.get_model_list()
-    buy_signal = pd.DataFrame()
-    rmse = pd.DataFrame()    
-    error_msg = []
-    
-    
-    # Date .........
-    for i in range(0, len(loc_time_seq)):
-    
-
-        date_period = cbyz.date_get_period(data_begin=loc_time_seq[i],
-                                           data_end=None, 
-                                           data_period=data_period,
-                                           predict_end=None, 
-                                           predict_period=predict_period)        
-        
-
-        data_begin_pre = date_period['DATA_BEGIN']
-        data_end_pre = date_period['DATA_END']
-        predict_begin = date_period['PREDICT_BEGIN']
-        predict_end = date_period['PREDICT_END']
-
-
-
-        # (1) data_begin and data_end may be changed here.        
-        # Update，增加df_normalize
-        
-        data_raw = sam.get_model_data(data_begin=data_begin_pre,
-                                      data_end=data_end_pre,
-                                      data_period=None, 
-                                      predict_end=predict_end, 
-                                      predict_period=predict_period,
-                                      stock_symbol=target_symbol,
-                                      lag=lag)
-        
-        data_begin = data_raw['DATA_BEGIN']
-        data_end = data_raw['DATA_END']        
-        
-        
-        if isinstance(data_raw, str) :
-            error_msg.append(data_raw)
-            continue
-        
-        
-        # Update, set to global variables?
-        model_data = data_raw['MODEL_DATA']
-        predict_data = data_raw['PRECIDT_DATA']
-        predict_date = data_raw['PRECIDT_DATE']
-        model_x = data_raw['MODEL_X']
-        model_y = data_raw['MODEL_Y']            
-
-
-        # Buy Price ......
-        # Bug, 檢查這一段邏輯有沒有錯
-        # BUG，BUY_PRICE可能有0
-        
-        # Bug, end_date可能沒有開盤，導致buy_price為空值
-        # real_data = btm_load_data(begin_date=data_begin,
-        #                           end_date=data_end)
-        
-        # real_data = real_data.drop(['HIGH', 'LOW'], axis=1)            
-        buy_price = model_data[model_data['WORK_DATE']==data_begin] \
-                    .rename(columns={'CLOSE':'BUY_PRICE'}) 
-            
-            
-        buy_price = buy_price[['STOCK_SYMBOL', 'BUY_PRICE']] \
-                    .reset_index(drop=True)
-    
-    
-        if len(buy_price) == 0:
-            print(str(data_begin) + ' without data.')
-            continue
-
-
-        
-        # Model ......
-        for j in range(0, len(model_list)):
-
-            cur_model = model_list[j]
-            
-            # Model results .......
-            # (1) Update, should deal with multiple signal issues.
-            #     Currently, only consider the first signal.
-            # (2) predict_data doesn't use.
-            
-            # global model_results_raw
-            model_results_raw = cur_model(stock_symbol=stock_symbol,
-                                          model_data=model_data, 
-                                          predict_date=predict_date,
-                                          model_x=model_x, model_y=model_y,
-                                          remove_none=True)      
-            
-            
-            if len(model_results_raw['RESULTS']) == 0:
-                continue
-            
-            
-            model_name = cur_model.__name__
-            
-            
-            # Buy Signal
-            temp_results = model_results_raw['RESULTS']
-            temp_results = temp_results.merge(buy_price, 
-                                                how='left',
-                                                on='STOCK_SYMBOL')
-            
-            
-            temp_results['ROI'] = (temp_results['CLOSE'] \
-                                    - temp_results['BUY_PRICE']) \
-                                    / temp_results['BUY_PRICE']
-
-
-            temp_results = temp_results[temp_results['ROI'] >= roi_base]
-            
-            
-            temp_results['MODEL'] = model_name
-            temp_results['DATA_BEGIN'] = data_begin
-            temp_results['DATA_END'] = data_end
-            temp_results['PREDICT_BEGIN'] = predict_begin
-            temp_results['PREDICT_END'] = predict_end
-            temp_results['BACKTEST_ID'] = i
-            
-            buy_signal = buy_signal.append(temp_results)        
-            
-            
-            # RMSE ......
-            new_rmse = model_results_raw['RMSE']
-            new_rmse['MODEL'] = model_name
-            new_rmse['BACKTEST_ID'] = i
-            rmse = rmse.append(new_rmse)
-        
-        
-    
-    if len(buy_signal) == 0:
-        print('bt_buy_signal return 0 row.')
-        return pd.DataFrame()
-    
-    
-    buy_signal = buy_signal.rename(columns={'CLOSE':'FORECAST_CLOSE'})
-    rmse = rmse.reset_index(drop=True)
-    
-    
-    # Add dynamic ROI -------
-    predict_roi_pre = cbyz.df_add_rank(buy_signal, 
-                               value='WORK_DATE',
-                               group_key=['STOCK_SYMBOL', 'BACKTEST_ID'])
-            
-
-    predict_roi = pd.DataFrame()
-    
-    
-    for i in range(0, len(loc_time_seq)):
-    
-        df_lv1 = predict_roi_pre[predict_roi_pre['BACKTEST_ID']==i]
-        unique_symbol = df_lv1['STOCK_SYMBOL'].unique()
-        
-        
-        for j in range(0, len(unique_symbol)):
-            
-            df_lv2 = df_lv1[df_lv1['STOCK_SYMBOL']==unique_symbol[j]] \
-                        .reset_index(drop=True)
-            
-            for k in range(0, len(df_lv2)):
-                
-                if k == 0:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'BUY_PRICE']
-                    continue
-                    
-                if df_lv2.loc[k, 'FORECAST_CLOSE'] >= df_lv2.loc[k-1, 'MAX_PRICE']:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k, 'FORECAST_CLOSE']
-                else:
-                    df_lv2.loc[k, 'MAX_PRICE'] = df_lv2.loc[k-1, 'MAX_PRICE']
-                            
-            predict_roi = predict_roi.append(df_lv2)
-    
-    # ............
-    predict_results = predict_roi.copy()
-    predict_results.loc[predict_results['MAX_PRICE'] * stop_loss \
-                        >= predict_results['FORECAST_CLOSE'], \
-                        'SELL_SIGNAL'] = True
-    
-    predict_results = cbyz.df_conv_na(predict_results,
-                                cols='SELL_SIGNAL',
-                                value=False)
- 
-    predict_results['GRP_SELL_SIGNAL'] = predict_results \
-        .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['SELL_SIGNAL'] \
-        .transform(max)
-    
-    
-    
-    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==True) \
-                   & (predict_results['SELL_SIGNAL']==False), \
-                   'REMOVE'] = True
-    
-    
-    # Remove for GRP_SELL_SIGNAL == NA ......
-    # Bug, 移除在period內完全沒碰到停損點的還沒判斷        
-    predict_results['MAX_RANK'] = predict_results \
-                    .groupby(['STOCK_SYMBOL', 'BACKTEST_ID'])['RANK'] \
-                    .transform(max)
-
-    predict_results.loc[(predict_results['GRP_SELL_SIGNAL']==False) \
-                   & (predict_results['RANK']<predict_results['MAX_RANK']), \
-                   'REMOVE'] = True
-      
-        
-    if debug == False:
-        predict_results = predict_results[predict_results['REMOVE'].isna()] \
-                            .drop(['REMOVE', 'MAX_RANK'], axis=1)   
-    
-    predict_results = predict_results.reset_index(drop=True)
-
-
-    predict_dict = {'RESULTS':predict_results, \
-                    'RMSE':rmse}
-    
-    return predict_dict
-
-
-
-
-def btm_gen_actions(predict_results, rmse):
-    
-    loc_rmse = rmse.copy()
-    
-    loc_rmse['RMSE_MEAN'] = loc_rmse \
-                                .groupby(['STOCK_SYMBOL', 'MODEL'])['RMSE'] \
-                                .transform('mean')
-    
-    
-    
-    loc_rmse['RMSE_MEAN_MIN'] = loc_rmse \
-                                .groupby(['STOCK_SYMBOL', 'MODEL'])['RMSE'] \
-                                .transform('min')
-
-
-    loc_rmse['RMSE_MEAN_MAX'] = loc_rmse \
-                                .groupby(['STOCK_SYMBOL', 'MODEL'])['RMSE'] \
-                                .transform('max')
-
-
-    
-    # loc_rmse.loc[loc_rmse['RMSE_MEAN']==loc_rmse['RMSE_MEAN_MIN'],
-    #     'ACTION'] = True 
-
-
-    # Check, 這個方式是否合理
-    loc_rmse = loc_rmse \
-                .drop_duplicates(subset=['STOCK_SYMBOL', 'MODEL']) \
-                .sort_values(by=['STOCK_SYMBOL', 'MODEL']) \
-                .reset_index(drop=True)
-                
-    # ......
-    
-    loc_main = predict_results.merge(loc_rmse, how='left',
-                            on=['MODEL', 'STOCK_SYMBOL'])
-    
-    # loc_main = loc_main[loc_main['ACTION']==True]
-    
-    
-    print('BUG,BUY_PRICE可能有0')
-    
-    
-    return_dict = {'SUMMARY':loc_rmse,
-                   'RESULTS':loc_main}
-    
-    return return_dict
-
-
-
-def btm_add_hist_data(predict_results):
-    
-        
-    # Organize results ------
-    loc_forecast = predict_results.copy()
-
-    loc_forecast = loc_forecast \
-                    .rename(columns={'WORK_DATE':'BUY_DATE'})
-
-    # Add Historical Data......
-    hist_data_info = loc_forecast[['STOCK_SYMBOL', 'PREDICT_BEGIN',
-                                   'PREDICT_END', 'FORECAST_CLOSE']] \
-                    .reset_index(drop=True)
-
-    
-    hist_data_period = hist_data_info[['PREDICT_BEGIN', 'PREDICT_END']] \
-                        .drop_duplicates() \
-                        .reset_index(drop=True)
-    
-    
-    hist_data_pre = pd.DataFrame()
-        
-    for i in range(0, len(hist_data_period)):
-
-        temp_begin = hist_data_period.loc[i, 'PREDICT_BEGIN']
-        temp_end = hist_data_period.loc[i, 'PREDICT_END']       
-        
-        # Symbol ...
-        temp_symbol = hist_data_info[
-            (hist_data_info['PREDICT_BEGIN']==temp_begin) \
-            & (hist_data_info['PREDICT_END']==temp_end)]
-
-        temp_symbol = temp_symbol['STOCK_SYMBOL'].tolist()  
-            
-            
-        new_data = ar.stk_get_data(data_begin=temp_begin, 
-                                   data_end=temp_end, 
-                                   stock_type='tw', 
-                                   stock_symbol=temp_symbol, 
-                                   local=local)           
-        
-        new_data['PREDICT_BEGIN'] = temp_begin
-        new_data['PREDICT_END'] = temp_end
-        
-        hist_data_pre = hist_data_pre.append(new_data)
-
-
-    hist_data_pre = hist_data_pre.drop(['HIGH', 'LOW'], axis=1) \
-                    .reset_index(drop=True)
-
-    # hist_data_pre = cbyz.df_ymd(hist_data_pre, cols='WORK_DATE')
-
-        
-    # Combine data ......
-    hist_data_full = hist_data_pre.merge(hist_data_info,
-                                         how='left',
-                                         on=['PREDICT_BEGIN', 'PREDICT_END', 
-                                             'STOCK_SYMBOL']) 
-
-        
-    hist_data = hist_data_full[hist_data_full['FORECAST_CLOSE'] \
-                          <= hist_data_full['CLOSE']] \
-                .drop_duplicates(subset=['PREDICT_BEGIN', 'PREDICT_END', 
-                                         'STOCK_SYMBOL']) \
-                .reset_index(drop=True)
-            
-      
-    # Join forecast and historical data ......
-    # Bug, 這裡的資料抓出來可能會有na          
-
-
-    backtest_results = loc_forecast \
-                        .merge(hist_data, how='left', 
-                               on=['STOCK_SYMBOL', 'PREDICT_BEGIN',
-                                   'PREDICT_END', 'FORECAST_CLOSE'])
-            
-    
-    backtest_results.loc[~backtest_results['CLOSE'].isna(), 'SUCCESS'] = True 
-    backtest_results.loc[backtest_results['CLOSE'].isna(), 'SUCCESS'] = False     
-        
-        
-    backtest_results = cbyz.df_ymd(backtest_results, 
-                                cols=['BUY_DATE', 'PREDICT_BEGIN',
-                                      'PREDICT_END'])    
-    
-
-        
-    # Combine data ......
-    hist_data_full = hist_data_pre.merge(hist_data_info,
-                                         how='left',
-                                         on=['PREDICT_BEGIN', 'PREDICT_END', 
-                                             'STOCK_SYMBOL']) 
-
-        
-    hist_data = hist_data_full[hist_data_full['FORECAST_CLOSE'] \
-                          <= hist_data_full['CLOSE']] \
-                .drop_duplicates(subset=['PREDICT_BEGIN', 'PREDICT_END', 
-                                         'STOCK_SYMBOL']) \
-                .reset_index(drop=True)
-            
-      
-    # Join forecast and historical data ......
-    # Bug, 這裡的資料抓出來可能會有na          
-
-
-    backtest_results = loc_forecast \
-                        .merge(hist_data,
-                               how='left',
-                               on=['STOCK_SYMBOL', 'PREDICT_BEGIN',
-                                   'PREDICT_END', 'FORECAST_CLOSE'])
-            
-    
-    backtest_results.loc[~backtest_results['CLOSE'].isna(), 'SUCCESS'] = True 
-    backtest_results.loc[backtest_results['CLOSE'].isna(), 'SUCCESS'] = False     
-        
-        
-    backtest_results = cbyz.df_ymd(backtest_results, 
-                                cols=['BUY_DATE', 'PREDICT_BEGIN',
-                                      'PREDICT_END'])    
-    
-
-        
-    # Combine data ......
-    hist_data_full = hist_data_pre.merge(hist_data_info,
-                                         how='left',
-                                         on=['PREDICT_BEGIN', 'PREDICT_END', 
-                                             'STOCK_SYMBOL']) 
-
-        
-    hist_data = hist_data_full[hist_data_full['FORECAST_CLOSE'] \
-                          <= hist_data_full['CLOSE']] \
-                .drop_duplicates(subset=['PREDICT_BEGIN', 'PREDICT_END', 
-                                         'STOCK_SYMBOL']) \
-                .reset_index(drop=True)
-            
-      
-    # Join forecast and historical data ......
-    # Bug, 這裡的資料抓出來可能會有na          
-
-
-    backtest_results = loc_forecast \
-                        .merge(hist_data,
-                               how='left',
-                               on=['STOCK_SYMBOL', 'PREDICT_BEGIN',
-                                   'PREDICT_END', 'FORECAST_CLOSE'])
-            
-    
-    backtest_results.loc[~backtest_results['CLOSE'].isna(), 'SUCCESS'] = True 
-    backtest_results.loc[backtest_results['CLOSE'].isna(), 'SUCCESS'] = False     
-        
-        
-    backtest_results = cbyz.df_ymd(backtest_results, 
-                                cols=['BUY_DATE', 'PREDICT_BEGIN',
-                                      'PREDICT_END'])    
-    
-
-        
-    # Combine data ......
-    hist_data_full = hist_data_pre.merge(hist_data_info,
-                                         how='left',
-                                         on=['PREDICT_BEGIN', 'PREDICT_END', 
-                                             'STOCK_SYMBOL']) 
-
-        
-    hist_data = hist_data_full[hist_data_full['FORECAST_CLOSE'] \
-                          <= hist_data_full['CLOSE']] \
-                .drop_duplicates(subset=['PREDICT_BEGIN', 'PREDICT_END', 
-                                         'STOCK_SYMBOL']) \
-                .reset_index(drop=True)
-            
-      
-    # Join forecast and historical data ......
-    # Bug, 這裡的資料抓出來可能會有na          
-
-
-    backtest_results = loc_forecast \
-                        .merge(hist_data,
-                               how='left',
-                               on=['STOCK_SYMBOL', 'PREDICT_BEGIN',
-                                   'PREDICT_END', 'FORECAST_CLOSE'])
-            
-    
-    backtest_results.loc[~backtest_results['CLOSE'].isna(), 'SUCCESS'] = True 
-    backtest_results.loc[backtest_results['CLOSE'].isna(), 'SUCCESS'] = False     
-        
-        
-    backtest_results = cbyz.df_ymd(backtest_results, 
-                                cols=['BUY_DATE', 'PREDICT_BEGIN',
-                                      'PREDICT_END'])    
-    
-
-        
-    # Combine data ......
-    hist_data_full = hist_data_pre.merge(hist_data_info,
-                                         how='left',
-                                         on=['PREDICT_BEGIN', 'PREDICT_END', 
-                                             'STOCK_SYMBOL']) 
-
-        
-    hist_data = hist_data_full[hist_data_full['FORECAST_CLOSE'] \
-                          <= hist_data_full['CLOSE']] \
-                .drop_duplicates(subset=['PREDICT_BEGIN', 'PREDICT_END', 
-                                         'STOCK_SYMBOL']) \
-                .reset_index(drop=True)
-            
-      
-    # Join forecast and historical data ......
-    # Bug, 這裡的資料抓出來可能會有na          
-
-
-    backtest_results = loc_forecast \
-                        .merge(hist_data,
-                               how='left',
-                               on=['STOCK_SYMBOL', 'PREDICT_BEGIN',
-                                   'PREDICT_END', 'FORECAST_CLOSE'])
-            
-    
-    backtest_results.loc[~backtest_results['CLOSE'].isna(), 'SUCCESS'] = True 
-    backtest_results.loc[backtest_results['CLOSE'].isna(), 'SUCCESS'] = False     
-        
-        
-    backtest_results = cbyz.df_ymd(backtest_results, 
-                                cols=['BUY_DATE', 'PREDICT_BEGIN',
-                                      'PREDICT_END'])    
-    
-    
-    # Reorganize ......
-    backtest_results = backtest_results \
-                    .sort_values(by=['STOCK_SYMBOL', 'BUY_DATE']) \
-                    .reset_index(drop=True)
-    
-    
-    return backtest_results
-
-
-# ...............
-
-
-
-

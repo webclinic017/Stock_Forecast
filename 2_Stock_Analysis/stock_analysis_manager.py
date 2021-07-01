@@ -10,7 +10,6 @@ Created on Sat Nov 14 17:23:08 2020
 # 1. Some models only work for some stock symbol.
 # > Clustering
 # 2. Add crypto
-# 3. 把Lag改成MA
 
 
 # Optimization
@@ -73,21 +72,23 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None, 
-                  stock_symbol=None, full_data=False):
+                  stock_symbol=None, full_data=False, industry=False):
     '''
     讀取資料及重新整理
     '''
     
+    ma_except_cols = []
+    lag_except_cols = []
+    
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
     loc_begin = cbyz.date_cal(data_begin, -1, 'd')
-    
     
     
     if full_data:
         data = stk.get_data(data_begin=loc_begin, 
                                  data_end=data_end, 
                                  stock_type=stock_type, 
-                                 stock_symbol=None, 
+                                 stock_symbol=[], 
                                  price_change=True,
                                  local=local)
     else:
@@ -100,17 +101,18 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
         
         
     # Exclude the symbols shorter than begin_date ......
+    # 抓一年資料的時候，這裡會排掉22支
+    print('sam_load_data - Update, fix new symbols issues')
     date_min = data['WORK_DATE'].min()
     data['MIN_DATE'] = data \
                         .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
                         .transform('min')
 
-    data = data[data['MIN_DATE']==date_min] \
-            .drop('MIN_DATE', axis=1)
+    data = data[data['MIN_DATE']==date_min].drop('MIN_DATE', axis=1)
 
 
     # Merge Other Data ......        
-    if full_data:        
+    if industry:        
         
         # Stock Info ...
         stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
@@ -119,16 +121,74 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
         stock_info = stock_info[['STOCK_SYMBOL', 'CAPITAL_LEVEL',
                                  'ESTABLISH_DAYS', 'LISTING_DAYS', 
                                  'INDUSTRY_ONE_HOT']]
+
+        stock_industry = stock_info[['STOCK_SYMBOL', 'INDUSTRY_ONE_HOT']]
         
-        stock_info = cbyz.df_get_dummies(df=stock_info, 
+        stock_info_dummy = cbyz.df_get_dummies(df=stock_info, 
                                          cols='INDUSTRY_ONE_HOT')
         
+        
+        # Industry Data ...
+        print('sam_load_data - 當有新股上市時，產業資料的比例會出現大幅變化，' \
+              + '評估如何處理')
+        
+        industry_df = data[['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE']]
+        industry_df = industry_df.merge(stock_industry, on='STOCK_SYMBOL')
+        
+        industry_df = industry_df \
+                        .groupby(['WORK_DATE', 'INDUSTRY_ONE_HOT']) \
+                        .agg({'CLOSE':'sum'}) \
+                        .reset_index() \
+                        .rename(columns={'CLOSE':'INDUSTRY_CLOSE'})
+        
         # Merge Data ......
-        data = data.merge(stock_info, how='left', on='STOCK_SYMBOL')
+        data = data \
+            .merge(stock_industry, how='left', on='STOCK_SYMBOL') \
+            .merge(industry_df, how='left', on=['WORK_DATE', 'INDUSTRY_ONE_HOT']) \
+            .drop('INDUSTRY_ONE_HOT', axis=1) \
+            .merge(stock_info_dummy, how='left', on=['STOCK_SYMBOL'])    
+        
+        data['INDUSTRY_CLOSE_RATIO'] = data['CLOSE'] / data['INDUSTRY_CLOSE']
         data = data[~data['ESTABLISH_DAYS'].isna()].reset_index(drop=True)
+        
+        # MA Except
+        new_cols = cbyz.df_get_cols_except(df=stock_info_dummy,
+                                           except_cols='STOCK_SYMBOL')
+    
+        ma_except_cols = ma_except_cols + new_cols
+
+
+    # Add K line
+    data = data \
+            .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+            .reset_index(drop=True)
+    data = stk.add_k_line(data)
     
     
-    return data
+    # Add Support Resistance
+    data, suppot_resist_cols = \
+        stk.add_support_resistance(df=data, cols='CLOSE', 
+                                   rank_thld=10, prominence=1)
+
+    ma_except_cols = ma_except_cols + suppot_resist_cols    
+    
+    # Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0
+    print('# Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0')
+    lag_except_cols = lag_except_cols + suppot_resist_cols
+        
+    
+    # Add Total Market Data ......
+    total_market = data \
+                    .groupby(['WORK_DATE']) \
+                    .agg({'CLOSE':'sum'}) \
+                    .reset_index() \
+                    .rename(columns={'CLOSE':'TOTAL_MARKET_CLOSE'})
+        
+    data = data.merge(total_market, how='left', on='WORK_DATE')
+    data['TOTAL_MARKET_CLOSE_RATIO'] = data['CLOSE'] / data['TOTAL_MARKET_CLOSE']
+
+    
+    return data, ma_except_cols, lag_except_cols
 
 
 
@@ -142,7 +202,10 @@ def get_model_data(ma_values=[5,20]):
     global shift_begin, shift_end, data_begin, data_end, full_data
     global predict_begin, predict_end, predict_period
     global stock_symbol
+    global model_y
     
+    
+    identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
     
     # ......
     stock_symbol = cbyz.conv_to_list(stock_symbol)
@@ -161,23 +224,14 @@ def get_model_data(ma_values=[5,20]):
     
     
     # Load Historical Data ......
-    loc_data = sam_load_data(data_begin=shift_begin,
-                                 data_end=data_end,
-                                 stock_symbol=stock_symbol, 
-                                 full_data=full_data) 
+    loc_data, market_except_ma, market_except_lag = \
+                                sam_load_data(data_begin=shift_begin,
+                                              data_end=data_end,
+                                              stock_symbol=stock_symbol, 
+                                              full_data=full_data,
+                                              industry=True) 
     
-    loc_data = loc_data.sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
-                .reset_index(drop=True)
-
-    # Add K line
-    loc_data = stk.add_k_line(loc_data)
-    
-    
-    # Add Support Resistance
-    loc_data, suppot_resist_cols = \
-        stk.add_support_resistance(df=loc_data, cols='CLOSE', 
-                                   rank_thld=10, prominence=1)
-    
+        
     # Predict Symbols ......
     if full_data:
         all_symbols = loc_data['STOCK_SYMBOL'].unique().tolist()
@@ -217,17 +271,23 @@ def get_model_data(ma_values=[5,20]):
     # Assign columns munually
     obj_cols = obj_cols + ['K_LINE_TYPE']
     loc_main = cbyz.df_get_dummies(loc_main, cols=obj_cols, 
-                                         expand_col_name=True)    
+                                   expand_col_name=True)    
     
-    # Shift ......
-    except_cols = ['WORK_DATE', 'STOCK_SYMBOL', 'YEAR', 'MONTH', 
-                   'WEEKDAY', 'WEEK_NUM']
-    except_cols = except_cols + suppot_resist_cols
-    shift_cols = cbyz.df_get_cols_except(df=loc_main, except_cols=except_cols)
+    # Calculate MA ......
+    ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
+    ma_except_cols = ma_except_cols + market_except_ma + identify_cols
+    
+    ma_cols_raw = cbyz.df_get_cols_except(df=loc_main, 
+                                         except_cols=ma_except_cols)
          
-    loc_main, ma_cols = stk.add_ma(df=loc_main, cols=shift_cols, 
+    loc_main, ma_cols = stk.add_ma(df=loc_main, cols=ma_cols_raw, 
                                    key=['STOCK_SYMBOL'], 
-                          date='WORK_DATE', values=ma_values)
+                                   date='WORK_DATE', values=ma_values)
+    
+    
+    ma_drop_cols = cbyz.li_remove_items(ma_cols_raw, model_y)
+    loc_main = loc_main.drop(ma_drop_cols, axis=1)
+    gc.collect()
     
 
     if predict_period > min(ma_values):
@@ -236,24 +296,38 @@ def get_model_data(ma_values=[5,20]):
               + 'and it will cause na.')
         del loc_main
 
-    
+
+    # Shift ......
     # Add lag, or there will be na in the predict period
+    # 1. 有些變數不計算MA，但是必須要算lag，不然會出錯，如INDUSTRY
+    lag_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
+    
+    lag_except_cols = lag_except_cols + market_except_lag \
+                        + identify_cols + model_y
+    
+    lag_cols_raw = cbyz.li_remove_items(li=list(loc_main.columns), 
+                                    remove=lag_except_cols)
+    
     loc_main, lag_cols = cbyz.df_add_shift(df=loc_main, 
-                                           cols=ma_cols, 
+                                           cols=lag_cols_raw, 
                                            shift=predict_period,
                                            group_by=['STOCK_SYMBOL'],
                                            suffix='_LAG', 
                                            remove_na=False)
+
+    lag_drop_cols = cbyz.li_remove_items(lag_cols_raw, model_y)  
+    loc_main = loc_main.drop(lag_drop_cols, axis=1)
+    gc.collect()
     
-    loc_main = cbyz.df_conv_na(df=loc_main, cols=suppot_resist_cols)
+    
+    # Convert NA
+    loc_main = cbyz.df_conv_na(df=loc_main, cols=lag_except_cols, value=0)
     
     
     # Variables ......
-    var_cols = ['MONTH', 'WEEKDAY', 'WEEK_NUM'] + suppot_resist_cols
-    model_x = lag_cols + var_cols
-    model_y = ['OPEN', 'HIGH', 'LOW', 'CLOSE']  # rmse 0.05
-    # model_y = ['PRICE_CHANGE_RATIO']          # rmse 0.11
-
+    model_x = lag_cols + lag_except_cols
+    model_x = cbyz.li_remove_items(model_x, model_y + identify_cols)    
+    
     
     # Model Data ......
     # loc_model_data = loc_data_shift.dropna(subset=model_x)
@@ -262,7 +336,7 @@ def get_model_data(ma_values=[5,20]):
 
 
     # Remove all data with na values ......
-    na_df = loc_main[model_x + ['STOCK_SYMBOL']]
+    na_df = loc_main[model_x + identify_cols]
     na_df = na_df[na_df.isna().any(axis=1)]
     symbols_removed = na_df['STOCK_SYMBOL'].unique().tolist()
     
@@ -299,8 +373,6 @@ def get_model_data(ma_values=[5,20]):
                                       show_progress=True)
     
     loc_model_data_raw = loc_main_norm[0]
-    
-    identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
     loc_model_data = loc_model_data_raw[norm_cols + identify_cols] \
                         .dropna(subset=model_x)
             
@@ -330,29 +402,34 @@ def get_model_data(ma_values=[5,20]):
 
 
 
-def split_data(symbol=None):
+def split_data():
     
     global model_data, model_x, model_y, model_addt_vars, predict_date
     global stock_symbol
     
     # Model Data ......
-    if symbol == None:
-        cur_model_data = model_data[model_data['WORK_DATE']<predict_date[0]] \
-                        .reset_index(drop=True)
-        
-        # Predict Data ......
-        cur_predict_data = model_data[model_data['WORK_DATE']>=predict_date[0]]
-        
-        
-    else:
-        cur_model_data = model_data[(model_data['STOCK_SYMBOL']==symbol) \
-                & (model_data['WORK_DATE']<predict_date[0])] \
-            .reset_index(drop=True)
+    cur_model_data = model_data[model_data['WORK_DATE']<predict_date[0]] \
+                    .reset_index(drop=True)
     
-        # Predict Data ......
-        cur_predict_data = model_data[
-            (model_data['STOCK_SYMBOL']==symbol) \
-                & (model_data['WORK_DATE']>=predict_date[0])]
+    # Predict Data ......
+    cur_predict_data = model_data[model_data['WORK_DATE']>=predict_date[0]]    
+
+
+    # if len(stock_symbol) == 0:
+    #     cur_model_data = model_data[model_data['WORK_DATE']<predict_date[0]] \
+    #                     .reset_index(drop=True)
+        
+    #     # Predict Data ......
+    #     cur_predict_data = model_data[model_data['WORK_DATE']>=predict_date[0]]
+    # else:
+    #     cur_model_data = model_data[(model_data['STOCK_SYMBOL']==symbol) \
+    #             & (model_data['WORK_DATE']<predict_date[0])] \
+    #         .reset_index(drop=True)
+    
+    #     # Predict Data ......
+    #     cur_predict_data = model_data[
+    #         (model_data['STOCK_SYMBOL']==symbol) \
+    #             & (model_data['WORK_DATE']>=predict_date[0])]
         
 
     global X_train, X_test, y_train, y_test, X_predict
@@ -479,7 +556,7 @@ def model_6(remove_none=True):
     for i in range(len(model_y)):
         
         # Dataset
-        split_data(symbol=None)
+        # split_data()
             
         regressor = xgb.XGBRegressor(
             n_estimators=100,
@@ -555,7 +632,7 @@ def predict():
     global model_data, predict_date, model_x, model_y, norm_orig, norm_group
     
    
-    split_data(symbol=None)
+    split_data()
     
    
     # Model ......
@@ -604,6 +681,12 @@ def predict():
     # Organize ......
     rmse = rmse.reset_index(drop=True)
     
+    # 
+    features = features \
+                .sort_values(by='IMPORTANCE', ascending=False) \
+                .reset_index(drop=True)
+    
+    # results
     results_pivot = results \
                     .pivot_table(index=['STOCK_SYMBOL', 'WORK_DATE', 'MODEL'],
                                  columns='Y',
@@ -614,7 +697,7 @@ def predict():
                                         original=norm_orig,
                                         groupby=norm_group)
     
-    return results, rmse
+    return results, rmse, features
 
 
 
@@ -623,8 +706,8 @@ def predict():
 
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, data_period=180, 
-           _stock_symbol=None, _stock_type='tw', ma_values=[5,20],
-           _full_data=False):
+           _stock_symbol=[], _stock_type='tw', ma_values=[3,5,20],
+           _full_data=False, _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE']):
     '''
     主工作區
     '''
@@ -635,13 +718,18 @@ def master(_predict_begin, _predict_end=None,
     # data_period = 365
     # _predict_begin = 20210611
     # _predict_end = None
-    # _predict_period = 5
     # _stock_type = 'tw'
-    # ma_values = [5,20]
+    # ma_values = [3,5,20]
+    # _predict_period = 2
+    # _full_data = True
     # _full_data = False
     # _stock_symbol = ['2301', '2474', '1714', '2385']
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
     
-
+    
+    if _predict_period not in ma_values:
+        ma_values.append(_predict_period)
+    
 
     # target_symbols = pd.read_csv(path_export \
     #                               + '/target_symbols_20210624_212851.csv')
@@ -685,18 +773,21 @@ def master(_predict_begin, _predict_end=None,
 
 
     # ......
-    data_raw = get_model_data(ma_values=ma_values)
-    
-    
     global model_data_raw, model_data, predict_date
     global model_x, model_y, model_addt_vars
     global norm_orig, norm_group
+        
+    # model_y = ['PRICE_CHANGE_RATIO']          
+    # model_y = ['OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # model_y = ['PRICE_CHANGE'] 
+    model_y = _model_y
+    
+    data_raw = get_model_data(ma_values=ma_values)
     
     model_data_raw = data_raw['MODEL_DATA_RAW']
     model_data = data_raw['MODEL_DATA']
     predict_date = data_raw['PRECIDT_DATE']
     model_x = data_raw['MODEL_X']
-    model_y = data_raw['MODEL_Y']    
     norm_orig = data_raw['NORM_ORIG']
     norm_group = data_raw['NORM_GROUP']
     model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']
@@ -705,7 +796,7 @@ def master(_predict_begin, _predict_end=None,
     global predict_results
     predict_results = predict()
     predict_results
-    
+    # features = predict_results[2]
     
     print('sam master - predict_begin + ' + str(_predict_begin))    
     
@@ -868,7 +959,5 @@ def find_target(data_begin, data_end):
 
 chk_data = stk.get_data(stock_symbol=['2029'])
 chk_data['HIGH'].max()
-
-
 
 
