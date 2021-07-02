@@ -44,6 +44,7 @@ Created on Sat Nov 14 17:23:09 2020
 import pandas as pd
 import numpy as np
 import sys, time, os, gc
+import random
 
 
 local = False
@@ -336,7 +337,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
 
 
 
-def eval_metrics():
+def eval_metrics(export_file=False):
 
 
     # MAPE ......
@@ -416,9 +417,11 @@ def eval_metrics():
                                        'METRIC', 'VALUE', 'OVERESTIMATE']]
 
        
-    time_serial = cbyz.get_time_serial(with_time=True)
-    stock_metrics.to_csv(path_export + '/MAPE/stock_mape_'+ time_serial + '.csv', 
-                         index=False)
+    if export_file:
+        time_serial = cbyz.get_time_serial(with_time=True)
+        stock_metrics.to_csv(path_export + '/MAPE/stock_mape_'\
+                             + time_serial + '.csv', 
+                             index=False)
     
     # Upload
     # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
@@ -445,26 +448,17 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _bt_last_begin = 20210702
     # bt_last_begin = 20210211
     predict_period = 2
-    interval = 90
-    bt_times = 3
-    data_period = 360 * 2
+    interval = random.randrange(15, 40)
+    bt_times = 10
+    data_period = 360 * 3
     # data_period = 360 * 5
     # data_period = 360 * 7    
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    _stock_symbol = [] # 為空的empty時，在cal_profit的地方會出錯
+    _stock_symbol = []
     _stock_type = 'tw'
     _ma_values = [5,20]
     # _ma_values = [3,5,20,60,120]    
 
-    # Worklist
-
-
-    # Read Files From SAM
-    # path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Export'
-    # target_symbols = pd.read_csv(path_sam \
-    #                               + '/target_symbols_20210629_224443.csv')
-        
-    # _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()    
 
 
     # ......    
@@ -528,11 +522,12 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # ------
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
-    eval_metrics()
+    # eval_metrics(export_file=False)
+    eval_metrics(export_file=True)
+
 
     
     return ''
-
 
 
 

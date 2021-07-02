@@ -81,6 +81,8 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     
     ma_except_cols = []
     lag_except_cols = []
+    global_norm_cols = []    
+
     
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
     loc_begin = cbyz.date_cal(data_begin, -1, 'd')
@@ -88,17 +90,22 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     
     if len(stock_symbol) == 0:
         data = stk.get_data(data_begin=loc_begin, 
-                                 data_end=data_end, 
-                                 stock_type=stock_type, stock_symbol=[], 
-                                 price_change=True, price_limit=True,
-                                 local=local)
+                            data_end=data_end, 
+                            stock_type=stock_type, stock_symbol=[], 
+                            price_change=True, price_limit=True, 
+                            trade_value=True,
+                            local=local)
     else:
         data = stk.get_data(data_begin=loc_begin, 
-                                 data_end=data_end, 
-                                 stock_type=stock_type, 
-                                 stock_symbol=stock_symbol, 
-                                 price_change=True, price_limit=True,
-                                 local=local)
+                            data_end=data_end, 
+                            stock_type=stock_type, 
+                            stock_symbol=stock_symbol, 
+                            price_change=True, price_limit=True,
+                            trade_value=True,
+                            local=local)
+        
+        
+    global_norm_cols = global_norm_cols + ['TRADE_VALUE_RATIO']
         
         
     # Exclude the symbols shorter than begin_date ......
@@ -230,12 +237,10 @@ def get_model_data(ma_values=[5,20]):
                                               data_end=data_end,
                                               industry=True) 
     
-        
     # Predict Symbols ......
     if len(stock_symbol) == 0:
         all_symbols = loc_data['STOCK_SYMBOL'].unique().tolist()
         stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':all_symbols})
-    
     else:
         stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
         
@@ -273,7 +278,6 @@ def get_model_data(ma_values=[5,20]):
                                    expand_col_name=True)    
     
     # Calculate MA ......
-    # Check，計算LIMIT_UP和LIMIT_DOWN的MA是否合理
     ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
     ma_except_cols = ma_except_cols + market_except_ma + identify_cols
     
@@ -303,9 +307,9 @@ def get_model_data(ma_values=[5,20]):
     
     lag_except_cols = lag_except_cols + market_except_lag \
                         + identify_cols + model_y
-    
+
     lag_cols_raw = cbyz.li_remove_items(li=list(loc_main.columns), 
-                                    remove=lag_except_cols)
+                                        remove=lag_except_cols)
     
     loc_main, lag_cols = cbyz.df_add_shift(df=loc_main, 
                                            cols=lag_cols_raw, 
@@ -364,15 +368,28 @@ def get_model_data(ma_values=[5,20]):
 
     
     
-    # Normalize ......
+    # Global Normalize ......
+    df_cols = pd.DataFrame({'COLS':list(loc_main.columns)})
+    df_cols = df_cols[df_cols['COLS'].str.contains('TRADE_VALUE')]
+    global_norm_cols = df_cols['COLS'].tolist()
+    
+    loc_main, _, _, _ = cbyz.df_normalize(df=loc_main,
+                                          cols=global_norm_cols,
+                                          groupby=[],
+                                          show_progress=True)    
+    
+    # Normalize By Stock ......
     norm_cols = cbyz.li_join_flatten(model_x, model_y) 
+    norm_cols = cbyz.li_remove_items(norm_cols, global_norm_cols)
+    
     loc_main_norm = cbyz.df_normalize(df=loc_main,
                                       cols=norm_cols,
                                       groupby=['STOCK_SYMBOL'],
                                       show_progress=True)
     
     loc_model_data_raw = loc_main_norm[0]
-    loc_model_data = loc_model_data_raw[norm_cols + identify_cols] \
+    loc_model_data = loc_model_data_raw[norm_cols + identify_cols \
+                                        + global_norm_cols] \
                         .dropna(subset=model_x)
             
             
@@ -949,6 +966,5 @@ def find_target(data_begin, data_end):
 
     
     return results_raw, stock_info
-
 
 
