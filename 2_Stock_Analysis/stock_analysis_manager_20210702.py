@@ -72,12 +72,10 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None, 
-                  industry=False):
+                  stock_symbol=None, full_data=False, industry=False):
     '''
     讀取資料及重新整理
     '''
-    
-    global stock_symbol
     
     ma_except_cols = []
     lag_except_cols = []
@@ -86,18 +84,19 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     loc_begin = cbyz.date_cal(data_begin, -1, 'd')
     
     
-    if len(stock_symbol) == 0:
+    if full_data:
         data = stk.get_data(data_begin=loc_begin, 
                                  data_end=data_end, 
-                                 stock_type=stock_type, stock_symbol=[], 
-                                 price_change=True, price_limit=True,
+                                 stock_type=stock_type, 
+                                 stock_symbol=[], 
+                                 price_change=True,
                                  local=local)
     else:
         data = stk.get_data(data_begin=loc_begin, 
                                  data_end=data_end, 
                                  stock_type=stock_type, 
                                  stock_symbol=stock_symbol, 
-                                 price_change=True, price_limit=True,
+                                 price_change=True,                                 
                                  local=local)
         
         
@@ -200,7 +199,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 def get_model_data(ma_values=[5,20]):
     
     
-    global shift_begin, shift_end, data_begin, data_end
+    global shift_begin, shift_end, data_begin, data_end, full_data
     global predict_begin, predict_end, predict_period
     global stock_symbol
     global model_y
@@ -228,11 +227,13 @@ def get_model_data(ma_values=[5,20]):
     loc_data, market_except_ma, market_except_lag = \
                                 sam_load_data(data_begin=shift_begin,
                                               data_end=data_end,
+                                              stock_symbol=stock_symbol, 
+                                              full_data=full_data,
                                               industry=True) 
     
         
     # Predict Symbols ......
-    if len(stock_symbol) == 0:
+    if full_data:
         all_symbols = loc_data['STOCK_SYMBOL'].unique().tolist()
         stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':all_symbols})
     
@@ -273,16 +274,16 @@ def get_model_data(ma_values=[5,20]):
                                    expand_col_name=True)    
     
     # Calculate MA ......
-    # Check，計算LIMIT_UP和LIMIT_DOWN的MA是否合理
     ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
     ma_except_cols = ma_except_cols + market_except_ma + identify_cols
     
     ma_cols_raw = cbyz.df_get_cols_except(df=loc_main, 
                                          except_cols=ma_except_cols)
-     
+         
     loc_main, ma_cols = stk.add_ma(df=loc_main, cols=ma_cols_raw, 
-                                   group_by=['STOCK_SYMBOL'], 
-                                   date_col='WORK_DATE', values=ma_values)
+                                   key=['STOCK_SYMBOL'], 
+                                   date='WORK_DATE', values=ma_values)
+    
     
     ma_drop_cols = cbyz.li_remove_items(ma_cols_raw, model_y)
     loc_main = loc_main.drop(ma_drop_cols, axis=1)
@@ -350,7 +351,7 @@ def get_model_data(ma_values=[5,20]):
     
     
     # 由於有些股票剛上市，或是有特殊原因，導致資料不齊全，全部排除處理
-    # if len(stock_symbol) == 0:
+    # if full_data:
     #     na_col = chk_na \
     #                 .sort_values(by='NA_COUNT', ascending=False) \
     #                 .reset_index(drop=True)
@@ -705,8 +706,8 @@ def predict():
 
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, data_period=180, 
-           _stock_symbol=[], _stock_type='tw', ma_values=[3,5,20,60],
-           _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE']):
+           _stock_symbol=[], _stock_type='tw', ma_values=[3,5,20],
+           _full_data=False, _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE']):
     '''
     主工作區
     '''
@@ -714,22 +715,27 @@ def master(_predict_begin, _predict_end=None,
     # date_period為10年的時候會出錯
     
     # data_period = 90
-    # data_period = 365 
-    # _predict_begin = 20210701
+    # data_period = 365
+    # _predict_begin = 20210611
     # _predict_end = None
     # _stock_type = 'tw'
-    # # ma_values = [2,5,20,60]
-    # ma_values = [3,5,20]    
+    # ma_values = [3,5,20]
     # _predict_period = 2
+    # _full_data = True
+    # _full_data = False
     # _stock_symbol = ['2301', '2474', '1714', '2385']
-    # # _stock_symbol = []
     # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # # _model_y = ['PRICE_CHANGE_RATIO']      
     
     
     if _predict_period not in ma_values:
         ma_values.append(_predict_period)
     
+
+    # target_symbols = pd.read_csv(path_export \
+    #                               + '/target_symbols_20210624_212851.csv')
+
+    # _stock_symbol = target_symbols['STOCK_SYMBOL'].tolist()
+
 
     # Process ......
     # 1. Full data to select symbols
@@ -742,11 +748,12 @@ def master(_predict_begin, _predict_end=None,
     # 建長期投資的基本面模型
     
 
-    global shift_begin, shift_end, data_begin, data_end
+    global shift_begin, shift_end, data_begin, data_end, full_data
     global predict_begin, predict_end, predict_period
     
     predict_period = _predict_period
     data_shift = -(max(ma_values) * 3)
+    full_data = _full_data
     
     
     shift_begin, shift_end, \
@@ -770,7 +777,11 @@ def master(_predict_begin, _predict_end=None,
     global model_x, model_y, model_addt_vars
     global norm_orig, norm_group
         
+    # model_y = ['PRICE_CHANGE_RATIO']          
+    # model_y = ['OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # model_y = ['PRICE_CHANGE'] 
     model_y = _model_y
+    
     data_raw = get_model_data(ma_values=ma_values)
     
     model_data_raw = data_raw['MODEL_DATA_RAW']
@@ -790,12 +801,6 @@ def master(_predict_begin, _predict_end=None,
     print('sam master - predict_begin + ' + str(_predict_begin))    
     
     return predict_results
-
-
-
-
-
-
 
 
 
@@ -950,5 +955,9 @@ def find_target(data_begin, data_end):
     
     return results_raw, stock_info
 
+
+
+chk_data = stk.get_data(stock_symbol=['2029'])
+chk_data['HIGH'].max()
 
 

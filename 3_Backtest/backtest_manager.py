@@ -98,16 +98,27 @@ cbyz.os_create_folder(path=[path_resource, path_function,
     
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
-                     bt_times, data_period, full_data):
+                     bt_times, data_period):
     
     
-    global stock_symbol, stock_type
-    bt_seq = cbyz.date_get_seq(begin_date=bt_last_begin,
-                               seq_length=bt_times,
-                               unit='d', interval=-interval,
-                               simplify_date=True)
+    global stock_symbol, stock_type, bt_info
     
-    bt_seq_list = bt_seq['WORK_DATE'].tolist()
+    # Prepare For Backtest Records ......
+    bt_info_raw = cbyz.date_get_seq(begin_date=bt_last_begin,
+                                seq_length=bt_times,
+                                unit='d', interval=-interval,
+                                simplify_date=True)
+    
+    bt_info = bt_info_raw[['WORK_DATE']] \
+            .reset_index() \
+            .rename(columns={'index':'BACKTEST_ID'})
+    
+    bt_info['DATA_PERIOD'] = data_period
+    bt_info['PREDICT_PERIOD'] = predict_period
+    bt_info = bt_info.drop('WORK_DATE', axis=1)
+    
+    
+    bt_seq = bt_info_raw['WORK_DATE'].tolist()
     
     
     # Work area ----------
@@ -117,16 +128,16 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     features = pd.DataFrame()
     
     # Predict ......
-    for i in range(0, len(bt_seq_list)):
+    for i in range(0, len(bt_seq)):
         
-        begin = bt_seq_list[i]
+        begin = bt_seq[i]
 
         results_raw = sam.master(_predict_begin=begin, 
                                  _predict_end=None, 
                                  _predict_period=predict_period,
                                  data_period=data_period, 
                                  _stock_symbol=stock_symbol,
-                                 _full_data=full_data)
+                                 ma_values=ma_values)
 
 
         new_results = results_raw[0]
@@ -282,45 +293,143 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     actions = actions[new_cols]
     
     
+    # # MAPE ......
+    # global mape, mape_group, mape_extreme
+    # mape = pd.DataFrame()
+    # mape_group = pd.DataFrame()
+    # mape_extreme = pd.DataFrame()
+    # mape_main = bt_main[bt_main['BACKTEST_ID']>0]
+    
+    # for y in model_y:
+        
+    #     mape_main['MAPE'] = abs(mape_main[y] \
+    #                             - mape_main[y + '_HIST']) \
+    #                         / mape_main[y + '_HIST']
+                            
+    #     mape_main['OVERESTIMATE'] = \
+    #         np.where(mape_main[y] > mape_main[y + '_HIST'], 1, 0)
+                 
+    #     # MAPE
+    #     new_mape = cbyz.summary(df=mape_main, group_by=[], cols='MAPE')
+    #     new_mape['Y'] = y        
+    #     mape = mape.append(new_mape)
+        
+        
+    #     # MAPE2
+    #     new_mape = cbyz.summary(df=mape_main, group_by='OVERESTIMATE', 
+    #                              cols='MAPE')
+    #     new_mape['Y'] = y
+    #     mape_group = mape_group.append(new_mape)
+        
+        
+    #     # MAPE Extreme
+    #     new_mape = mape_main[mape_main['MAPE'] > 0.1]
+    #     new_mape = cbyz.summary(df=new_mape, 
+    #                             group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
+    #                             cols='MAPE')
+    #     new_mape['Y'] = y
+    #     mape_extreme = mape_extreme.append(new_mape)
+        
+
+
+# .................
+
+
+
+def eval_metrics():
+
+
     # MAPE ......
+    global bt_main, bt_info
     global mape, mape_group, mape_extreme
+    global stock_metrics_raw, stock_metrics
+    
+    model_y_hist = [y + '_HIST' for y in model_y]
+    mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
+        
     mape = pd.DataFrame()
     mape_group = pd.DataFrame()
     mape_extreme = pd.DataFrame()
-    mape_main = bt_main[bt_main['BACKTEST_ID']>0]
+    stock_metrics_raw = pd.DataFrame()
+    
     
     for y in model_y:
         
-        mape_main['MAPE'] = abs(mape_main[y] \
+        mape_main.loc[:, 'MAPE'] = abs(mape_main[y] \
                                 - mape_main[y + '_HIST']) \
-                            / mape_main['CLOSE_HIST']
+                            / mape_main[y + '_HIST']
                             
-        mape_main['OVERESTIMATE'] = \
+        mape_main.loc[:, 'OVERESTIMATE'] = \
             np.where(mape_main[y] > mape_main[y + '_HIST'], 1, 0)
                  
-        # MAPE
+        # MAPE Overview
         new_mape = cbyz.summary(df=mape_main, group_by=[], cols='MAPE')
-        new_mape['Y'] = y        
+        new_mape.loc[:, 'Y'] = y
         mape = mape.append(new_mape)
         
-        # MAPE2
+        
+        # Group MAPE ......
         new_mape = cbyz.summary(df=mape_main, group_by='OVERESTIMATE', 
                                  cols='MAPE')
-        new_mape['Y'] = y
+        new_mape.loc[:, 'Y'] = y
         mape_group = mape_group.append(new_mape)
         
         
-        # MAPE Extreme
+        # Extreme MAPE ......
         new_mape = mape_main[mape_main['MAPE'] > 0.1]
         new_mape = cbyz.summary(df=new_mape, 
                                 group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
                                 cols='MAPE')
-        new_mape['Y'] = y
+        new_mape.loc[:, 'Y'] = y
         mape_extreme = mape_extreme.append(new_mape)
-        
+
+
+        # Stock MAPE ......
+        new_metrics = mape_main[['BACKTEST_ID', 'STOCK_SYMBOL', 
+                                 'WORK_DATE', 'MAPE', 'OVERESTIMATE',
+                                 y, y + '_HIST']] \
+            .rename(columns={y:'FORECAST_VALUE',
+                             y + '_HIST':'HIST_VALUE'})
+
+        new_metrics.loc[:, 'Y'] = y
+        stock_metrics_raw = stock_metrics_raw.append(new_metrics)
+    
+    
+    
+    stock_metrics_raw = stock_metrics_raw \
+                        .merge(bt_info, how='left', on='BACKTEST_ID')
+    
+    stock_metrics_raw['METRIC'] = 'MAPE'
+    stock_metrics_raw['STOCK_TYPE'] = 'TW'
+    stock_metrics_raw.loc[:, 'EXECUTE_DATE'] = \
+                cbyz.date_get_today(simplify=False)
+    
+    stock_metrics_raw = cbyz.df_ymd(df=stock_metrics_raw, cols='WORK_DATE')
+    stock_metrics_raw = stock_metrics_raw \
+                        .rename(columns={'WORK_DATE':'PREDICT_DATE',
+                                         'MAPE':'VALUE'})
+                
+    stock_metrics_raw = stock_metrics_raw.round({'VALUE': 3})
+    stock_metrics = stock_metrics_raw[['STOCK_TYPE', 'STOCK_SYMBOL', 
+                                       'EXECUTE_DATE', 'PREDICT_DATE', 
+                                       'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
+                                       'METRIC', 'VALUE', 'OVERESTIMATE']]
+
+       
+    time_serial = cbyz.get_time_serial(with_time=True)
+    stock_metrics.to_csv(path_export + '/MAPE/stock_mape_'+ time_serial + '.csv', 
+                         index=False)
+    
+    # Upload
+    # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
+    # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_sql.html
+    # ar.db_upload(data=stock_mape, table_name='forecast_records', 
+    #              local=local)
+
 
 
 # ..........
+
 
 
 def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5, 
@@ -333,7 +442,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     # Parameters
-    _bt_last_begin = 20210701
+    _bt_last_begin = 20210702
     # bt_last_begin = 20210211
     predict_period = 2
     interval = 90
@@ -344,14 +453,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = [] # 為空的empty時，在cal_profit的地方會出錯
     _stock_type = 'tw'
-    full_data = True
-    # full_data = False
-
+    _ma_values = [5,20]
+    # _ma_values = [3,5,20,60,120]    
 
     # Worklist
-
-
-    # 如果可以把stock_symbol設為[]，是不是真的還需要full_data
 
 
     # Read Files From SAM
@@ -363,13 +468,14 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
 
     # ......    
-    global stock_symbol, bt_last_begin, stock_type
+    global stock_symbol, bt_last_begin, stock_type, ma_values
     stock_symbol = _stock_symbol
     bt_last_begin = _bt_last_begin
     
     stock_type = _stock_type    
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
-
+    
+    ma_values = _ma_values
     
     # full_data = sam.sam_load_data(data_begin=None, data_end=None, 
     #                               stock_type=stock_type, period=None, 
@@ -388,8 +494,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      predict_period=predict_period, 
                      interval=interval,
                      bt_times=bt_times,
-                     data_period=data_period,
-                     full_data=full_data)
+                     data_period=data_period)
 
     
     # Profit ------    
@@ -404,7 +509,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # file_name=None    
     
     
-    global bt_main, actions, mape, mape_group, mape_extreme
+    global bt_main, actions
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                export_file=True, load_file=True, path=path_temp,
                file_name=None) 
@@ -419,8 +524,16 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     actions.to_excel(path_export + '/actions_' + time_serial + '.xlsx', 
                      index=False, encoding='utf-8-sig')
 
+
+    # ------
+    global mape, mape_group, mape_extreme
+    global stock_metrics_raw, stock_metrics
+    eval_metrics()
+
     
     return ''
+
+
 
 
 # ..............=
