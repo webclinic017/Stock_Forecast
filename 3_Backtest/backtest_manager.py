@@ -12,17 +12,10 @@ Created on Sat Nov 14 17:23:09 2020
 # 2.Retrieve one symbol historical data to ensure calendar
 
 
-# Trend and associtation
-
-# Add date for sell signal
-# Delete success
-
-
 
 # 在台灣投資股票的交易成本包含手續費與交易稅，
 # 手續費公定價格是0.1425%，買進和賣出時各要收取一次，
 # 股票交易稅是0.3%，如果投資ETF交易稅是0.1%，僅在賣出時收取。
-
 
 
 # To do action
@@ -30,9 +23,6 @@ Created on Sat Nov 14 17:23:09 2020
 # (2) 用迴歸，看哪一支model的成效好
 # (3) 多數決
 # (4) RMSE > How many model agree > RMSE (Chosen)
-
-
-# Update 1，在沒有sell_signal的情況下繼續放著，總收益會是多少？
 
 
 # rmse and profit regression
@@ -52,19 +42,14 @@ local = True
 # Path .....
 if local == True:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/3_Backtest'
-    master_path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast'
 else:
-    path = '/home/aronhack/stock_forecast/dashboard'
-    # path = '/home/aronhack/stock_analysis_us/dashboard'
-    master_path = '/home/aronhack/stock_forecast'
+    path = '/home/aronhack/stock_forecast/3_Backtest'
     
-
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 master_path + '/2_Stock_Analysis',
-                 master_path + '/Function', 
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ']
+                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 path + '/Function']
 
 
 for i in path_codebase:    

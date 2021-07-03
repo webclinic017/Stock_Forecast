@@ -34,13 +34,14 @@ stock_type = 'tw'
 if local == True:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis'
 else:
-    path = '/home/aronhack/stock_predict/2_Stock_Analysis'
+    path = '/home/aronhack/stock_forecast/2_Stock_Analysis'
 
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',]
+                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 path + '/Function']
 
 
 for i in path_codebase:    
@@ -286,7 +287,8 @@ def get_model_data(ma_values=[5,20]):
      
     loc_main, ma_cols = stk.add_ma(df=loc_main, cols=ma_cols_raw, 
                                    group_by=['STOCK_SYMBOL'], 
-                                   date_col='WORK_DATE', values=ma_values)
+                                   date_col='WORK_DATE', values=ma_values,
+                                   wma=True)
     
     ma_drop_cols = cbyz.li_remove_items(ma_cols_raw, model_y)
     loc_main = loc_main.drop(ma_drop_cols, axis=1)
@@ -966,5 +968,4 @@ def find_target(data_begin, data_end):
 
     
     return results_raw, stock_info
-
 
