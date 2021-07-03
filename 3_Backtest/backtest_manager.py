@@ -25,8 +25,6 @@ Created on Sat Nov 14 17:23:09 2020
 
 
 
-
-
 # To do action
 # (1) 集成
 # (2) 用迴歸，看哪一支model的成效好
@@ -230,8 +228,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                                      group_by=['STOCK_SYMBOL'], suffix='_LAST', 
                                      remove_na=False)
 
-    # Update, Add predict rmse
-
 
     # Prepare columns ......
     hist_cols = [i + '_HIST' for i in model_y]
@@ -337,11 +333,12 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
 
 
 
-def eval_metrics(export_file=False):
+def eval_metrics(export_file=False, upload=False):
+
 
 
     # MAPE ......
-    global bt_main, bt_info
+    global bt_main, bt_info, rmse
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
     
@@ -396,38 +393,49 @@ def eval_metrics(export_file=False):
         stock_metrics_raw = stock_metrics_raw.append(new_metrics)
     
     
-    
+    # Oraganize
     stock_metrics_raw = stock_metrics_raw \
-                        .merge(bt_info, how='left', on='BACKTEST_ID')
-    
-    stock_metrics_raw['METRIC'] = 'MAPE'
+                        .merge(bt_info, how='left', on='BACKTEST_ID') \
+                        .merge(rmse, how='left', on=['Y', 'BACKTEST_ID'])
+
+
+    stock_metrics_raw['MODEL_METRIC'] = 'RMSE'    
+    stock_metrics_raw['FORECAST_METRIC'] = 'MAPE'
     stock_metrics_raw['STOCK_TYPE'] = 'TW'
-    stock_metrics_raw.loc[:, 'EXECUTE_DATE'] = \
-                cbyz.date_get_today(simplify=False)
+    stock_metrics_raw.loc[:, 'EXECUTE_DATE'] = cbyz.date_get_today(simplify=False)
     
-    stock_metrics_raw = cbyz.df_ymd(df=stock_metrics_raw, cols='WORK_DATE')
+    
+    stock_metrics_raw = \
+        cbyz.df_date_simplify(df=stock_metrics_raw, 
+                              cols=['EXECUTE_DATE', 'WORK_DATE'])    
+    
     stock_metrics_raw = stock_metrics_raw \
                         .rename(columns={'WORK_DATE':'PREDICT_DATE',
-                                         'MAPE':'VALUE'})
+                                         'RMSE':'MODEL_PRECISION',
+                                         'MAPE':'FORECAST_PRECISION'}) \
+                        .round({'MODEL_PRECISION':3,
+                                'FORECAST_PRECISION':3})
+
                 
-    stock_metrics_raw = stock_metrics_raw.round({'VALUE': 3})
     stock_metrics = stock_metrics_raw[['STOCK_TYPE', 'STOCK_SYMBOL', 
                                        'EXECUTE_DATE', 'PREDICT_DATE', 
                                        'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
-                                       'METRIC', 'VALUE', 'OVERESTIMATE']]
-
-       
+                                       'MODEL_METRIC', 'MODEL_PRECISION',
+                                       'FORECAST_METRIC', 'FORECAST_PRECISION', 
+                                       'OVERESTIMATE']]
+    
+    stock_metrics['STOCK_TYPE'] = 'DEL'
+    
+        
     if export_file:
         time_serial = cbyz.get_time_serial(with_time=True)
-        stock_metrics.to_csv(path_export + '/MAPE/stock_mape_'\
+        stock_metrics.to_csv(path_export + '/Metrics/stock_mape_'\
                              + time_serial + '.csv', 
                              index=False)
-    
-    # Upload
-    # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
-    # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_sql.html
-    # ar.db_upload(data=stock_mape, table_name='forecast_records', 
-    #              local=local)
+            
+    if upload:
+        ar.db_upload(data=stock_metrics, table_name='forecast_records3', 
+                     local=local)
 
 
 
@@ -449,8 +457,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # bt_last_begin = 20210211
     predict_period = 2
     interval = random.randrange(15, 40)
-    bt_times = 10
-    data_period = 360 * 3
+    bt_times = 2
+    data_period = 360 * 2
     # data_period = 360 * 5
     # data_period = 360 * 7    
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
@@ -522,9 +530,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # ------
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
-    # eval_metrics(export_file=False)
-    eval_metrics(export_file=True)
-
+    eval_metrics(export_file=False, upload=False)
+    # eval_metrics(export_file=False, upload=True)
 
     
     return ''
@@ -532,6 +539,46 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
 
 # ..............=
+
+
+
+# def upload_records():
+#     '''
+#     Delete if eval_metrics works fine.
+#     '''
+    
+   
+#     file = pd.read_csv(path_export + '/Metrics/stock_20210703_123339.csv')
+#     file = pd.read_csv(path_export + '/Metrics/stock_mape_20210703_133643.csv')
+    
+#     file.columns = ['STOCK_TYPE', 'STOCK_SYMBOL', 
+#                     'EXECUTE_DATE', 'PREDICT_DATE', 
+#                     'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
+#                     'FORECAST_METRIC', 'FORECAST_PRECISION', 
+#                     'OVERESTIMATE']
+    
+    
+#     file['MODEL_METRIC'] = 'RMSE'
+#     file['MODEL_PRECISION'] = 0.058570158
+#     file['MODEL_PRECISION'] = 0.056767662
+    
+    
+#     file = file[['STOCK_TYPE', 'STOCK_SYMBOL', 
+#                 'EXECUTE_DATE', 'PREDICT_DATE', 
+#                 'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
+#                 'MODEL_METRIC', 'MODEL_PRECISION',
+#                 'FORECAST_METRIC', 'FORECAST_PRECISION', 
+#                 'OVERESTIMATE']]
+    
+    
+#     file = file.round({'MODEL_PRECISION':3,
+#                       'FORECAST_PRECISION':3})
+    
+#     # ar.db_upload(data=file, table_name='forecast_records3', 
+#     #               local=local, chunk=30000)
+    
+#     return ''
+
 
 
 def check():
