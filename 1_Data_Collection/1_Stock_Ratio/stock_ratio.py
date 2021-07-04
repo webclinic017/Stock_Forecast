@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon May 31 22:05:39 2021
+
+@author: Aron
+"""
+
+
+# % 讀取套件 -------
+import pandas as pd
+import numpy as np
+import sys, time, os, gc
+
+
+local = False
+local = True
+
+
+# Path .....
+if local == True:
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection/1_Stock_Ratio'
+else:
+    path = '/home/aronhack/stock_forecast/dashboard/'
+
+
+# Codebase ......
+path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
+                 r'/Users/Aron/Documents/GitHub/Codebase_YZ/',
+                 path + 'Function/']
+
+
+for i in path_codebase:    
+    if i not in sys.path:
+        sys.path = [i] + sys.path
+
+
+import codebase_yz as cbyz
+import arsenal as ar
+import arsenal_stock as stk
+
+
+
+data = stk.get_data(data_begin=20210630, data_end=20210703, stock_symbol=['0050'])
+
+
+# 自動設定區 -------
+pd.set_option('display.max_columns', 30)
+ 
+
+# 新增工作資料夾
+global path_resource, path_function, path_temp, path_export
+path_resource = path + '/Resource'
+path_function = path + '/Function'
+path_temp = path + '/Temp'
+path_export = path + '/Export'
+
+
+cbyz.os_create_folder(path=[path_resource, path_function, 
+                         path_temp, path_export])      
+
+
+
+def load_data():
+    '''
+    讀取資料及重新整理
+    '''
+    return ''
+
+
+
+def master():
+    '''
+    主工作區
+    '''
+    
+    return ''
+
+
+
+
+def check():
+    '''
+    資料驗證
+    '''    
+    return ''
+
+
+
+
+# 集保比例 ......
+    
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from bs4 import BeautifulSoup
+from selenium.webdriver.support.ui import Select
+
+
+
+# https://www.tdcc.com.tw/smWeb/QryStockAjax.do
+link = 'https://www.tdcc.com.tw/portal/zh/smWeb/qryStock'
+webdriver_path = '/Users/Aron/Documents/GitHub/Arsenal/geckodriver'
+driver = webdriver.Firefox(executable_path=webdriver_path)
+driver.get(link)
+
+
+# Date ......
+date_li = []
+dropdown = driver.find_element_by_name("scaDate")
+options = [x for x in dropdown.find_elements_by_tag_name("option")]
+
+for option in options:
+    date_li.append(option.get_attribute("value"))
+    
+    
+date_li.sort(reverse=False) 
+date_list = cbyz.li_remove_items(date_li, ['20210702', '20210625'])
+
+
+
+# Stock Symbol ......
+symbols_raw = stk.twse_get_data()
+symbols = symbols_raw['STOCK_SYMBOL'].tolist()
+
+
+# Merge ......
+symbols_tb = symbols_raw[['STOCK_SYMBOL']]
+date_df = pd.DataFrame({'WORK_DATE':date_li})
+main_tb = cbyz.df_cross_join(date_df, symbols_tb)
+
+
+# Bug，要考慮還沒有file的狀況
+load_fail = False
+try:
+    file = pd.read_csv(path_export + '/stock_ratio.csv')
+except:
+    load_fail = True
+    
+    
+# file = file \
+#         .drop_duplicates(subset=['STOCK_SYMBOL', 'WORK_DATE', '序']) \
+#         .reset_index(drop=True)
+
+
+if load_fail == False and len(file) > 0:
+
+    file.loc[:, 'IN_LIST'] = 1
+    file = cbyz.df_conv_col_type(df=file, 
+                                 cols=['STOCK_SYMBOL', 'WORK_DATE'],
+                                 to='str')
+
+    main_tb = main_tb.merge(file, how='left', on=['STOCK_SYMBOL', 'WORK_DATE'])
+    main_tb = main_tb[main_tb['IN_LIST'].isna()]
+    
+
+
+# NoSuchElementException: Unable to locate element: //select[@name='scaDate']/option[text()='20200710']
+
+# 這個程式的哲學是盡量減少sleep的時間，雖然這可能會導致抓不到某些element，但下一次再回洗它就可以了。
+
+
+# Query ......
+result = pd.DataFrame()
+
+for i in range(len(date_li)):
+    
+    # Date
+    d = date_li[i]
+    
+    temp_tb = main_tb[main_tb['WORK_DATE']==d]
+    if len(temp_tb) == 0:
+        continue    
+
+    for s in range(len(symbols)):
+        symbol = symbols[s]
+        
+        # 已經存在現有檔案中
+        chk = temp_tb[temp_tb['STOCK_SYMBOL']==symbol]
+        if len(chk) == 0:
+            continue
+        
+        # 1. 抓一小段資料後，網址可能會自動跳轉到首頁，首頁的載入速度又很慢
+        #    如果sleep的時間太短，sleep結束後，
+        #    首頁可能還沒載入完畢，程式不會出錯，但會一直卡在首頁
+        # 3. sleepe為0.8時可能會出現以下錯誤
+        # StaleElementReferenceException: The element reference of <input id="StockNo" name="stockNo" type="text"> is stale; either the element is no longer attached to the DOM, it is not in the current frame context, or the document has been refreshed        
+        if driver.current_url != link:
+            # time.sleep(0.2)                
+            driver.get(link)
+            # time.sleep(2)
+            time.sleep(1)
+        
+        # 當發生自動跳轉問題時，需要重新設定時間區間，所以把這段寫在內層的for loop，而不是
+        # 寫在外面
+        try:
+            driver.find_element_by_xpath("//select[@name='scaDate']/option[text()='" \
+                     + d + "']").click()
+        except:
+            s = s - 1
+            continue
+
+        
+        # NoSuchElementException: Unable to locate element: [id="StockNo"]
+        try:
+            time.sleep(0.8)
+            symbol_input = driver.find_element_by_id("StockNo")
+            symbol_input.clear()
+            symbol_input.send_keys(symbol)              
+        except:
+            s = s - 1
+            continue
+        # else:
+        #     symbol_input.clear()
+        #     symbol_input.send_keys(symbol)        
+            
+        
+        # 抓一小段資料後，網址可能會自動跳轉
+        if driver.current_url != link:
+            s = s - 1
+            continue
+
+
+        # Submit .....
+        try:
+            #　sleep的時間為0.3時，可能會太快，導致抓不到submit的按鈕
+            # time.sleep(0.2)
+            submit = driver.find_element_by_css_selector("input[type='submit']")
+            submit.submit()
+            # time.sleep(0.4)            
+        except:
+            s = s - 1
+            continue
+        # else:
+        #     submit.submit()
+        #     time.sleep(0.2)
+            
+
+
+        try:
+            # time.sleep(1)
+            time.sleep(0.5)
+            role_main = driver.find_element_by_css_selector("[role='main']")
+            html = role_main.get_attribute('innerHTML')
+            soup = BeautifulSoup(html, 'html.parser')       
+        except:
+            s = s - 1            
+            continue
+        
+        
+        
+        # soup.findAll(text='證券代號：0050')會找不到
+        # 檢查表格上方的內容和symbol是否一致，避免抓到前一檔的資料
+        table_header = soup.findAll('p')
+        text = []
+        for t in table_header:
+            text.append(t.text.strip())
+        
+        text = ''.join(text)
+
+        # 這裡的冒號是全形
+        if '證券代號：' + symbol not in text:
+            continue
+        
+        # Parse Table ......            
+        table = soup.findAll('table', {"class": 'table'})
+        table = str(table[0])
+        new_df = pd.read_html(table)[0]
+        
+
+        # fetch_fail = False
+        # count = 0
+        # while 2 > 1:
+        #     if count > 5:
+        #         fetch_fail = True
+        #         break
+            
+        #     try:
+        #         # Table .....
+        #         # 可能會有抓不到table的情形
+        #         table = driver.find_element_by_class_name('table')
+        #         html = table.get_attribute('outerHTML')
+        #         soup = BeautifulSoup(html, 'html.parser')
+        #         count = count + 1
+        #     except:
+        #         time.sleep(0.3)
+        #     else:
+        #         break
+        
+        # if fetch_fail:
+        #     continue
+        
+        
+        # new_df = pd.read_html(str(soup))[0]
+        new_df['STOCK_SYMBOL'] = symbol
+        new_df['WORK_DATE'] = d
+        
+        result = result.append(new_df)
+        time.sleep(0.4)
+
+
+        if s % 50 == 0 and len(result) > 0:
+            
+            try:
+                file = pd.read_csv(path_export + '/stock_ratio.csv')
+                file = file.append(result)
+            except:
+                file = result
+    
+            file.to_csv(path_export + '/stock_ratio.csv', 
+                          index=False, encoding='utf-8-sig')
+            
+            result = pd.DataFrame()
+            print('update_file')
+    
+    
+    # 避免最後一輪迴圈的時候，可能有剩餘的資料沒有記錄到 ......
+    if len(result) > 0:
+        file = pd.read_csv(path_export + '/stock_ratio.csv')
+        file = file.append(result)
+    
+        file.to_csv(path_export + '/stock_ratio.csv', 
+                      index=False, encoding='utf-8-sig')
+        
+        print('update_file')
+            
+    print(str(i) + '/' + str(len(date_li)))
+
+
+
+
+
+

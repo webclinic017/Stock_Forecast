@@ -232,6 +232,9 @@ def master(overwrite=False, upload=True):
             return ''
         
         
+    # data['WORK_DATE'] = 20210702
+    
+        
    # Update，如tmse的transaction
     data = data[['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
                  'HIGH', 'LOW', 'CLOSE', 'VOLUME']]

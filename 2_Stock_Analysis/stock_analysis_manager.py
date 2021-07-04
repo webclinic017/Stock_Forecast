@@ -3,6 +3,10 @@
 """
 Created on Sat Nov 14 17:23:08 2020
 
+20210704 - Add COVID-19 / Sdd Industry Trade Value
+
+
+
 @author: Aron
 """
 
@@ -175,9 +179,11 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     
     
     # Add Support Resistance
+    global data_period
     data, suppot_resist_cols = \
         stk.add_support_resistance(df=data, cols='CLOSE', 
-                                   rank_thld=10, prominence=1)
+                                   rank_thld=int(data_period * 2 / 360),
+                                   prominence=1)
 
     ma_except_cols = ma_except_cols + suppot_resist_cols    
     
@@ -215,6 +221,15 @@ def get_model_data(ma_values=[5,20]):
     
     
     identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
+
+
+    # Stock Info .......
+    stock_info = stk.tw_get_stock_info(export_file=True, 
+                                       load_file=True, 
+                                       file_name=None, 
+                                       path=path_temp)    
+
+    stock_industry = stock_info[['STOCK_SYMBOL', 'INDUSTRY']]
     
     # ......
     stock_symbol = cbyz.conv_to_list(stock_symbol)
@@ -237,6 +252,21 @@ def get_model_data(ma_values=[5,20]):
                                 sam_load_data(data_begin=shift_begin,
                                               data_end=data_end,
                                               industry=True) 
+
+
+    # Industry Values
+    loc_data = loc_data.merge(stock_industry, how='left', on=['STOCK_SYMBOL'])
+
+    loc_data['INDUSTRY_TRADE_VALUE'] = \
+                        loc_data \
+                        .groupby(['WORK_DATE', 'INDUSTRY'])['TRADE_VALUE'] \
+                        .transform('sum')
+
+
+    loc_data['INDUSTRY_TRADE_VALUE_RATIO'] = \
+        loc_data['INDUSTRY_TRADE_VALUE'] / loc_data['TOTAL_TRADE_VALUE']
+    
+    
     
     # Predict Symbols ......
     if len(stock_symbol) == 0:
@@ -263,6 +293,7 @@ def get_model_data(ma_values=[5,20]):
     
     loc_main = loc_main.merge(calendar, how='left', on='WORK_DATE')
     
+
     
     # One Hot Encoding ......
     data_types = loc_main.dtypes
@@ -278,6 +309,14 @@ def get_model_data(ma_values=[5,20]):
     loc_main = cbyz.df_get_dummies(loc_main, cols=obj_cols, 
                                    expand_col_name=True)    
     
+    
+    # COVID-19
+    covid19 = ar.get_covid19_data()
+    loc_main = loc_main.merge(covid19, how='left', on='WORK_DATE')
+    loc_main = cbyz.df_conv_na(df=loc_main, cols=['COVID19'])
+
+    
+    
     # Calculate MA ......
     ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
     ma_except_cols = ma_except_cols + market_except_ma + identify_cols
@@ -288,7 +327,7 @@ def get_model_data(ma_values=[5,20]):
     loc_main, ma_cols = stk.add_ma(df=loc_main, cols=ma_cols_raw, 
                                    group_by=['STOCK_SYMBOL'], 
                                    date_col='WORK_DATE', values=ma_values,
-                                   wma=True)
+                                   wma=False)
     
     ma_drop_cols = cbyz.li_remove_items(ma_cols_raw, model_y)
     loc_main = loc_main.drop(ma_drop_cols, axis=1)
@@ -300,6 +339,7 @@ def get_model_data(ma_values=[5,20]):
         print('get_model_data - predict_period is longer than ma values, ' \
               + 'and it will cause na.')
         del loc_main
+
 
 
     # Shift ......
@@ -368,7 +408,6 @@ def get_model_data(ma_values=[5,20]):
     #     loc_main = loc_main[~loc_main['STOCK_SYMBOL'].isin(symbols_removed)] \
     #                 .reset_index(drop=True)
 
-    
     
     # Global Normalize ......
     df_cols = pd.DataFrame({'COLS':list(loc_main.columns)})
@@ -723,7 +762,7 @@ def predict():
 # %% Master ------
 
 def master(_predict_begin, _predict_end=None, 
-           _predict_period=15, data_period=180, 
+           _predict_period=15, _data_period=180, 
            _stock_symbol=[], _stock_type='tw', ma_values=[3,5,20,60],
            _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE']):
     '''
@@ -732,7 +771,7 @@ def master(_predict_begin, _predict_end=None,
     
     # date_period為10年的時候會出錯
     
-    # data_period = 90
+    # _data_period = 90
     # data_period = 365 
     # _predict_begin = 20210701
     # _predict_end = None
@@ -761,12 +800,12 @@ def master(_predict_begin, _predict_end=None,
     # 建長期投資的基本面模型
     
 
-    global shift_begin, shift_end, data_begin, data_end
+    global shift_begin, shift_end, data_begin, data_end, data_period
     global predict_begin, predict_end, predict_period
     
     predict_period = _predict_period
     data_shift = -(max(ma_values) * 3)
-    
+    data_period = _data_period
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_begin, predict_end = \
@@ -968,4 +1007,3 @@ def find_target(data_begin, data_end):
 
     
     return results_raw, stock_info
-

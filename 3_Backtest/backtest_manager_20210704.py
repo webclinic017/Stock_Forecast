@@ -126,7 +126,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         results_raw = sam.master(_predict_begin=begin, 
                                  _predict_end=None, 
                                  _predict_period=predict_period,
-                                 _data_period=data_period, 
+                                 data_period=data_period, 
                                  _stock_symbol=stock_symbol,
                                  ma_values=ma_values)
 
@@ -455,7 +455,6 @@ def eval_metrics(export_file=False, upload=False):
 
 
 
-
 # ..........
 
 
@@ -478,10 +477,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # Parameters
     _bt_last_begin = 20210703
     # bt_last_begin = 20210211
-    predict_period = 3
+    predict_period = 2
     interval = random.randrange(3, 15)
-    bt_times = 5
-    # data_period = 360 * 1
+    bt_times = 1
+    # data_period = 360 * 2
     data_period = 360 * 5
     # data_period = 360 * 7    
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
@@ -531,8 +530,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # path=None
     # file_name=None    
     
-
-    # cal_profit中的close_hist有問題，預測0703時，hist應該都是na，但出現0702的資料
     
     global bt_main, actions
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
@@ -554,8 +551,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 算回測precision的時候，可以低估，但不可以高估    
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
-    # eval_metrics(export_file=False, upload=False)
-    eval_metrics(export_file=False, upload=True)
+    eval_metrics(export_file=False, upload=False)
+    # eval_metrics(export_file=False, upload=True)
 
 
     
