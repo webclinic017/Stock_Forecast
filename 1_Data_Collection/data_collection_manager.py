@@ -231,8 +231,9 @@ def master(overwrite=False, upload=True):
         if len(chk_main) == 0:
             return ''
         
-        
+    # Check
     # data['WORK_DATE'] = 20210702
+    # data[data['STOCK_SYMBOL']=='2399']
     
         
    # Update，如tmse的transaction

@@ -237,8 +237,8 @@ for i in range(len(date_li)):
 
 
         try:
-            # time.sleep(1)
-            time.sleep(0.5)
+            time.sleep(1)
+            # time.sleep(0.5)
             role_main = driver.find_element_by_css_selector("[role='main']")
             html = role_main.get_attribute('innerHTML')
             soup = BeautifulSoup(html, 'html.parser')       
@@ -249,23 +249,35 @@ for i in range(len(date_li)):
         
         
         # soup.findAll(text='證券代號：0050')會找不到
-        # 檢查表格上方的內容和symbol是否一致，避免抓到前一檔的資料
-        table_header = soup.findAll('p')
-        text = []
-        for t in table_header:
-            text.append(t.text.strip())
+        # table_header = soup.findAll('p')
+        # text = []
+        # for t in table_header:
+        #     text.append(t.text.strip())
         
-        text = ''.join(text)
+        # text = ''.join(text)
 
-        # 這裡的冒號是全形
-        if '證券代號：' + symbol not in text:
-            continue
+        # # 這裡的冒號是全形
+        # if '證券代號：' + symbol not in text:
+        #     continue
+    
         
         # Parse Table ......            
         table = soup.findAll('table', {"class": 'table'})
+
+        if len(table) == 0:
+            s = s - 1
+            continue
+
         table = str(table[0])
         new_df = pd.read_html(table)[0]
         
+        # 刪除table，避免抓到前一檔的資料        
+        del table        
+        
+        if new_df.iloc[0, 0] == '查無此資料':
+            new_df = new_df[new_df.index > 0]
+            new_df.loc[0] = [np.nan for i in range(len(new_df.columns))]
+
 
         # fetch_fail = False
         # count = 0
@@ -321,6 +333,7 @@ for i in range(len(date_li)):
         file.to_csv(path_export + '/stock_ratio.csv', 
                       index=False, encoding='utf-8-sig')
         
+        result = pd.DataFrame()        
         print('update_file')
             
     print(str(i) + '/' + str(len(date_li)))
@@ -329,4 +342,12 @@ for i in range(len(date_li)):
 
 
 
+# Fail
+# for i in range(10):
+    
+#     if i == 5:
+#         i = i - 1
+#         continue
+        
+#     print(i)
 

@@ -19,7 +19,7 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Analysis/'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/'
 else:
     path = '/home/aronhack/stock_forecast/dashboard/'
 
@@ -84,8 +84,8 @@ def check():
 
 
 
-if __name__ == '__main__':
-    master()
+# if __name__ == '__main__':
+#     master()
 
 
 
@@ -99,11 +99,14 @@ info
 # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
 # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
 
-data = tejapi.get('TWN/EWTINST1C', 
-                  mdate={'gt':'2021-06-29','lt':'2021-06-30'},
-                  paginate=True)
+# 從0401開始
+# data = tejapi.get('TWN/EWTINST1C', 
+#                   mdate={'gte':'2021-04-01','lte':'2021-04-20'},
+#                   paginate=True)
 
 
+# # 十天14208筆
+# data.to_csv(path_export + '/data_202100401_20210420.csv', index=False)
 
 
 

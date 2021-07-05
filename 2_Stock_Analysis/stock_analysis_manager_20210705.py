@@ -4,8 +4,8 @@
 Created on Sat Nov 14 17:23:08 2020
 
 20210704 - Add COVID-19 / Sdd Industry Trade Value
-20210705 - 1. Exclude low volume symbols
-           2. Add select_stock_symbols to exclude low volume symbols.
+20210704 - 1. Exclude low volume symbols
+
 
 @author: Aron
 """
@@ -76,198 +76,6 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
-def select_stock_symbols(df, volume_thld=1000):
-
-
-    # Select Rules
-    # 1. 先找百元以下的，才有資金可以買一整張
-    # 2. 不要找疫情後才爆漲到歷史新高的
-
-    global predict_begin
-    begin = cbyz.date_cal(predict_begin, -3, 'm')
-
-    # data_end = cbyz.date_get_today()
-    # data_begin = cbyz.date_cal(data_end, -1, 'm')
-
-
-    # Stock info
-    # Section 1. 資本額大小 ------
-    stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
-                                       file_name=None, path=path_temp)
-    
-    # 1-1. 挑選中大型股 ......
-    symbol_levels = stock_info[stock_info['CAPITAL_LEVEL']==1]
-    symbol_levels = symbol_levels[['STOCK_SYMBOL']]
-    df = cbyz.df_anti_merge(df, symbol_levels, on='STOCK_SYMBOL')    
-    
-
-    # 挑選交易量大的 ......
-    if volume_thld > 0:
-        one_week_date = cbyz.date_cal(predict_begin, -8, 'd')
-        one_week_volume = df[df['WORK_DATE']>=one_week_date]
-        
-        one_week_volume = one_week_volume \
-                            .groupby(['STOCK_SYMBOL']) \
-                            .agg({'VOLUME':'mean'}) \
-                            .reset_index()
-                            
-        one_week_volume = \
-            one_week_volume[one_week_volume['VOLUME']<volume_thld * 1000] \
-            .drop('VOLUME', axis=1)
-                                    
-        if len(one_week_volume) > 0:
-            df = cbyz.df_anti_merge(df, one_week_volume, on='STOCK_SYMBOL')
-
-
-    
-    # 3天漲超過15%  .....
-    # temp_begin = cbyz.date_cal(predict_begin, -3, 'm')
-    # data = df[df['WORK_DATE']>=temp_begin]    
-    
-    # data, cols_pre = cbyz.df_add_shift(df=data, 
-    #                                    group_by=['STOCK_SYMBOL'], 
-    #                                    cols=['CLOSE'], shift=3,
-    #                                    remove_na=False)
-
-
-    # data['TEMP_PRICE_CHANGE_RATIO'] = (data['CLOSE'] - data['CLOSE_PRE']) \
-    #                         / data['CLOSE_PRE']
-    
-    
-    # data = data[data['TEMP_PRICE_CHANGE_RATIO']<0.15]
-    # data = data[['STOCK_SYMBOL']].drop_duplicates().reset_index(drop=True)
-
-    # df = cbyz.df_anti_merge(df, data, on='STOCK_SYMBOL')
-
-    
-    return df
-
-
-
-
-def select_stock_symbols_manually(data_begin, data_end):
-
-
-    # Select Rules
-    # 1. 先找百元以下的，才有資金可以買一整張
-    # 2. 不要找疫情後才爆漲到歷史新高的
-
-
-    data_end = cbyz.date_get_today()
-    data_begin = cbyz.date_cal(data_end, -1, 'm')
-
-
-    # Stock info
-    stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
-                                       file_name=None, path=path_temp)
-    
-    
-    # Section 1. 資本額大小 ------
-    
-    # 1-1. 挑選中大型股 ......
-    level3_symbol = stock_info[stock_info['CAPITAL_LEVEL']>=2]
-    level3_symbol = level3_symbol['STOCK_SYMBOL'].tolist()
-    
-    data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
-                            stock_symbol=level3_symbol, 
-                            price_change=True,
-                            shift=0, stock_type='tw', local=local)
-    
-    data = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbol)]
-    
-
-    # 1-2. 不排除 ......
-    data = stk.get_data(data_begin=data_begin, data_end=data_end, 
-                            stock_symbol=[], 
-                            price_change=True,
-                            shift=0, stock_type='tw', local=True)
-    
-    
-    # Section 2. 依價格篩選 ......
-    
-    # 2-1. 不篩選 .....
-    target_symbols = data[['STOCK_SYMBOL']] \
-                    .drop_duplicates() \
-                    .reset_index(drop=True)
-    
-    
-    # 2-2. 低價股全篩 .....
-    # 目前排除80元以上
-    last_date = data['WORK_DATE'].max()
-    last_price = data[data['WORK_DATE']==last_date]
-    last_price = last_price[last_price['CLOSE']>80]
-    last_price = last_price[['STOCK_SYMBOL']].drop_duplicates()
-    
-    
-    target_symbols = cbyz.df_anti_merge(data, last_price, on='STOCK_SYMBOL')
-    target_symbols = target_symbols[['STOCK_SYMBOL']].drop_duplicates()
-    
-    
-    # 2-3. 3天漲超過10%  .....
-    data, cols_pre = cbyz.df_add_shift(df=data, 
-                                       group_by=['STOCK_SYMBOL'], 
-                                       cols=['CLOSE'], shift=3,
-                                       remove_na=False)
-    
-
-    data['PRICE_CHANGE_RATIO'] = (data['CLOSE'] - data['CLOSE_PRE']) \
-                            / data['CLOSE_PRE']
-    
-    
-    results_raw = data[data['PRICE_CHANGE_RATIO']>=0.15]
-    
-    
-    summary = results_raw \
-                .groupby(['STOCK_SYMBOL']) \
-                .size() \
-                .reset_index(name='COUNT')
-                
-    
-    # Select Symboles ......
-    target_symbols = results_raw.copy()
-    target_symbols = cbyz.df_add_size(df=target_symbols,
-                                      group_by='STOCK_SYMBOL',
-                                      col_name='TIMES')
-        
-    target_symbols = target_symbols \
-                    .groupby(['STOCK_SYMBOL']) \
-                    .agg({'CLOSE':'mean',
-                          'TIMES':'mean'}) \
-                    .reset_index()
-    
-    target_symbols = target_symbols.merge(stock_info, how='left', 
-                                          on='STOCK_SYMBOL')
-    
-    target_symbols = target_symbols \
-                        .sort_values(by=['TIMES', 'CLOSE'],
-                                     ascending=[False, True]) \
-                        .reset_index(drop=True)
-                        
-    target_symbols = target_symbols[target_symbols['CLOSE']<=100] \
-                            .reset_index(drop=True)
-
-
-    # Export ......
-    time_serial = cbyz.get_time_serial(with_time=True)
-    target_symbols.to_csv(path_export + '/target_symbols_' \
-                          + time_serial + '.csv',
-                          index=False, encoding='utf-8-sig')
-
-    # target_symbols.to_excel(path_export + '/target_symbols_' \
-    #                         + time_serial + '.xlsx',
-    #                         index=False)
-
-    # Plot ......       
-    # plot_data = results.melt(id_vars='PROFIT')
-
-    # cbyz.plotly(df=plot_data, x='PROFIT', y='value', groupby='variable', 
-    #             title="", xaxes="", yaxes="", mode=1)
-
-    
-    return results_raw, stock_info
-
-
-
 def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None, 
                   industry=False):
     '''
@@ -314,11 +122,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                         .transform('min')
 
     data = data[data['MIN_DATE']==date_min].drop('MIN_DATE', axis=1)
-    
-    
-    # Exclude Low Volume Symbols ......        
-    data = select_stock_symbols(df=data, volume_thld=1000)
-        
+
 
     # Merge Other Data ......        
     if industry:        
@@ -449,11 +253,27 @@ def get_model_data(ma_values=[5,20], volume_thld=1000):
                                               data_end=data_end,
                                               industry=True) 
                                 
-    # # Exclude Low Volume Symbols ......                                
-    # loc_data = select_stock_symbols(df=loc_data, volume_thld=volume_thld)
-    
-    
-    # Industry Values ......
+
+    # Exclude Low Volume Symbols ......                                
+    if volume_thld > 0:
+        one_week_date = cbyz.date_cal(data_end, -7, 'd')
+        one_week_volume = loc_data[loc_data['WORK_DATE']>=one_week_date]
+        
+        one_week_volume = one_week_volume \
+                            .groupby(['STOCK_SYMBOL']) \
+                            .agg({'VOLUME':'mean'}) \
+                            .reset_index()
+                            
+        one_week_volume = \
+            one_week_volume[one_week_volume['VOLUME']<volume_thld * 1000] \
+            .drop('VOLUME', axis=1)
+                                    
+        if len(one_week_volume) > 0:
+            loc_data = cbyz.df_anti_merge(loc_data, one_week_volume, 
+                                          on='STOCK_SYMBOL')
+            
+
+    # Industry Values
     loc_data = loc_data.merge(stock_industry, how='left', on=['STOCK_SYMBOL'])
 
     loc_data['INDUSTRY_TRADE_VALUE'] = \
@@ -971,15 +791,15 @@ def master(_predict_begin, _predict_end=None,
     # date_period為10年的時候會出錯
     
     # _data_period = 90
-    # # data_period = 365 
-    # _predict_begin = 20210706
+    # data_period = 365 
+    # _predict_begin = 20210701
     # _predict_end = None
     # _stock_type = 'tw'
     # # ma_values = [2,5,20,60]
     # ma_values = [3,5,20]    
     # _predict_period = 2
     # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
-    # _stock_symbol = []
+    # # _stock_symbol = []
     # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
     # # _model_y = ['PRICE_CHANGE_RATIO']      
     
@@ -990,6 +810,7 @@ def master(_predict_begin, _predict_end=None,
 
     # Process ......
     # 1. Full data to select symbols
+
 
 
     # Worklist .....
@@ -1079,3 +900,129 @@ def check():
     
     chk = loc_main[loc_main['OPEN_MA_20_LAG'].isna()]
     
+
+
+
+# %% Stock Selection ------
+
+
+def find_target(data_begin, data_end):
+
+
+    # Select Rules
+    # 1. 先找百元以下的，才有資金可以買一整張
+    # 2. 不要找疫情後才爆漲到歷史新高的
+
+
+    data_end = cbyz.date_get_today()
+    data_begin = cbyz.date_cal(data_end, -1, 'm')
+
+
+    # Stock info
+    stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
+                                       file_name=None, path=path_temp)
+    
+    
+    # Section 1. 資本額大小 ------
+    
+    # 1-1. 挑選中大型股 ......
+    level3_symbol = stock_info[stock_info['CAPITAL_LEVEL']>=2]
+    level3_symbol = level3_symbol['STOCK_SYMBOL'].tolist()
+    
+    data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
+                            stock_symbol=level3_symbol, 
+                            price_change=True,
+                            shift=0, stock_type='tw', local=True)
+    
+    data = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbol)]
+    
+
+    # 1-2. 不排除 ......
+    data = stk.get_data(data_begin=data_begin, data_end=data_end, 
+                            stock_symbol=[], 
+                            price_change=True,
+                            shift=0, stock_type='tw', local=True)
+    
+    
+    # Section 2. 依價格篩選 ......
+    
+    # 2-1. 不篩選 .....
+    target_symbols = data[['STOCK_SYMBOL']] \
+                    .drop_duplicates() \
+                    .reset_index(drop=True)
+    
+    
+    # 2-2. 低價股全篩 .....
+    # 目前排除80元以上
+    last_date = data['WORK_DATE'].max()
+    last_price = data[data['WORK_DATE']==last_date]
+    last_price = last_price[last_price['CLOSE']>80]
+    last_price = last_price[['STOCK_SYMBOL']].drop_duplicates()
+    
+    
+    target_symbols = cbyz.df_anti_merge(data, last_price, on='STOCK_SYMBOL')
+    target_symbols = target_symbols[['STOCK_SYMBOL']].drop_duplicates()
+    
+    
+    # 2-3. 3天漲超過10%  .....
+    data, cols_pre = cbyz.df_add_shift(df=data, 
+                                       group_by=['STOCK_SYMBOL'], 
+                                       cols=['CLOSE'], shift=3,
+                                       remove_na=False)
+    
+
+    data['PRICE_CHANGE_RATIO'] = (data['CLOSE'] - data['CLOSE_PRE']) \
+                            / data['CLOSE_PRE']
+    
+    
+    results_raw = data[data['PRICE_CHANGE_RATIO']>=0.15]
+    
+    
+    summary = results_raw \
+                .groupby(['STOCK_SYMBOL']) \
+                .size() \
+                .reset_index(name='COUNT')
+                
+    
+    # Select Symboles ......
+    target_symbols = results_raw.copy()
+    target_symbols = cbyz.df_add_size(df=target_symbols,
+                                      group_by='STOCK_SYMBOL',
+                                      col_name='TIMES')
+        
+    target_symbols = target_symbols \
+                    .groupby(['STOCK_SYMBOL']) \
+                    .agg({'CLOSE':'mean',
+                          'TIMES':'mean'}) \
+                    .reset_index()
+    
+    target_symbols = target_symbols.merge(stock_info, how='left', 
+                                          on='STOCK_SYMBOL')
+    
+    target_symbols = target_symbols \
+                        .sort_values(by=['TIMES', 'CLOSE'],
+                                     ascending=[False, True]) \
+                        .reset_index(drop=True)
+                        
+    target_symbols = target_symbols[target_symbols['CLOSE']<=100] \
+                            .reset_index(drop=True)
+
+
+    # Export ......
+    time_serial = cbyz.get_time_serial(with_time=True)
+    target_symbols.to_csv(path_export + '/target_symbols_' \
+                          + time_serial + '.csv',
+                          index=False, encoding='utf-8-sig')
+
+    # target_symbols.to_excel(path_export + '/target_symbols_' \
+    #                         + time_serial + '.xlsx',
+    #                         index=False)
+
+    # Plot ......       
+    # plot_data = results.melt(id_vars='PROFIT')
+
+    # cbyz.plotly(df=plot_data, x='PROFIT', y='value', groupby='variable', 
+    #             title="", xaxes="", yaxes="", mode=1)
+
+    
+    return results_raw, stock_info

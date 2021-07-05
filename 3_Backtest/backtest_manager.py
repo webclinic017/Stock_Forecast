@@ -182,6 +182,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                                  local=local)
     
     hist_data_raw = hist_data_raw[['WORK_DATE', 'STOCK_SYMBOL'] + model_y]
+    hist_data_raw = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
 
 
     # Get Last Date ....        
@@ -208,7 +209,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
         
     hist_data = cbyz.df_cross_join(date_prev, symbol_df)
     hist_data = hist_data.merge(hist_data_raw, how='left', 
-                                on=['WORK_DATE', 'STOCK_SYMBOL'])
+                                on=['LAST_DATE', 'STOCK_SYMBOL'])
     
     # Merge hist data
     hist_data = cbyz.df_shift_fill_na(df=hist_data, 
@@ -267,7 +268,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     
     
     # Forecast Records ......
-    records_begin = cbyz.date_cal(bt_last_begin, -14, 'd')
+    records_begin = cbyz.date_cal(bt_last_begin, -2, 'm')
     records = stk.get_forecast_records(forecast_begin=records_begin, 
                                         forecast_end=None, 
                                         execute_begin=None, 
@@ -275,17 +276,19 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                                         y=['CLOSE'], summary=True,
                                         local=local)
     
-    records = records \
-        .rename(columns={'FORECAST_PRECISION_MEAN':'RECORD_FORECAST_PRECISION_MEAN',
-                         'FORECAST_PRECISION_MAX':'RECORD_FORECAST_PRECISION_MAX'})
-    
+    if len(records)  > 0:
+        records = records \
+            .rename(columns={'FORECAST_PRECISION_MEAN':'RECORD_PRECISION_MEAN',
+                             'FORECAST_PRECISION_MAX':'RECORD_PRECISION_MAX'})
+        
     
     # Rearrange Columns ......            
     if 'CLOSE' in model_y:
         profit_cols = ['CLOSE_PROFIT_PREDICT', 'CLOSE_PROFIT_RATIO_PREDICT']
         
     profit_cols = profit_cols \
-        + ['RECORD_FORECAST_PRECISION_MEAN', 'RECORD_FORECAST_PRECISION_MAX']
+        + ['RECORD_PRECISION_MEAN', 'RECORD_PRECISION_MAX', 
+           'DIFF_MEAN', 'DIFF_MAX']
         
     
     cols_1 = ['BACKTEST_ID', 'STOCK_SYMBOL', 'STOCK_NAME', 
@@ -299,47 +302,19 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                 + model_y_hist + cols_2
 
 
-    actions = actions.merge(records, how='left', on=['STOCK_SYMBOL'])          
-    actions = actions[new_cols]
+    # Merge Data ......
+    if len(records) > 0:
+        actions = actions.merge(records, how='left', on=['STOCK_SYMBOL'])
+    
+        actions.loc[:, 'DIFF_MEAN'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
+            - actions['RECORD_PRECISION_MEAN']
+    
+        actions.loc[:, 'DIFF_MAX'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
+            - actions['RECORD_PRECISION_MAX']
     
     
-    # # MAPE ......
-    # global mape, mape_group, mape_extreme
-    # mape = pd.DataFrame()
-    # mape_group = pd.DataFrame()
-    # mape_extreme = pd.DataFrame()
-    # mape_main = bt_main[bt_main['BACKTEST_ID']>0]
+        actions = actions[new_cols]
     
-    # for y in model_y:
-        
-    #     mape_main['MAPE'] = abs(mape_main[y] \
-    #                             - mape_main[y + '_HIST']) \
-    #                         / mape_main[y + '_HIST']
-                            
-    #     mape_main['OVERESTIMATE'] = \
-    #         np.where(mape_main[y] > mape_main[y + '_HIST'], 1, 0)
-                 
-    #     # MAPE
-    #     new_mape = cbyz.summary(df=mape_main, group_by=[], cols='MAPE')
-    #     new_mape['Y'] = y        
-    #     mape = mape.append(new_mape)
-        
-        
-    #     # MAPE2
-    #     new_mape = cbyz.summary(df=mape_main, group_by='OVERESTIMATE', 
-    #                              cols='MAPE')
-    #     new_mape['Y'] = y
-    #     mape_group = mape_group.append(new_mape)
-        
-        
-    #     # MAPE Extreme
-    #     new_mape = mape_main[mape_main['MAPE'] > 0.1]
-    #     new_mape = cbyz.summary(df=new_mape, 
-    #                             group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
-    #                             cols='MAPE')
-    #     new_mape['Y'] = y
-    #     mape_extreme = mape_extreme.append(new_mape)
-        
 
 
 # .................
@@ -391,8 +366,10 @@ def eval_metrics(export_file=False, upload=False):
         new_mape = cbyz.summary(df=new_mape, 
                                 group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
                                 cols='MAPE')
-        new_mape.loc[:, 'Y'] = y
-        mape_extreme = mape_extreme.append(new_mape)
+        
+        if len(new_mape) > 0:
+            new_mape.loc[:, 'Y'] = y
+            mape_extreme = mape_extreme.append(new_mape)
 
 
         # Stock MAPE ......
@@ -455,7 +432,6 @@ def eval_metrics(export_file=False, upload=False):
 
 
 
-
 # ..........
 
 
@@ -464,6 +440,8 @@ def eval_metrics(export_file=False, upload=False):
 # 2107032103 - wma True
 # 2107032324 - wma False
 # 2107040026 - wma False
+
+# 202107051915之後的rmse不加低價股
 
 
 def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5, 
@@ -475,20 +453,23 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     '''
     
     
+    # 用5年的精準度不會比1年高
+    # 用2年的精準度比1年好
+    
     # Parameters
-    _bt_last_begin = 20210703
-    # bt_last_begin = 20210211
+    # _bt_last_begin = 20210705
+    _bt_last_begin = 20210706
     predict_period = 3
     interval = random.randrange(3, 15)
-    bt_times = 5
-    # data_period = 360 * 1
-    data_period = 360 * 5
+    bt_times = 1
+    data_period = 360 * 1
+    # data_period = 360 * 2
+    # data_period = 360 * 5
     # data_period = 360 * 7    
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
     _ma_values = [5,20]
-    # _ma_values = [3,5,20,60,120]    
 
 
     # Rename predict period as forecast preiod
@@ -509,6 +490,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
 
     # full_data = full_data['FULL_DATA']
+    
+    # 全部股票都塞進模型的時候，rmse 0.05-0.06，mape 0.05-0.06
     
     
     # Predict ------
@@ -532,8 +515,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # file_name=None    
     
 
-    # cal_profit中的close_hist有問題，預測0703時，hist應該都是na，但出現0702的資料
-    
     global bt_main, actions
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                export_file=True, load_file=True, path=path_temp,
@@ -545,9 +526,32 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                                col_name='ROWS')
 
 
+    # Export ......
     time_serial = cbyz.get_time_serial(with_time=True)
-    actions.to_excel(path_export + '/actions_' + time_serial + '.xlsx', 
-                     index=False, encoding='utf-8-sig')
+    excel_name = path_export + '/actions_' + time_serial + '.xlsx'
+    writer = pd.ExcelWriter(excel_name, engine='xlsxwriter')
+
+
+    workbook  = writer.book
+    workbook.add_worksheet('stock') 
+    sht = workbook.get_worksheet_by_name("stock")
+
+
+    cbyz.excel_add_df(actions, sht, 
+                      startrow=0, startcol=0, header=True)
+
+    # Add Format
+    digi_format = workbook.add_format({'num_format':'0.0'})
+    percent_format = workbook.add_format({'num_format':'0.0%'})
+
+    cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
+                          startrow=1, endrow=9999,
+                          startcol=6, endcol=11)
+    
+    cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
+                          startrow=1, endrow=9999,
+                          startcol=12, endcol=15)    
+    writer.save()
 
 
     # ------
@@ -555,7 +559,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
     # eval_metrics(export_file=False, upload=False)
-    eval_metrics(export_file=False, upload=True)
+    # eval_metrics(export_file=False, upload=True)
 
 
     
@@ -612,6 +616,27 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
 
 
+# %% View ------
+def view_today_limit_up():
+    
+    data = stk.get_data(data_begin=20210702, data_end=20210705, price_change=True)
+    
+    
+    # chk = data[data['PRICE_CHANGE_RATIO']>0.08]
+    chk = data[data['VOLUME']>1000000]
+    
+    
+    
+    stock_info = stk.tw_get_stock_info()    
+    stock_main = chk.merge(stock_info, how='left', on='STOCK_SYMBOL')
+    stock_main
+    
+    
+
+
+
+# %% Check ------
+
 def check():
     '''
     資料驗證
@@ -627,7 +652,7 @@ def check():
 def check_price():
     
     
-    chk = bt_results[bt_results['STOCK_SYMBOL']=='4967']
+    chk = bt_results[bt_results['STOCK_SYMBOL']=='2399']
     chk
 
     chk = bt_results[bt_results['STOCK_SYMBOL']=='2702']
