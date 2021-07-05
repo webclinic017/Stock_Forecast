@@ -186,7 +186,8 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
 
 
     # Get Last Date ....        
-    calendar_end = cbyz.date_cal(bt_last_begin, predict_period, unit='d')
+    calendar_end = cbyz.date_cal(bt_last_begin, predict_period, unit='d')    
+    # calendar_end = cbyz.date_cal(bt_last_begin, -1, unit='d')
     date_prev = ar.get_calendar(begin_date=loc_begin, end_date=calendar_end,
                                 simplify=True)
     
@@ -240,8 +241,9 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                           + model_y + hist_cols + last_cols]
 
     # Fill na in the prediction period.
+    today = cbyz.date_get_today()
     for i in hist_cols:
-        main_data[i] = np.where(main_data['WORK_DATE'] > bt_last_begin,
+        main_data[i] = np.where(main_data['WORK_DATE'] > today,
                                 np.nan, main_data[i])
 
     # Check na ......
@@ -269,7 +271,8 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     
     # Forecast Records ......
     records_begin = cbyz.date_cal(bt_last_begin, -2, 'm')
-    records = stk.get_forecast_records(forecast_begin=records_begin, 
+    print('暫時移除records_begin')
+    records = stk.get_forecast_records(forecast_begin=None, 
                                         forecast_end=None, 
                                         execute_begin=None, 
                                         execute_end=None, 
@@ -312,7 +315,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
         actions.loc[:, 'DIFF_MAX'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
             - actions['RECORD_PRECISION_MAX']
     
-    
         actions = actions[new_cols]
     
 
@@ -333,6 +335,12 @@ def eval_metrics(export_file=False, upload=False):
     model_y_hist = [y + '_HIST' for y in model_y]
     mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
         
+    
+    if len(mape_main) == 0:
+        return ''
+    
+    
+    # ......
     mape = pd.DataFrame()
     mape_group = pd.DataFrame()
     mape_extreme = pd.DataFrame()
@@ -456,16 +464,28 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 用5年的精準度不會比1年高
     # 用2年的精準度比1年好
     
+    
+    # 1Y - RMSE 0.6
+    # 3Y - RMSE 0.52
+    # 5Y - RMSE 0.54
+    
+    # 7Y - RMSE 0.46
+    # 3Y - MAPE 0.043
+    
+    # 回測的日期如果是假日，會造成HIST配對不到，增加自動調整機制
+    
     # Parameters
     # _bt_last_begin = 20210705
     _bt_last_begin = 20210706
+    # _bt_last_begin = 20210601
     predict_period = 3
-    interval = random.randrange(3, 15)
-    bt_times = 1
-    data_period = 360 * 1
-    # data_period = 360 * 2
+    # interval = random.randrange(90, 180)
+    interval = 6
+    bt_times = 5
     # data_period = 360 * 5
-    # data_period = 360 * 7    
+    # data_period = 360 * 2
+    # data_period = 360 * 3
+    data_period = 360 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
@@ -559,15 +579,11 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
     # eval_metrics(export_file=False, upload=False)
-    # eval_metrics(export_file=False, upload=True)
+    eval_metrics(export_file=False, upload=True)
 
 
     
     return ''
-
-
-
-    
 
 
 

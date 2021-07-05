@@ -19,7 +19,7 @@ local = True
 
 # Path .....
 if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/'
+    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection/2_TEJ'
 else:
     path = '/home/aronhack/stock_forecast/dashboard/'
 
@@ -112,8 +112,13 @@ info
 
 
 
+file = pd.read_csv(path_export + '/data_20210701_20210702.csv')
+file['mdate'].apply()
+
+pd.to_datetime(file.mdate)
 
 
+ar.db_upload(data=file, table_name='ewtinst1c')
 
 
 

@@ -1067,6 +1067,21 @@ if __name__ == '__main__':
 
 
 
+def temp():
+    
+    
+    records = stk.get_forecast_records(forecast_begin=None, 
+                                    forecast_end=None, 
+                                    execute_begin=None, 
+                                    execute_end=None, 
+                                    y=['CLOSE'], summary=True,
+                                    local=local)
+    
+    chk = records[records['STOCK_SYMBOL']=='2323']
+    chk
+
+
+
 def check():
     
     chk = cbyz.df_chk_col_na(df=model_data_raw)    

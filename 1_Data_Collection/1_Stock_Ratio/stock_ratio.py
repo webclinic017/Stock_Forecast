@@ -133,24 +133,27 @@ main_tb = cbyz.df_cross_join(date_df, symbols_tb)
 load_fail = False
 try:
     file = pd.read_csv(path_export + '/stock_ratio.csv')
+    # file = file.rename(columns={'LEVEL':'持股/單位數分級'})
+    
+    file.loc[:, 'LEVEL'] = np.where(file['LEVEL'].isna(), 'NA', file['LEVEL'])
 except:
     load_fail = True
     
     
-# file = file \
-#         .drop_duplicates(subset=['STOCK_SYMBOL', 'WORK_DATE', '序']) \
-#         .reset_index(drop=True)
+file = file \
+        .drop_duplicates(subset=['STOCK_SYMBOL', 'WORK_DATE', '持股/單位數分級']) \
+        .reset_index(drop=True)
 
-
+    
 if load_fail == False and len(file) > 0:
 
-    file.loc[:, 'IN_LIST'] = 1
+    # file.loc[:, 'IN_LIST'] = 1
     file = cbyz.df_conv_col_type(df=file, 
                                  cols=['STOCK_SYMBOL', 'WORK_DATE'],
                                  to='str')
 
     main_tb = main_tb.merge(file, how='left', on=['STOCK_SYMBOL', 'WORK_DATE'])
-    main_tb = main_tb[main_tb['IN_LIST'].isna()]
+    main_tb = main_tb[main_tb['LEVEL'].isna()]
     
 
 
@@ -277,7 +280,7 @@ for i in range(len(date_li)):
         if new_df.iloc[0, 0] == '查無此資料':
             new_df = new_df[new_df.index > 0]
             new_df.loc[0] = [np.nan for i in range(len(new_df.columns))]
-
+            new_df.loc[0, '持股/單位數分級'] = 'NA'
 
         # fetch_fail = False
         # count = 0
