@@ -92,7 +92,7 @@ def select_stock_symbols(df):
 
     # Stock info
     # Section 1. 資本額大小 ------
-    stock_info = stk.tw_get_stock_info(export_file=True, load_file=False, 
+    stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
                                        file_name=None, path=path_temp)
     
     # 1-1. 挑選中大型股 ......
@@ -159,7 +159,7 @@ def select_stock_symbols_manually(data_begin, data_end):
 
 
     # Stock info
-    stock_info = stk.tw_get_stock_info(export_file=True, load_file=False, 
+    stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
                                        file_name=None, path=path_temp)
     
     
@@ -302,6 +302,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                             trade_value=True,
                             local=local)
         
+        
     global_norm_cols = global_norm_cols + ['TRADE_VALUE_RATIO']
         
         
@@ -325,7 +326,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     if industry:        
         
         # Stock Info ...
-        stock_info = stk.tw_get_stock_info(export_file=True, load_file=False, 
+        stock_info = stk.tw_get_stock_info(export_file=True, load_file=True, 
                                            file_name=None, path=path_temp)
         
         stock_info = stock_info[['STOCK_SYMBOL', 'CAPITAL_LEVEL',
@@ -377,11 +378,10 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     
     # Add Support Resistance
     global data_period
-    # prominence = 4是慢慢測試抓出來的
     data, suppot_resist_cols = \
         stk.add_support_resistance(df=data, cols='CLOSE', 
-                                   rank_thld=int(data_period * 2 / 365), # 目前沒有用到
-                                   prominence=4)
+                                   rank_thld=int(data_period * 2 / 365),
+                                   prominence=1)
 
     ma_except_cols = ma_except_cols + suppot_resist_cols    
     
@@ -409,7 +409,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 
 
 
-def get_model_data(ma_values=[5,20], industry=False):
+def get_model_data(ma_values=[5,20]):
     
     
     global shift_begin, shift_end, data_begin, data_end
@@ -424,7 +424,7 @@ def get_model_data(ma_values=[5,20], industry=False):
 
     # Stock Info .......
     stock_info = stk.tw_get_stock_info(export_file=True, 
-                                       load_file=False, 
+                                       load_file=True, 
                                        file_name=None, 
                                        path=path_temp)    
 
@@ -439,21 +439,23 @@ def get_model_data(ma_values=[5,20], industry=False):
     loc_data, market_except_ma, market_except_lag = \
                                 sam_load_data(data_begin=shift_begin,
                                               data_end=data_end,
-                                              industry=industry) 
+                                              industry=True) 
                                 
+    # # Exclude Low Volume Symbols ......                                
+    # loc_data = select_stock_symbols(df=loc_data, volume_thld=volume_thld)
+    
     
     # Industry Values ......
-    if industry:
-        loc_data = loc_data.merge(stock_industry, how='left', on=['STOCK_SYMBOL'])
-    
-        loc_data['INDUSTRY_TRADE_VALUE'] = \
-                            loc_data \
-                            .groupby(['WORK_DATE', 'INDUSTRY'])['TRADE_VALUE'] \
-                            .transform('sum')
-    
-    
-        loc_data['INDUSTRY_TRADE_VALUE_RATIO'] = \
-            loc_data['INDUSTRY_TRADE_VALUE'] / loc_data['TOTAL_TRADE_VALUE']
+    loc_data = loc_data.merge(stock_industry, how='left', on=['STOCK_SYMBOL'])
+
+    loc_data['INDUSTRY_TRADE_VALUE'] = \
+                        loc_data \
+                        .groupby(['WORK_DATE', 'INDUSTRY'])['TRADE_VALUE'] \
+                        .transform('sum')
+
+
+    loc_data['INDUSTRY_TRADE_VALUE_RATIO'] = \
+        loc_data['INDUSTRY_TRADE_VALUE'] / loc_data['TOTAL_TRADE_VALUE']
     
     
     
@@ -480,10 +482,6 @@ def get_model_data(ma_values=[5,20], industry=False):
     
     loc_main = loc_main.merge(calendar, how='left', on='WORK_DATE')
     
-    
-    # Add Symbol As Categorical Data ......
-    # 造成精準度下降，而且要跑很久
-    # loc_main.loc[loc_main.index, 'SYMBOL_VAR'] = loc_main['STOCK_SYMBOL']
 
     
     # One Hot Encoding ......
@@ -495,8 +493,7 @@ def get_model_data(ma_values=[5,20], industry=False):
         
     obj_cols = obj_cols['index'].tolist()
     
-    
-    # Assign categorical columns with numeric data
+    # Assign columns munually
     obj_cols = obj_cols + ['K_LINE_TYPE']
     loc_main = cbyz.df_get_dummies(loc_main, cols=obj_cols, 
                                    expand_col_name=True)    
@@ -509,19 +506,12 @@ def get_model_data(ma_values=[5,20], industry=False):
 
     
     # Calculate MA ......
-    
-    # Columns ...
-    symbol_vars = [s for s in list(loc_main.columns) if 'SYMBOL_VAR' in s]
-    
     ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
-    ma_except_cols = ma_except_cols + market_except_ma \
-                        + identify_cols + symbol_vars
-    
+    ma_except_cols = ma_except_cols + market_except_ma + identify_cols
     
     ma_cols_raw = cbyz.df_get_cols_except(df=loc_main, 
                                          except_cols=ma_except_cols)
-    
-    # Calculate ...
+     
     loc_main, ma_cols = stk.add_ma(df=loc_main, cols=ma_cols_raw, 
                                    group_by=['STOCK_SYMBOL'], 
                                    date_col='WORK_DATE', values=ma_values,
@@ -608,49 +598,26 @@ def get_model_data(ma_values=[5,20], industry=False):
     
     # Global Normalize ......
     df_cols = pd.DataFrame({'COLS':list(loc_main.columns)})
-    
-    
-    # Global Normalize ......
-    temp_cols = df_cols[df_cols['COLS'].str.contains('TOTAL_TRADE_VALUE')]
-    trade_value_cols = temp_cols['COLS'].tolist()
-    global_norm_cols = trade_value_cols
+    df_cols = df_cols[df_cols['COLS'].str.contains('TRADE_VALUE')]
+    global_norm_cols = df_cols['COLS'].tolist()
     
     loc_main, _, _, _ = cbyz.df_normalize(df=loc_main,
                                           cols=global_norm_cols,
-                                          groupby=[],
-                                          method=0,
-                                          show_progress=True)    
-    
-    
-    # Global Normalize By Day ......
-    temp_cols = df_cols[df_cols['COLS'].str.contains('TRADE_VALUE')]
-    global_norm_by_date = temp_cols['COLS'].tolist()
-    
-    global_norm_by_date = cbyz.li_remove_items(global_norm_by_date, 
-                                               global_norm_cols)
-    
-    loc_main, _, _, _ = cbyz.df_normalize(df=loc_main,
-                                          cols=global_norm_by_date,
                                           groupby=['WORK_DATE'],
-                                          method=0,
                                           show_progress=True)    
-        
     
     # Normalize By Stock ......
     norm_cols = cbyz.li_join_flatten(model_x, model_y) 
-    norm_cols = cbyz.li_remove_items(norm_cols, trade_value_cols)
-    # norm_cols = cbyz.li_remove_items(norm_cols, global_norm_cols + symbol_vars)
+    norm_cols = cbyz.li_remove_items(norm_cols, global_norm_cols)
     
     loc_main_norm = cbyz.df_normalize(df=loc_main,
                                       cols=norm_cols,
                                       groupby=['STOCK_SYMBOL'],
-                                      method=0,
                                       show_progress=True)
-    
     
     loc_model_data_raw = loc_main_norm[0]
     loc_model_data = loc_model_data_raw[norm_cols + identify_cols \
-                                        + trade_value_cols] \
+                                        + global_norm_cols] \
                         .dropna(subset=model_x)
             
             
@@ -989,30 +956,28 @@ def master(predict_begin, _predict_end=None,
     # date_period為10年的時候會出錯
     
     # _data_period = 90
-    # _data_period = 365 
-    # predict_begin = 20210706
+    # # _data_period = 365 
+    # predict_begin = 20210625
     # _stock_type = 'tw'
     # # ma_values = [2,5,20,60]
     # ma_values = [3,5,20]    
     # _predict_period = 2
-    # _stock_symbol = ['2301', '2474', '1714', '2385']
+    # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
     # _stock_symbol = []
     # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # # _model_y = ['PRICE_CHANGE_RATIO']      
-    # _volume_thld = 1000
-
+    # _model_y = ['PRICE_CHANGE_RATIO']      
     
-    # if _predict_period not in ma_values:
-    #     ma_values.append(_predict_period)
     
-
+    if _predict_period not in ma_values:
+        ma_values.append(_predict_period)
+    
 
     # Worklist .....
     # 建長期投資的基本面模型
     
 
     global shift_begin, shift_end, data_begin, data_end, data_period
-    global predict_date, predict_period
+    global predict_date, predict_period, calendar
     
     predict_period = _predict_period
     data_shift = -(max(ma_values) * 3)
@@ -1028,7 +993,6 @@ def master(predict_begin, _predict_end=None,
                                predict_period=predict_period,
                                shift=data_shift)  
     
-    global calendar
     calendar = calendar.drop('TRADE_DATE', axis=1)
     
     
@@ -1048,8 +1012,7 @@ def master(predict_begin, _predict_end=None,
     global norm_orig, norm_group
         
     model_y = _model_y
-    # 0706，industry會造成RMSE下降，可能是標準化的地方出錯
-    data_raw = get_model_data(ma_values=ma_values, industry=False)
+    data_raw = get_model_data(ma_values=ma_values)
     
     model_data_raw = data_raw['MODEL_DATA_RAW']
     model_data = data_raw['MODEL_DATA']

@@ -478,19 +478,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     '''
     
     
-    # 用5年的精準度不會比1年高
-    # 用2年的精準度比1年好
-    
-    
-    # 1Y - RMSE 0.6
-    # 3Y - RMSE 0.52
-    # 5Y - RMSE 0.54
-    
-    # 7Y - RMSE 0.046
-    # 3Y - MAPE 0.043
-    
-    # 回測的日期如果是假日，會造成HIST配對不到，增加自動調整機制
-    
     # Parameters
     # _bt_last_begin = 20210705
     _bt_last_begin = 20210707
@@ -498,9 +485,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # interval = random.randrange(90, 180)
     _interval = 3
     _bt_times = 3
-    # data_period = 365 * 5
-    # data_period = 365 * 1
     data_period = 365 * 3
+    # data_period = 365 * 5
     # data_period = 365 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
@@ -546,6 +532,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # Profit ------    
     # Update, 需把Y為close和Y為price_change的情況分開處理
+    # Update, stock_info每日比對檔案自動匯
     
     # y_thld=-100
     # time_thld=predict_period
@@ -555,6 +542,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # path=None
     # file_name=None    
     
+    
+    # 評估是否把cal_profit拆開，並把eval_metrics插在中間，讓本次回測的結果可以顯示在Excel中
 
     global bt_main, actions
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
@@ -573,7 +562,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     writer = pd.ExcelWriter(excel_name, engine='xlsxwriter')
 
 
-    workbook  = writer.book
+    workbook = writer.book
     workbook.add_worksheet('stock') 
     sht = workbook.get_worksheet_by_name("stock")
 
@@ -599,8 +588,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 算回測precision的時候，可以低估，但不可以高估    
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
-    eval_metrics(export_file=False, upload=False)
-    # eval_metrics(export_file=False, upload=True)
+    # eval_metrics(export_file=False, upload=False)
+    eval_metrics(export_file=False, upload=True)
     
     
     # Full Data
@@ -611,7 +600,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
 
     # full_data = full_data['FULL_DATA']    
-
 
     
     return ''

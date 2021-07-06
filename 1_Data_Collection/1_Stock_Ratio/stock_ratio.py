@@ -135,6 +135,7 @@ level = '持股/單位數分級'
 
 try:
     file = pd.read_csv(path_export + '/stock_ratio.csv')
+    file['STOCK_SYMBOL'] = file['STOCK_SYMBOL'].str.replace('ID_', '')
     # chk = file.group
 except:
     load_fail = True
@@ -157,6 +158,10 @@ if load_fail == False and len(file) > 0:
     
     summary = main_tb.groupby(['WORK_DATE']).size().reset_index(name='COUNT')
 
+else:
+    main_tb = main_tb_pre.copy()
+
+
 
 
 # NoSuchElementException: Unable to locate element: //select[@name='scaDate']/option[text()='20200710']
@@ -168,7 +173,7 @@ if load_fail == False and len(file) > 0:
 
 # %% Query ......
 result = pd.DataFrame()
-date_list = date_list[:1]
+# date_list = date_list[:1]
 
 
 for i in range(len(date_list)):
@@ -280,7 +285,9 @@ for i in range(len(date_list)):
         if new_df.iloc[0, 0] == '查無此資料':
             new_df = new_df[new_df.index > 0]
             new_df.loc[0] = [np.nan for i in range(len(new_df.columns))]
-            new_df.loc[0, '持股/單位數分級'] = 'NA'
+            
+            # 用NA的話，存成csv的時候會變成空格，在前面用isna()的時候會誤判
+            new_df.loc[0, '持股/單位數分級'] = 'Null'
 
         # fetch_fail = False
         # count = 0
@@ -305,8 +312,8 @@ for i in range(len(date_list)):
         #     continue
         
         
-        # new_df = pd.read_html(str(soup))[0]
-        new_df['STOCK_SYMBOL'] = symbol
+        # 存成csv的時候，股票編號可能會被當成數字，像是0050會變成50，因此在前面加上ID_
+        new_df['STOCK_SYMBOL'] = 'ID_' + symbol
         new_df['WORK_DATE'] = d
         
         result = result.append(new_df)
