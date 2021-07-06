@@ -593,18 +593,19 @@ def get_model_data(ma_values=[5,20], volume_thld=1000):
     chk_na = cbyz.df_chk_col_na(df=chk, positive_only=True, return_obj=True,
                                 alert=True, alert_obj='loc_main')
     
+    
     # 由於有些股票剛上市，或是有特殊原因，導致資料不齊全，全部排除處理
-    if len(stock_symbol) == 0:
-        na_col = chk_na \
-                    .sort_values(by='NA_COUNT', ascending=False) \
-                    .reset_index(drop=True)
+    # if len(stock_symbol) == 0:
+    #     na_col = chk_na \
+    #                 .sort_values(by='NA_COUNT', ascending=False) \
+    #                 .reset_index(drop=True)
                     
-        na_col = na_col.loc[0, 'COLUMN']
-        symbols_removed = loc_main[loc_main[na_col].isna()]
-        symbols_removed = symbols_removed['STOCK_SYMBOL'].unique().tolist()
+    #     na_col = na_col.loc[0, 'COLUMN']
+    #     symbols_removed = loc_main[loc_main[na_col].isna()]
+    #     symbols_removed = symbols_removed['STOCK_SYMBOL'].unique().tolist()
         
-        loc_main = loc_main[~loc_main['STOCK_SYMBOL'].isin(symbols_removed)] \
-                    .reset_index(drop=True)
+    #     loc_main = loc_main[~loc_main['STOCK_SYMBOL'].isin(symbols_removed)] \
+    #                 .reset_index(drop=True)
 
     
     # Global Normalize ......
@@ -969,18 +970,18 @@ def master(_predict_begin, _predict_end=None,
     
     # date_period為10年的時候會出錯
     
-    _data_period = 90
-    _data_period = 365 
-    _predict_begin = 20210706
-    _predict_end = None
-    _stock_type = 'tw'
-    # ma_values = [2,5,20,60]
-    ma_values = [3,5,20]    
-    _predict_period = 2
-    _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
-    _stock_symbol = []
-    _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # _model_y = ['PRICE_CHANGE_RATIO']      
+    # _data_period = 90
+    # # data_period = 365 
+    # _predict_begin = 20210706
+    # _predict_end = None
+    # _stock_type = 'tw'
+    # # ma_values = [2,5,20,60]
+    # ma_values = [3,5,20]    
+    # _predict_period = 2
+    # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
+    # _stock_symbol = []
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # # _model_y = ['PRICE_CHANGE_RATIO']      
     
     
     if _predict_period not in ma_values:

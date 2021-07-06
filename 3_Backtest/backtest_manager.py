@@ -168,13 +168,29 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     '''
     
     global predict_period, bt_last_begin
+    global interval, bt_times 
     global bt_results, rmse, bt_main, actions, model_y
     global stock_symbol, stock_type
 
 
-    print('Bug, data_begin and data_end should follow the backtest range')
-    loc_begin = 20180101
-    hist_data_raw = stk.get_data(data_begin=loc_begin, 
+    # Period ......
+    # predict_period * 2是為了保險起見
+    bt_first_begin = cbyz.date_cal(bt_last_begin, 
+                                    -interval * bt_times - predict_period * 2, 
+                                    'd')
+    
+    bt_last_end = cbyz.date_cal(bt_last_begin, predict_period, unit='d') 
+    forecast_calendar = ar.get_calendar(begin_date=bt_last_begin, 
+                                        end_date=bt_last_end,
+                                        simplify=True)    
+    
+    forecast_calendar = forecast_calendar[['WORK_DATE']]
+    forecast_calendar = forecast_calendar['WORK_DATE'].tolist()
+    
+
+    # Hist Data ......
+    # loc_begin = 20180101
+    hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
                                  data_end=bt_last_begin, 
                                  stock_type=stock_type, 
                                  stock_symbol=stock_symbol, 
@@ -182,57 +198,53 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                                  local=local)
     
     hist_data_raw = hist_data_raw[['WORK_DATE', 'STOCK_SYMBOL'] + model_y]
-    hist_data_raw = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
+    hist_data = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
+    # hist_data_raw = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
 
 
-    # Get Last Date ....        
-    calendar_end = cbyz.date_cal(bt_last_begin, predict_period, unit='d')    
-    # calendar_end = cbyz.date_cal(bt_last_begin, -1, unit='d')
-    date_prev = ar.get_calendar(begin_date=loc_begin, end_date=calendar_end,
-                                simplify=True)
+    calendar = hist_data_raw[['WORK_DATE']] \
+                .append(forecast_calendar) \
+                .drop_duplicates()
     
-    date_prev = date_prev[['WORK_DATE']]
-    date_prev = cbyz.df_add_shift(df=date_prev, cols='WORK_DATE', shift=1)
-    date_prev = date_prev[0].dropna(subset=['WORK_DATE_PRE'], axis=0)
-    date_prev = cbyz.df_conv_col_type(df=date_prev, cols='WORK_DATE_PRE', 
+    # Get Last Date ....        
+    date_last = calendar[['WORK_DATE']]
+    date_last = cbyz.df_add_shift(df=date_last, cols='WORK_DATE', shift=1)
+    date_last = date_last[0].dropna(subset=['WORK_DATE_PRE'], axis=0)
+    date_last = cbyz.df_conv_col_type(df=date_last, cols='WORK_DATE_PRE', 
                                       to='int')
     
-    date_prev.columns = ['WORK_DATE', 'LAST_DATE']
-    date_prev = date_prev.reset_index(drop=True)
+    date_last.columns = ['WORK_DATE', 'LAST_DATE']
+
     
-    
+    # ......
     if len(stock_symbol) > 0:
         symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
     else:
         temp_symbol = hist_data_raw['STOCK_SYMBOL'].unique().tolist()
         symbol_df = pd.DataFrame({'STOCK_SYMBOL':temp_symbol})        
-        
-        
-    hist_data = cbyz.df_cross_join(date_prev, symbol_df)
-    hist_data = hist_data.merge(hist_data_raw, how='left', 
-                                on=['LAST_DATE', 'STOCK_SYMBOL'])
-    
-    # Merge hist data
-    hist_data = cbyz.df_shift_fill_na(df=hist_data, 
-                                      loop_times=predict_period+1, 
-                                      cols=model_y, group_by=['STOCK_SYMBOL'])
-
-    # Add last price
-    hist_data, _ = cbyz.df_add_shift(df=hist_data, cols=model_y, shift=1,
-                                     group_by=['STOCK_SYMBOL'], suffix='_LAST', 
-                                     remove_na=False)
 
 
     # Prepare columns ......
     hist_cols = [i + '_HIST' for i in model_y]
     hist_cols_dict = cbyz.li_to_dict(model_y, hist_cols)
-    hist_data = hist_data.rename(columns=hist_cols_dict)
-
+    
     last_cols = [i + '_LAST' for i in model_y]
+
+        
+    # Merge hist data ......
+    main_data_pre = cbyz.df_cross_join(date_last, symbol_df)
+    main_data_pre = main_data_pre.merge(hist_data, how='left', 
+                                on=['LAST_DATE', 'STOCK_SYMBOL'])
     
-    
+    # Add last price
+    main_data_pre, _ = cbyz.df_add_shift(df=main_data_pre, cols=model_y, 
+                                         shift=1, group_by=['STOCK_SYMBOL'], 
+                                         suffix='_LAST', remove_na=False)
+
+    main_data_pre = main_data_pre.rename(columns=hist_cols_dict)
+
     # Organize ......
-    main_data = bt_results.merge(hist_data, how='left', 
+    main_data = bt_results.merge(main_data_pre, how='left', 
                                  on=['WORK_DATE', 'STOCK_SYMBOL'])
 
 
@@ -240,18 +252,26 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                            'WORK_DATE', 'LAST_DATE'] \
                           + model_y + hist_cols + last_cols]
 
-    # Fill na in the prediction period.
-    today = cbyz.date_get_today()
+
+    # 把LAST全部補上最後一個交易日的資料
+    # 因為迴測的時間有可能是假日，所以這裡的LAST可能會有NA
+    main_data = cbyz.df_shift_fill_na(df=main_data, 
+                                      loop_times=predict_period+1, 
+                                      cols=last_cols, 
+                                      group_by=['STOCK_SYMBOL', 'BACKTEST_ID'])
+
+
+    # Fill na in the forecast period.
     for i in hist_cols:
-        main_data[i] = np.where(main_data['WORK_DATE'] > today,
+        main_data[i] = np.where(main_data['WORK_DATE'].isin(forecast_calendar),
                                 np.nan, main_data[i])
 
     # Check na ......
-    # 這裡有na是合理的，因為hist都是na
-    chk = cbyz.df_chk_col_na(df=main_data, positive_only=True)
+    # 這裡有na是合理的，因為hist可能都是na
     
-    last_cols = [i + '_LAST' for i in model_y]
-    main_data = main_data.dropna(subset=last_cols)
+    print('BUG - 因為迴測的時間有可能是假日，所以這裡的LAST和HIST可能會有NA')
+    chk = cbyz.df_chk_col_na(df=main_data, positive_only=True)
+    main_data = main_data.dropna(subset=last_cols + hist_cols)
     
     if len(chk) > len(model_y):
         print('Err01. cal_profit - main_data has na in columns.')
@@ -469,7 +489,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 3Y - RMSE 0.52
     # 5Y - RMSE 0.54
     
-    # 7Y - RMSE 0.46
+    # 7Y - RMSE 0.046
     # 3Y - MAPE 0.043
     
     # 回測的日期如果是假日，會造成HIST配對不到，增加自動調整機制
@@ -480,16 +500,22 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # _bt_last_begin = 20210601
     predict_period = 3
     # interval = random.randrange(90, 180)
-    interval = 6
-    bt_times = 5
-    # data_period = 360 * 5
-    # data_period = 360 * 2
-    # data_period = 360 * 3
-    data_period = 360 * 7
+    _interval = 6
+    _bt_times = 3
+    # data_period = 365 * 5
+    # data_period = 365 * 2
+    data_period = 365 * 3
+    # data_period = 365 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
-    _ma_values = [5,20]
+    _ma_values = [5,10,20]
+
+
+
+    global interval, bt_times 
+    interval = _interval
+    bt_times = _bt_times
 
 
     # Rename predict period as forecast preiod
