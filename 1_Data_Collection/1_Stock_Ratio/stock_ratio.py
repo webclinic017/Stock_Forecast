@@ -131,30 +131,33 @@ main_tb = cbyz.df_cross_join(date_df, symbols_tb)
 
 # Bug，要考慮還沒有file的狀況
 load_fail = False
+level = '持股/單位數分級'
+
 try:
     file = pd.read_csv(path_export + '/stock_ratio.csv')
     # file = file.rename(columns={'LEVEL':'持股/單位數分級'})
     
-    file.loc[:, 'LEVEL'] = np.where(file['LEVEL'].isna(), 'NA', file['LEVEL'])
+    # file.loc[:, '持股/單位數分級'] = np.where(file['持股/單位數分級'].isna(), 
+    #                                    'NA', file['LEVEL'])
 except:
     load_fail = True
     
     
-file = file \
-        .drop_duplicates(subset=['STOCK_SYMBOL', 'WORK_DATE', '持股/單位數分級']) \
-        .reset_index(drop=True)
+# file = file \
+#         .drop_duplicates(subset=['STOCK_SYMBOL', 'WORK_DATE', '持股/單位數分級']) \
+#         .reset_index(drop=True)
 
     
 if load_fail == False and len(file) > 0:
-
-    # file.loc[:, 'IN_LIST'] = 1
+    
     file = cbyz.df_conv_col_type(df=file, 
                                  cols=['STOCK_SYMBOL', 'WORK_DATE'],
                                  to='str')
 
     main_tb = main_tb.merge(file, how='left', on=['STOCK_SYMBOL', 'WORK_DATE'])
-    main_tb = main_tb[main_tb['LEVEL'].isna()]
+    main_tb = main_tb[main_tb[level].isna()]
     
+
 
 
 # NoSuchElementException: Unable to locate element: //select[@name='scaDate']/option[text()='20200710']
@@ -199,7 +202,6 @@ for i in range(len(date_li)):
             driver.find_element_by_xpath("//select[@name='scaDate']/option[text()='" \
                      + d + "']").click()
         except:
-            s = s - 1
             continue
 
         
@@ -210,7 +212,6 @@ for i in range(len(date_li)):
             symbol_input.clear()
             symbol_input.send_keys(symbol)              
         except:
-            s = s - 1
             continue
         # else:
         #     symbol_input.clear()
@@ -219,7 +220,6 @@ for i in range(len(date_li)):
         
         # 抓一小段資料後，網址可能會自動跳轉
         if driver.current_url != link:
-            s = s - 1
             continue
 
 
@@ -231,7 +231,6 @@ for i in range(len(date_li)):
             submit.submit()
             # time.sleep(0.4)            
         except:
-            s = s - 1
             continue
         # else:
         #     submit.submit()
@@ -246,7 +245,6 @@ for i in range(len(date_li)):
             html = role_main.get_attribute('innerHTML')
             soup = BeautifulSoup(html, 'html.parser')       
         except:
-            s = s - 1            
             continue
         
         
@@ -268,7 +266,6 @@ for i in range(len(date_li)):
         table = soup.findAll('table', {"class": 'table'})
 
         if len(table) == 0:
-            s = s - 1
             continue
 
         table = str(table[0])
