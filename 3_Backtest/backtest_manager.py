@@ -113,7 +113,8 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Work area ----------
-    global bt_results, rmse, features, model_y
+    global bt_results, rmse, features, model_y, volume_thld
+    
     bt_results_raw = pd.DataFrame()
     rmse = pd.DataFrame()
     features = pd.DataFrame()
@@ -123,12 +124,13 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         begin = bt_seq[i]
 
-        results_raw = sam.master(_predict_begin=begin, 
+        results_raw = sam.master(predict_begin=begin,
                                  _predict_end=None, 
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
                                  _stock_symbol=stock_symbol,
-                                 ma_values=ma_values)
+                                 ma_values=ma_values,
+                                 _volume_thld=volume_thld)
 
 
         new_results = results_raw[0]
@@ -209,8 +211,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     
  
     
-
-    
     # hist_data = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
     # hist_data_raw = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
 
@@ -220,10 +220,9 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     #             .drop_duplicates()
     
     # Get Last Date ....        
-    date_last = calendar[(calendar['TRADE_DATE']==True) \
-                         | (calendar['TRADE_DATE'].isna())]
-        
+    date_last = calendar[calendar['TRADE_DATE']>0]
     date_last = cbyz.df_add_shift(df=date_last, cols='WORK_DATE', shift=1)
+    
     date_last = date_last[0] \
                 .dropna(subset=['WORK_DATE_PRE'], axis=0) \
                 .rename(columns={'WORK_DATE_PRE':'LAST_DATE'})
@@ -277,7 +276,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
 
     # Check na ......
     # 這裡有na是合理的，因為hist可能都是na
-    print('BUG - 因為迴測的時間有可能是假日，所以這裡的LAST和HIST可能會有NA')
     chk = cbyz.df_chk_col_na(df=main_data, positive_only=True)
     main_data = main_data.dropna(subset=last_cols)
     
@@ -467,17 +465,8 @@ def eval_metrics(export_file=False, upload=False):
                      local=local)
 
 
-
 # ..........
 
-
-# 2107032145 - wma True
-# 2107031812 - wma True
-# 2107032103 - wma True
-# 2107032324 - wma False
-# 2107040026 - wma False
-
-# 202107051915之後的rmse不加低價股
 
 
 def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5, 
@@ -504,60 +493,47 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # Parameters
     # _bt_last_begin = 20210705
-    _bt_last_begin = 20210706
-    # _bt_last_begin = 20210601
+    _bt_last_begin = 20210707
     predict_period = 3
     # interval = random.randrange(90, 180)
-    _interval = 6
+    _interval = 3
     _bt_times = 3
     # data_period = 365 * 5
-    # data_period = 365 * 2
+    # data_period = 365 * 1
     data_period = 365 * 3
     # data_period = 365 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
     _ma_values = [5,10,20]
+    _volume_thld = 2000
 
 
-
-    global interval, bt_times 
+    global interval, bt_times, volume_thld
     interval = _interval
     bt_times = _bt_times
-
+    volume_thld = _volume_thld
 
     # Rename predict period as forecast preiod
     # ......    
     global stock_symbol, stock_type, ma_values
     global bt_last_begin, bt_last_end
     
+    stock_type = _stock_type    
     stock_symbol = _stock_symbol
-    
+    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
+
     bt_last_begin = _bt_last_begin
     bt_last_end = cbyz.date_cal(bt_last_begin, predict_period, 'd')
     
-    stock_type = _stock_type    
-    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
-    
     ma_values = _ma_values
-    
     
     
     global calendar
     calendar = stk.get_market_calendar(begin_date=20140101, 
                                        end_date=bt_last_end, 
-                                       stock_type=stock_type, local=local)
-    
-    # full_data = sam.sam_load_data(data_begin=None, data_end=None, 
-    #                               stock_type=stock_type, period=None, 
-    #                               stock_symbol=stock_symbol, 
-    #                               lite=False, full=True)
-
-
-    # full_data = full_data['FULL_DATA']
-    
-    # 全部股票都塞進模型的時候，rmse 0.05-0.06，mape 0.05-0.06
-    
+                                       stock_type=stock_type, 
+                                       local=local)
     
     # Predict ------
     global bt_results, rmse, features
@@ -571,11 +547,11 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # Profit ------    
     # Update, 需把Y為close和Y為price_change的情況分開處理
     
-    # y_thld=0.2
+    # y_thld=-100
     # time_thld=predict_period
-    # rmse_thld=0.1
+    # rmse_thld=5
     # export_file=True
-    # load_file=False
+    # load_file=True
     # path=None
     # file_name=None    
     
@@ -623,8 +599,18 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 算回測precision的時候，可以低估，但不可以高估    
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
-    # eval_metrics(export_file=False, upload=False)
-    eval_metrics(export_file=False, upload=True)
+    eval_metrics(export_file=False, upload=False)
+    # eval_metrics(export_file=False, upload=True)
+    
+    
+    # Full Data
+    # full_data = sam.sam_load_data(data_begin=None, data_end=None, 
+    #                               stock_type=stock_type, period=None, 
+    #                               stock_symbol=stock_symbol, 
+    #                               lite=False, full=True)
+
+
+    # full_data = full_data['FULL_DATA']    
 
 
     

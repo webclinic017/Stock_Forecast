@@ -76,15 +76,15 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
-def select_stock_symbols(df):
+def select_stock_symbols(df, volume_thld=1000):
 
 
     # Select Rules
     # 1. 先找百元以下的，才有資金可以買一整張
     # 2. 不要找疫情後才爆漲到歷史新高的
 
-    global predict_date
-    predict_begin = cbyz.date_cal(predict_date[0], -3, 'm')
+    global predict_begin
+    begin = cbyz.date_cal(predict_begin, -3, 'm')
 
     # data_end = cbyz.date_get_today()
     # data_begin = cbyz.date_cal(data_end, -1, 'm')
@@ -102,7 +102,6 @@ def select_stock_symbols(df):
     
 
     # 挑選交易量大的 ......
-    global volume_thld
     if volume_thld > 0:
         one_week_date = cbyz.date_cal(predict_begin, -8, 'd')
         one_week_volume = df[df['WORK_DATE']>=one_week_date]
@@ -317,9 +316,8 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     data = data[data['MIN_DATE']==date_min].drop('MIN_DATE', axis=1)
     
     
-    # Exclude Low Volume Symbols ......
-    global volume_thld
-    data = select_stock_symbols(df=data)
+    # Exclude Low Volume Symbols ......        
+    data = select_stock_symbols(df=data, volume_thld=1000)
         
 
     # Merge Other Data ......        
@@ -380,7 +378,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     global data_period
     data, suppot_resist_cols = \
         stk.add_support_resistance(df=data, cols='CLOSE', 
-                                   rank_thld=int(data_period * 2 / 365),
+                                   rank_thld=int(data_period * 2 / 360),
                                    prominence=1)
 
     ma_except_cols = ma_except_cols + suppot_resist_cols    
@@ -409,14 +407,13 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 
 
 
-def get_model_data(ma_values=[5,20]):
+def get_model_data(ma_values=[5,20], volume_thld=1000):
     
     
     global shift_begin, shift_end, data_begin, data_end
-    global predict_date, predict_period, calendar
+    global predict_begin, predict_end, predict_period
     global stock_symbol
     global model_y
-    global volume_thld
     
     
     identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
@@ -434,6 +431,17 @@ def get_model_data(ma_values=[5,20]):
     stock_symbol = cbyz.conv_to_list(stock_symbol)
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, 'str')
 
+
+    # Date ......
+    predict_date = cbyz.date_get_seq(begin_date=predict_begin,
+                                     seq_length=predict_period,
+                                     interval=1,
+                                     unit='d', simplify_date=True,
+                                     ascending=True)
+        
+    predict_date = predict_date[['WORK_DATE']]
+    predict_date_list = predict_date['WORK_DATE'].tolist()
+    
     
     # Load Historical Data ......
     loc_data, market_except_ma, market_except_lag = \
@@ -466,11 +474,13 @@ def get_model_data(ma_values=[5,20]):
     else:
         stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
         
-        
-    predict_date_df = pd.DataFrame({'WORK_DATE':predict_date})
-    predict_df = cbyz.df_cross_join(stock_symbol_df, predict_date_df)
+    predict_df = cbyz.df_cross_join(stock_symbol_df, predict_date)
 
      
+    # Calendar ......
+    calendar = ar.get_calendar(simplify=True)
+    calendar = calendar.drop('WEEK_ID', axis=1)
+    
     
     # Add predict Data ......
     loc_main = loc_data.merge(predict_df, how='outer',
@@ -504,6 +514,7 @@ def get_model_data(ma_values=[5,20]):
     loc_main = loc_main.merge(covid19, how='left', on='WORK_DATE')
     loc_main = cbyz.df_conv_na(df=loc_main, cols=['COVID19'])
 
+    
     
     # Calculate MA ......
     ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
@@ -583,7 +594,7 @@ def get_model_data(ma_values=[5,20]):
                                 alert=True, alert_obj='loc_main')
     
     # 由於有些股票剛上市，或是有特殊原因，導致資料不齊全，全部排除處理
-    if len(stock_symbol) == 0 and len(chk_na) > 0:
+    if len(stock_symbol) == 0:
         na_col = chk_na \
                     .sort_values(by='NA_COUNT', ascending=False) \
                     .reset_index(drop=True)
@@ -630,6 +641,7 @@ def get_model_data(ma_values=[5,20]):
     export_dict = {'MODEL_DATA_RAW':loc_model_data_raw,
                    'MODEL_DATA':loc_model_data,
                    # 'PRECIDT_DATA':predict_data,
+                   'PRECIDT_DATE':predict_date_list,
                    'MODEL_X':model_x,
                    'MODEL_Y':model_y,
                    'DATA_BEGIN':data_begin,
@@ -651,7 +663,7 @@ def split_data():
     global stock_symbol
     
     # Model Data ......
-    cur_model_data = model_data[model_data['WORK_DATE']<=predict_date[0]] \
+    cur_model_data = model_data[model_data['WORK_DATE']<predict_date[0]] \
                     .reset_index(drop=True)
     
     # Predict Data ......
@@ -798,6 +810,9 @@ def model_6(remove_none=True):
     
     for i in range(len(model_y)):
         
+        # Dataset
+        # split_data()
+            
         regressor = xgb.XGBRegressor(
             n_estimators=100,
             reg_lambda=1,
@@ -868,7 +883,7 @@ def get_model_list(status=[0,1]):
 def predict():
     
     global shift_begin, shift_end, data_begin, data_end
-    global predict_date, predict_end    
+    global predict_begin, predict_end    
     global model_data, predict_date, model_x, model_y, norm_orig, norm_group
     
    
@@ -944,27 +959,27 @@ def predict():
 
 # %% Master ------
 
-def master(predict_begin, _predict_end=None, 
+def master(_predict_begin, _predict_end=None, 
            _predict_period=15, _data_period=180, 
            _stock_symbol=[], _stock_type='tw', ma_values=[3,5,20,60],
-           _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE'],
-           _volume_thld=1000):
+           _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE']):
     '''
     主工作區
     '''
     
     # date_period為10年的時候會出錯
     
-    # _data_period = 90
-    # # _data_period = 365 
-    # predict_begin = 20210625
-    # _stock_type = 'tw'
-    # # ma_values = [2,5,20,60]
-    # ma_values = [3,5,20]    
-    # _predict_period = 2
-    # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
-    # _stock_symbol = []
-    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
+    _data_period = 90
+    _data_period = 365 
+    _predict_begin = 20210706
+    _predict_end = None
+    _stock_type = 'tw'
+    # ma_values = [2,5,20,60]
+    ma_values = [3,5,20]    
+    _predict_period = 2
+    _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
+    _stock_symbol = []
+    _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
     # _model_y = ['PRICE_CHANGE_RATIO']      
     
     
@@ -972,33 +987,32 @@ def master(predict_begin, _predict_end=None,
         ma_values.append(_predict_period)
     
 
+    # Process ......
+    # 1. Full data to select symbols
+
+
     # Worklist .....
+    # 移動平均線加權weight?
+    # rmse by model and symbol?
     # 建長期投資的基本面模型
     
 
     global shift_begin, shift_end, data_begin, data_end, data_period
-    global predict_date, predict_period, calendar
+    global predict_begin, predict_end, predict_period
     
     predict_period = _predict_period
     data_shift = -(max(ma_values) * 3)
     data_period = _data_period
     
-    
     shift_begin, shift_end, \
-            data_begin, data_end, predict_date, calendar = \
-                stk.get_period(data_begin=None,
-                               data_end=None, 
-                               data_period=data_period,
-                               predict_begin=predict_begin,
-                               predict_period=predict_period,
-                               shift=data_shift)  
-    
-    calendar = calendar.drop('TRADE_DATE', axis=1)
-    
-    
-    global volume_thld
-    volume_thld = _volume_thld
-    
+            data_begin, data_end, predict_begin, predict_end = \
+                cbyz.date_get_period(data_begin=None,
+                                       data_end=None, 
+                                       data_period=data_period,
+                                       predict_begin=_predict_begin,
+                                       predict_end=_predict_end, 
+                                       predict_period=predict_period,
+                                       shift=data_shift)  
     
     global stock_symbol, stock_type
     stock_type = _stock_type
@@ -1007,15 +1021,16 @@ def master(predict_begin, _predict_end=None,
 
 
     # ......
-    global model_data_raw, model_data
+    global model_data_raw, model_data, predict_date
     global model_x, model_y, model_addt_vars
     global norm_orig, norm_group
         
     model_y = _model_y
-    data_raw = get_model_data(ma_values=ma_values)
+    data_raw = get_model_data(ma_values=ma_values, volume_thld=1000)
     
     model_data_raw = data_raw['MODEL_DATA_RAW']
     model_data = data_raw['MODEL_DATA']
+    predict_date = data_raw['PRECIDT_DATE']
     model_x = data_raw['MODEL_X']
     norm_orig = data_raw['NORM_ORIG']
     norm_group = data_raw['NORM_GROUP']
@@ -1027,9 +1042,9 @@ def master(predict_begin, _predict_end=None,
     predict_results
     # features = predict_results[2]
     
+    print('sam master - predict_begin + ' + str(_predict_begin))    
     
     return predict_results
-
 
 
 
@@ -1044,7 +1059,7 @@ if __name__ == '__main__':
     
     # master()
 
-    report = master(predict_begin=20210601, _predict_end=None, 
+    report = master(_predict_begin=20210601, _predict_end=None, 
            _predict_period=15, data_period=360, 
            _stock_symbol=['2301', '2474', '1714', '2385'])
 

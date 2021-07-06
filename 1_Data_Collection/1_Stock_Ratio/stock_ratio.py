@@ -125,8 +125,8 @@ symbols = symbols_raw['STOCK_SYMBOL'].tolist()
 
 # Merge ......
 symbols_tb = symbols_raw[['STOCK_SYMBOL']]
-date_df = pd.DataFrame({'WORK_DATE':date_li})
-main_tb = cbyz.df_cross_join(date_df, symbols_tb)
+date_df = pd.DataFrame({'WORK_DATE':date_list})
+main_tb_pre = cbyz.df_cross_join(date_df, symbols_tb)
 
 
 # Bug，要考慮還沒有file的狀況
@@ -135,10 +135,7 @@ level = '持股/單位數分級'
 
 try:
     file = pd.read_csv(path_export + '/stock_ratio.csv')
-    # file = file.rename(columns={'LEVEL':'持股/單位數分級'})
-    
-    # file.loc[:, '持股/單位數分級'] = np.where(file['持股/單位數分級'].isna(), 
-    #                                    'NA', file['LEVEL'])
+    # chk = file.group
 except:
     load_fail = True
     
@@ -154,9 +151,11 @@ if load_fail == False and len(file) > 0:
                                  cols=['STOCK_SYMBOL', 'WORK_DATE'],
                                  to='str')
 
-    main_tb = main_tb.merge(file, how='left', on=['STOCK_SYMBOL', 'WORK_DATE'])
+    main_tb = main_tb_pre.merge(file, how='left', 
+                                on=['STOCK_SYMBOL', 'WORK_DATE'])
     main_tb = main_tb[main_tb[level].isna()]
     
+    summary = main_tb.groupby(['WORK_DATE']).size().reset_index(name='COUNT')
 
 
 
@@ -165,13 +164,17 @@ if load_fail == False and len(file) > 0:
 # 這個程式的哲學是盡量減少sleep的時間，雖然這可能會導致抓不到某些element，但下一次再回洗它就可以了。
 
 
-# Query ......
-result = pd.DataFrame()
 
-for i in range(len(date_li)):
+
+# %% Query ......
+result = pd.DataFrame()
+date_list = date_list[:1]
+
+
+for i in range(len(date_list)):
     
     # Date
-    d = date_li[i]
+    d = date_list[i]
     
     temp_tb = main_tb[main_tb['WORK_DATE']==d]
     if len(temp_tb) == 0:
@@ -336,7 +339,7 @@ for i in range(len(date_li)):
         result = pd.DataFrame()        
         print('update_file')
             
-    print(str(i) + '/' + str(len(date_li)))
+    print(str(i) + '/' + str(len(date_list)))
 
 
 

@@ -93,32 +93,51 @@ def check():
 import tejapi
 tejapi.ApiConfig.api_key = "22DZ20gwIuY3tfezbVnf1zjnp8cfnB"
 info = tejapi.ApiConfig.info()
-info
+info['todayRows']
 
 
 # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
 # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
 
-# 從0401開始
-# data = tejapi.get('TWN/EWTINST1C', 
-#                   mdate={'gte':'2021-04-01','lte':'2021-04-20'},
-#                   paginate=True)
 
 
-# # 十天14208筆
-# data.to_csv(path_export + '/data_202100401_20210420.csv', index=False)
+import datetime
+
+
+def query_data():
+    
+    
+    begin = 20210126
+    end = 20210131
+    
+    begin_str = cbyz.ymd(begin)
+    begin_str = begin_str.strftime('%Y-%m-%d')
+
+
+    end_str = cbyz.ymd(end)
+    end_str = end_str.strftime('%Y-%m-%d')    
+    
+    # 從0401開始
+    data = tejapi.get('TWN/EWTINST1C', 
+                      mdate={'gte':begin_str, 'lte':end_str},
+                      paginate=True)
+    
+    
+    # 十天14208筆
+    data.to_csv(path_export + '/data_' + begin_str + '_' + end_str + '.csv', 
+                index=False)
+    
+    
+    file = pd.read_csv(path_export + '/data_20210701_20210702.csv')
+    file['mdate'].apply()
+    
+    pd.to_datetime(file.mdate)
+    
+    
+    ar.db_upload(data=file, table_name='ewtinst1c')
 
 
 
-
-
-file = pd.read_csv(path_export + '/data_20210701_20210702.csv')
-file['mdate'].apply()
-
-pd.to_datetime(file.mdate)
-
-
-ar.db_upload(data=file, table_name='ewtinst1c')
 
 
 
