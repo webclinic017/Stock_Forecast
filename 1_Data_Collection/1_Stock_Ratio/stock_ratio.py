@@ -83,6 +83,11 @@ def check():
     '''
     資料驗證
     '''    
+
+    # chk = file[(file['STOCK_SYMBOL']=='00878') & (file['WORK_DATE']==20210710)]
+    # chk = file[file['WORK_DATE']==20200710].drop_duplicates(subset=['STOCK_SYMBOL'])
+    # chk = file[file[level]=='Null']    
+    
     return ''
 
 
@@ -136,14 +141,20 @@ level = '持股/單位數分級'
 try:
     file = pd.read_csv(path_export + '/stock_ratio.csv')
     file['STOCK_SYMBOL'] = file['STOCK_SYMBOL'].str.replace('ID_', '')
-    # chk = file.group
+    
 except:
     load_fail = True
-    
+
     
 # file = file \
 #         .drop_duplicates(subset=['STOCK_SYMBOL', 'WORK_DATE', '持股/單位數分級']) \
 #         .reset_index(drop=True)
+
+
+
+
+
+
 
     
 if load_fail == False and len(file) > 0:

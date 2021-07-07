@@ -67,7 +67,7 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-import stock_analysis_manager_v01 as sam
+import stock_analysis_manager_v03 as sam
 # import stock_analysis_manager_dev as sam
 
 
@@ -486,11 +486,11 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # Parameters
     # _bt_last_begin = 20210705
-    _bt_last_begin = 20210706
+    _bt_last_begin = 20210707
     predict_period = 3
     # interval = random.randrange(90, 180)
     _interval = 3
-    _bt_times = 1
+    _bt_times = 3
     data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
@@ -552,9 +552,15 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 評估是否把cal_profit拆開，並把eval_metrics插在中間，讓本次回測的結果可以顯示在Excel中
 
     global bt_main, actions
+    
+    # 算回測precision的時候，可以低估，但不可以高估    
+    global mape, mape_group, mape_extreme
+    global stock_metrics_raw, stock_metrics    
+    
+    
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False) 
+               file_name=None, upload_metrics=True) 
     
     
     actions = actions[actions['MODEL']=='model_6']
@@ -593,14 +599,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                           startcol=12, endcol=15)    
     writer.save()
 
-
-    # ------
-    # 算回測precision的時候，可以低估，但不可以高估    
-    global mape, mape_group, mape_extreme
-    global stock_metrics_raw, stock_metrics
-    # eval_metrics(export_file=False, upload=False)
-    # eval_metrics(export_file=False, upload=True)
-    
 
     
     # Full Data
