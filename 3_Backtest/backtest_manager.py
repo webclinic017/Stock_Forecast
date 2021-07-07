@@ -67,7 +67,8 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-import stock_analysis_manager as sam
+import stock_analysis_manager_v01 as sam
+# import stock_analysis_manager_dev as sam
 
 
 
@@ -124,7 +125,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         begin = bt_seq[i]
 
-        results_raw = sam.master(predict_begin=begin,
+        results_raw = sam.master(_predict_begin=begin,
                                  _predict_end=None, 
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
@@ -164,7 +165,8 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
 def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, 
-               export_file=True, load_file=False, path=None, file_name=None):
+               export_file=True, load_file=False, path=None, file_name=None,
+               upload_metrics=False):
     '''
     應用場景有可能全部作回測，而不做任何預測，因為data_end直接設為bt_last_begin
     '''
@@ -281,8 +283,9 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     
     if len(chk) > len(model_y):
         print('Err01. cal_profit - main_data has na in columns.')
+        
 
-
+    # Generate Actions ......
     bt_main, actions = \
         stk.gen_predict_action(df=main_data, rmse=rmse,
                                   date='WORK_DATE', 
@@ -293,6 +296,9 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
                                   export_file=export_file, 
                                   load_file=load_file, file_name=file_name,
                                   path=path)
+        
+    # Evaluate Precision ......
+    eval_metrics(export_file=False, upload=upload_metrics)            
     
     
     # Forecast Records ......
@@ -422,7 +428,7 @@ def eval_metrics(export_file=False, upload=False):
                         .merge(bt_info, how='left', on='BACKTEST_ID') \
                         .merge(rmse, how='left', on=['Y', 'BACKTEST_ID'])
 
-
+    stock_metrics_raw['VERSION'] = sam.version
     stock_metrics_raw['MODEL_METRIC'] = 'RMSE'    
     stock_metrics_raw['FORECAST_METRIC'] = 'MAPE'
     stock_metrics_raw['STOCK_TYPE'] = 'TW'
@@ -446,7 +452,7 @@ def eval_metrics(export_file=False, upload=False):
                                 'FORECAST_PRECISION':3})
 
                 
-    stock_metrics = stock_metrics_raw[['STOCK_TYPE', 'STOCK_SYMBOL', 
+    stock_metrics = stock_metrics_raw[['VERSION', 'STOCK_TYPE', 'STOCK_SYMBOL', 
                                        'EXECUTE_SERIAL', 'FORECAST_DATE', 
                                        'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
                                        'MODEL_METRIC', 'MODEL_PRECISION',
@@ -461,7 +467,7 @@ def eval_metrics(export_file=False, upload=False):
                              index=False)
             
     if upload:
-        ar.db_upload(data=stock_metrics, table_name='forecast_records4', 
+        ar.db_upload(data=stock_metrics, table_name='forecast_records', 
                      local=local)
 
 
@@ -480,19 +486,19 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # Parameters
     # _bt_last_begin = 20210705
-    _bt_last_begin = 20210707
+    _bt_last_begin = 20210706
     predict_period = 3
     # interval = random.randrange(90, 180)
     _interval = 3
-    _bt_times = 3
-    data_period = 365 * 3
+    _bt_times = 1
+    data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
     _ma_values = [5,10,20]
-    _volume_thld = 2000
+    _volume_thld = 1000
 
 
     global interval, bt_times, volume_thld
@@ -548,7 +554,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global bt_main, actions
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                export_file=True, load_file=True, path=path_temp,
-               file_name=None) 
+               file_name=None, upload_metrics=False) 
     
     
     actions = actions[actions['MODEL']=='model_6']
@@ -576,7 +582,11 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
                           startrow=1, endrow=9999,
-                          startcol=6, endcol=11)
+                          startcol=7, endcol=11)
+
+    cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
+                          startrow=1, endrow=9999,
+                          startcol=6, endcol=6)    
     
     cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
                           startrow=1, endrow=9999,
@@ -589,8 +599,9 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
     # eval_metrics(export_file=False, upload=False)
-    eval_metrics(export_file=False, upload=True)
+    # eval_metrics(export_file=False, upload=True)
     
+
     
     # Full Data
     # full_data = sam.sam_load_data(data_begin=None, data_end=None, 

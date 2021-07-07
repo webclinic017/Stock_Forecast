@@ -291,7 +291,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                             data_end=data_end, 
                             stock_type=stock_type, stock_symbol=[], 
                             price_change=True, price_limit=True, 
-                            trade_value=True,
+                            trade_value=False,
                             local=local)
     else:
         data = stk.get_data(data_begin=loc_begin, 
@@ -378,27 +378,28 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     # Add Support Resistance
     global data_period
     # prominence = 4是慢慢測試抓出來的
-    data, suppot_resist_cols = \
-        stk.add_support_resistance(df=data, cols='CLOSE', 
-                                   rank_thld=int(data_period * 2 / 365), # 目前沒有用到
-                                   prominence=4)
+    # data, suppot_resist_cols = \
+    #     stk.add_support_resistance(df=data, cols='CLOSE', 
+    #                                rank_thld=int(data_period * 2 / 365), # 目前沒有用到
+    #                                prominence=4)
 
-    ma_except_cols = ma_except_cols + suppot_resist_cols    
+    # ma_except_cols = ma_except_cols + suppot_resist_cols    
     
-    # Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0
-    print('# Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0')
-    lag_except_cols = lag_except_cols + suppot_resist_cols
+    # # Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0
+    # print('# Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0')
+    # lag_except_cols = lag_except_cols + suppot_resist_cols
         
     
     # Add Total Market Data ......
-    total_market = data \
-                    .groupby(['WORK_DATE']) \
-                    .agg({'CLOSE':'sum'}) \
-                    .reset_index() \
-                    .rename(columns={'CLOSE':'TOTAL_MARKET_CLOSE'})
+    # print('這裡很怪')
+    # total_market = data \
+    #                 .groupby(['WORK_DATE']) \
+    #                 .agg({'CLOSE':'sum'}) \
+    #                 .reset_index() \
+    #                 .rename(columns={'CLOSE':'TOTAL_MARKET_CLOSE'})
         
-    data = data.merge(total_market, how='left', on='WORK_DATE')
-    data['TOTAL_MARKET_CLOSE_RATIO'] = data['CLOSE'] / data['TOTAL_MARKET_CLOSE']
+    # data = data.merge(total_market, how='left', on='WORK_DATE')
+    # data['TOTAL_MARKET_CLOSE_RATIO'] = data['CLOSE'] / data['TOTAL_MARKET_CLOSE']
 
     
     return data, ma_except_cols, lag_except_cols
@@ -988,18 +989,19 @@ def master(predict_begin, _predict_end=None,
     
     # date_period為10年的時候會出錯
     
-    # _data_period = 90
-    # _data_period = 365 
-    # predict_begin = 20210706
-    # _stock_type = 'tw'
-    # # ma_values = [2,5,20,60]
-    # ma_values = [3,5,20]    
-    # _predict_period = 2
-    # _stock_symbol = ['2301', '2474', '1714', '2385']
-    # _stock_symbol = []
+    _data_period = 90
+    _data_period = 365 
+    predict_begin = 20210706
+    _stock_type = 'tw'
+    # ma_values = [2,5,20,60]
+    ma_values = [3,5,20]    
+    _predict_period = 2
+    _stock_symbol = ['2301', '2474', '1714', '2385']
+    _stock_symbol = []
     # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # # _model_y = ['PRICE_CHANGE_RATIO']      
-    # _volume_thld = 1000
+    _model_y= ['CLOSE']
+    # _model_y = ['PRICE_CHANGE_RATIO']      
+    _volume_thld = 1000
 
     
     # if _predict_period not in ma_values:
@@ -1012,7 +1014,7 @@ def master(predict_begin, _predict_end=None,
     
 
     global shift_begin, shift_end, data_begin, data_end, data_period
-    global predict_date, predict_period
+    global predict_date, predict_period, calendar
     
     predict_period = _predict_period
     data_shift = -(max(ma_values) * 3)
@@ -1028,7 +1030,6 @@ def master(predict_begin, _predict_end=None,
                                predict_period=predict_period,
                                shift=data_shift)  
     
-    global calendar
     calendar = calendar.drop('TRADE_DATE', axis=1)
     
     
