@@ -109,7 +109,7 @@ def select_stock_symbols(df):
         
         one_week_volume = one_week_volume \
                             .groupby(['STOCK_SYMBOL']) \
-                            .agg({'VOLUME':'mean'}) \
+                            .agg({'VOLUME':'min'}) \
                             .reset_index()
                             
         one_week_volume = \
@@ -463,6 +463,19 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     loc_main = loc_main.merge(calendar, how='left', on='WORK_DATE')    
     
     
+    # TEJ ......
+    tej_data = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
+                                     trade=True, local=local)
+
+    loc_main = loc_main.merge(tej_data, how='left', 
+                              on=['STOCK_SYMBOL', 'WORK_DATE'])  
+
+
+    # COVID-19 ......
+    covid19 = ar.get_covid19_data()
+    loc_main = loc_main.merge(covid19, how='left', on='WORK_DATE')
+    loc_main = cbyz.df_conv_na(df=loc_main, cols=['COVID19'])
+
     
     # One Hot Encoding ......
     data_types = loc_main.dtypes
@@ -477,13 +490,6 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     obj_cols = obj_cols + ['K_LINE_TYPE']
     loc_main = cbyz.df_get_dummies(loc_main, cols=obj_cols, 
                                    expand_col_name=True)    
-    
-    
-    # COVID-19
-    covid19 = ar.get_covid19_data()
-    loc_main = loc_main.merge(covid19, how='left', on='WORK_DATE')
-    loc_main = cbyz.df_conv_na(df=loc_main, cols=['COVID19'])
-
     
     
     # Calculate MA ......
@@ -595,7 +601,7 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
                                               show_progress=True)    
         # Modify Columns
         norm_cols = cbyz.li_remove_items(norm_cols, global_norm_cols)  
-        keep_cols = keep_cols + global_norm_cols
+        # keep_cols = keep_cols + global_norm_cols
     
     
     # Normalize By Day ...
@@ -609,7 +615,7 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
                                               show_progress=True)    
         # Modify List
         norm_cols = cbyz.li_remove_items(norm_cols, norm_cols_by_day)    
-        keep_cols = keep_cols + norm_cols_by_day        
+        # keep_cols = keep_cols + norm_cols_by_day        
                 
         
     # Normalize By Stock ......
@@ -803,10 +809,10 @@ def model_6(remove_none=True):
         # split_data()
             
         regressor = xgb.XGBRegressor(
-            n_estimators=100,
+            n_estimators=400,
             reg_lambda=1,
             gamma=0,
-            max_depth=3
+            max_depth=6
         )
         
         regressor.fit(X_train_lite, y_train_lite[i])
@@ -841,6 +847,7 @@ def model_6(remove_none=True):
                    'FEATURES':features,
                     'RMSE':rmse
                    } 
+    
 
     return return_dict
 
@@ -877,6 +884,20 @@ def predict():
     
    
     split_data()
+   
+    
+    # global X_train, X_test, y_train, y_test, X_predict
+    # global X_train_lite, X_test_lite, y_train_lite, y_test_lite, X_predict_lite
+
+    # bulk_test = cbyz.ml_bulk_run_reg_model(X_train=X_train_lite, 
+    #                                         y_train=y_train_lite[0], 
+    #                                         X_test=X_test_lite, 
+    #                                         y_test=y_test_lite[0], 
+    #                                         rf=False, kr=False, lreg=True, 
+    #                                         svr=True, dt=False, sgd=True, 
+    #                                         knn=False, xgb=False)
+    
+
     
    
     # Model ......
@@ -967,32 +988,35 @@ def master(_predict_begin, _predict_end=None,
     # - Fix induxtry
     # - Add daily backup for stock info
     # - Update resistance and support function in stk
-    
+    # v0.4
+    # - Fix trade value
+    # - Add TEJ data
     
     global version
-    version = 0.3
+    version = 0.4
 
     
-    _data_period = 90
-    _data_period = 365 
-    _predict_begin = 20210706
-    _predict_end = None
-    _stock_type = 'tw'
-    # ma_values = [2,5,20,60]
-    ma_values = [3,5,20]    
-    _predict_period = 2
-    _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
-    _stock_symbol = []
-    _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    _model_y = ['PRICE_CHANGE_RATIO']      
-    _model_y= ['CLOSE']
-    _volume_thld = 1000
+    # _data_period = 90
+    # _data_period = 365 
+    # _data_period = 225
+    # _predict_begin = 20210705
+    # _predict_end = None
+    # _stock_type = 'tw'
+    # # ma_values = [2,5,20,60]
+    # ma_values = [5,10,20]    
+    # _predict_period = 2
+    # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
+    # _stock_symbol = []
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # _model_y = ['PRICE_CHANGE_RATIO']      
+    # _model_y= ['CLOSE']
+    # _volume_thld = 1000
     
     
-    if _predict_period not in ma_values:
-        ma_values.append(_predict_period)    
+    
+    # if _predict_period not in ma_values:
+    #     ma_values.append(_predict_period)    
         
-    
     
     # Process ......
     # 1. Full data to select symbols
@@ -1010,7 +1034,8 @@ def master(_predict_begin, _predict_end=None,
     global predict_date, predict_period, calendar
     
     predict_period = _predict_period
-    data_shift = -(max(ma_values) * 3)
+    # data_shift = -(max(ma_values) * 3)
+    data_shift = -(max(ma_values) * 2)
     data_period = _data_period
     
     shift_begin, shift_end, \
@@ -1038,9 +1063,11 @@ def master(_predict_begin, _predict_end=None,
     global norm_orig, norm_group
         
     model_y = _model_y
+    
+    # 0707 - industry可以提高提精準，trade_value會下降
     data_raw = get_model_data(ma_values=ma_values, 
                               industry=True, 
-                              trade_value=False)
+                              trade_value=True)
     
     model_data_raw = data_raw['MODEL_DATA_RAW']
     model_data = data_raw['MODEL_DATA']

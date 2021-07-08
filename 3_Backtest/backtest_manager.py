@@ -67,7 +67,7 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-import stock_analysis_manager_v03 as sam
+import stock_analysis_manager_v04 as sam
 # import stock_analysis_manager_dev as sam
 
 
@@ -84,6 +84,31 @@ path_export = path + '/Export'
 
 cbyz.os_create_folder(path=[path_resource, path_function, 
                          path_temp, path_export])     
+
+
+
+def set_calendar(_bt_last_begin, predict_period):
+
+    global calendar, bt_last_begin, bt_last_end    
+    bt_last_begin = _bt_last_begin
+    calendar_end = cbyz.date_cal(bt_last_begin, predict_period + 20, 'd')
+    
+    calendar = stk.get_market_calendar(begin_date=20140101, 
+                                       end_date=calendar_end, 
+                                       stock_type=stock_type, 
+                                       local=local)
+    
+    calendar['TRADE'] = np.where(calendar['TRADE_DATE']==0, 0, 1)
+    
+    
+    calendar, _ = cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
+                                    shift=predict_period - 1, 
+                                    group_by=['TRADE'], 
+                                    suffix='_LAST', remove_na=False)
+    
+    bt_last_end = calendar[calendar['WORK_DATE_LAST']==bt_last_begin]
+    bt_last_end = int(bt_last_end['WORK_DATE'])    
+
 
 
 # ..........
@@ -164,7 +189,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
 
-def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, 
+def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
                export_file=True, load_file=False, path=None, file_name=None,
                upload_metrics=False):
     '''
@@ -302,11 +327,11 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15,
     
     
     # Forecast Records ......
-    records_begin = cbyz.date_cal(bt_last_begin, -2, 'm')
+    # records_begin = cbyz.date_cal(bt_last_begin, -2, 'm')
     print('暫時移除records_begin')
     records = stk.get_forecast_records(forecast_begin=None, 
                                         forecast_end=None, 
-                                        execute_begin=None, 
+                                        execute_begin=execute_begin, 
                                         execute_end=None, 
                                         y=['CLOSE'], summary=True,
                                         local=local)
@@ -381,7 +406,7 @@ def eval_metrics(export_file=False, upload=False):
     
     for y in model_y:
         
-        mape_main.loc[:, 'MAPE'] = abs(mape_main[y] \
+        mape_main.loc[:, 'MAPE'] = (mape_main[y] \
                                 - mape_main[y + '_HIST']) \
                             / mape_main[y + '_HIST']
                             
@@ -486,12 +511,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # Parameters
     # _bt_last_begin = 20210705
-    _bt_last_begin = 20210707
-    predict_period = 3
+    _bt_last_begin = 20210705
+    predict_period = 5
     # interval = random.randrange(90, 180)
-    _interval = 3
-    _bt_times = 3
-    data_period = 365 * 2
+    _interval = 2
+    _bt_times = 2
+    data_period = 230 # 235
+    # data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
@@ -505,6 +531,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     interval = _interval
     bt_times = _bt_times
     volume_thld = _volume_thld
+    ma_values = _ma_values
+        
 
     # Rename predict period as forecast preiod
     # ......    
@@ -515,17 +543,12 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     stock_symbol = _stock_symbol
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
 
-    bt_last_begin = _bt_last_begin
-    bt_last_end = cbyz.date_cal(bt_last_begin, predict_period, 'd')
+
+    # Set Date ......
+    global calendar, bt_last_begin, bt_last_end
+    set_calendar(_bt_last_begin, predict_period)
     
-    ma_values = _ma_values
-    
-    
-    global calendar
-    calendar = stk.get_market_calendar(begin_date=20140101, 
-                                       end_date=bt_last_end, 
-                                       stock_type=stock_type, 
-                                       local=local)
+
     
     # Predict ------
     global bt_results, rmse, features
@@ -559,6 +582,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
+               execute_begin=2107082013,
                export_file=True, load_file=True, path=path_temp,
                file_name=None, upload_metrics=True) 
     
@@ -665,16 +689,15 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 # %% View ------
 def view_today_limit_up():
     
-    data = stk.get_data(data_begin=20210702, data_end=20210705, price_change=True)
+    data = stk.get_data(data_begin=20210706, data_end=20210707, price_change=True)
+    
+    data = data[data['PRICE_CHANGE_RATIO']>0.08]
+    # chk = data[data['VOLUME']>1000000]
+    # 
     
     
-    # chk = data[data['PRICE_CHANGE_RATIO']>0.08]
-    chk = data[data['VOLUME']>1000000]
-    
-    
-    
-    stock_info = stk.tw_get_stock_info()    
-    stock_main = chk.merge(stock_info, how='left', on='STOCK_SYMBOL')
+    stock_info = stk.tw_get_stock_info(path=path_temp)
+    stock_main = data.merge(stock_info, how='left', on='STOCK_SYMBOL')
     stock_main
     
     

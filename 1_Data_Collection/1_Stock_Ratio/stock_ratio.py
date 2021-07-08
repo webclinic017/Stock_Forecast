@@ -84,8 +84,8 @@ def check():
     資料驗證
     '''    
 
-    # chk = file[(file['STOCK_SYMBOL']=='00878') & (file['WORK_DATE']==20210710)]
-    # chk = file[file['WORK_DATE']==20200710].drop_duplicates(subset=['STOCK_SYMBOL'])
+    chk = file[(file['STOCK_SYMBOL']=='2347') & (file['WORK_DATE']==20210611)]
+    chk = file[file['WORK_DATE']==20200710].drop_duplicates(subset=['STOCK_SYMBOL'])
     # chk = file[file[level]=='Null']    
     
     return ''
@@ -117,8 +117,9 @@ options = [x for x in dropdown.find_elements_by_tag_name("option")]
 for option in options:
     date_li.append(option.get_attribute("value"))
     
-    
-date_li.sort(reverse=False) 
+
+date_li.sort(reverse=True)     
+# date_li.sort(reverse=False) 
 date_list = cbyz.li_remove_items(date_li, ['20210702', '20210625'])
 
 
