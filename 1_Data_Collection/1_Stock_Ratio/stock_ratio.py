@@ -120,7 +120,7 @@ for option in options:
 
 date_li.sort(reverse=True)     
 # date_li.sort(reverse=False) 
-date_list = cbyz.li_remove_items(date_li, ['20210702', '20210625'])
+date_list = cbyz.li_remove_items(date_li, ['20210702', '20210625', '20210709'])
 
 
 
@@ -211,9 +211,7 @@ for i in range(len(date_list)):
         # 3. sleepe為0.8時可能會出現以下錯誤
         # StaleElementReferenceException: The element reference of <input id="StockNo" name="stockNo" type="text"> is stale; either the element is no longer attached to the DOM, it is not in the current frame context, or the document has been refreshed        
         if driver.current_url != link:
-            # time.sleep(0.2)                
             driver.get(link)
-            # time.sleep(2)
             time.sleep(1)
         
         # 當發生自動跳轉問題時，需要重新設定時間區間，所以把這段寫在內層的for loop，而不是
@@ -233,9 +231,6 @@ for i in range(len(date_list)):
             symbol_input.send_keys(symbol)              
         except:
             continue
-        # else:
-        #     symbol_input.clear()
-        #     symbol_input.send_keys(symbol)        
             
         
         # 抓一小段資料後，網址可能會自動跳轉
@@ -246,16 +241,10 @@ for i in range(len(date_list)):
         # Submit .....
         try:
             #　sleep的時間為0.3時，可能會太快，導致抓不到submit的按鈕
-            # time.sleep(0.2)
             submit = driver.find_element_by_css_selector("input[type='submit']")
             submit.submit()
-            # time.sleep(0.4)            
         except:
             continue
-        # else:
-        #     submit.submit()
-        #     time.sleep(0.2)
-            
 
 
         try:
@@ -267,20 +256,6 @@ for i in range(len(date_list)):
         except:
             continue
         
-        
-        
-        # soup.findAll(text='證券代號：0050')會找不到
-        # table_header = soup.findAll('p')
-        # text = []
-        # for t in table_header:
-        #     text.append(t.text.strip())
-        
-        # text = ''.join(text)
-
-        # # 這裡的冒號是全形
-        # if '證券代號：' + symbol not in text:
-        #     continue
-    
         
         # Parse Table ......            
         table = soup.findAll('table', {"class": 'table'})
@@ -301,28 +276,6 @@ for i in range(len(date_list)):
             # 用NA的話，存成csv的時候會變成空格，在前面用isna()的時候會誤判
             new_df.loc[0, '持股/單位數分級'] = 'Null'
 
-        # fetch_fail = False
-        # count = 0
-        # while 2 > 1:
-        #     if count > 5:
-        #         fetch_fail = True
-        #         break
-            
-        #     try:
-        #         # Table .....
-        #         # 可能會有抓不到table的情形
-        #         table = driver.find_element_by_class_name('table')
-        #         html = table.get_attribute('outerHTML')
-        #         soup = BeautifulSoup(html, 'html.parser')
-        #         count = count + 1
-        #     except:
-        #         time.sleep(0.3)
-        #     else:
-        #         break
-        
-        # if fetch_fail:
-        #     continue
-        
         
         # 存成csv的時候，股票編號可能會被當成數字，像是0050會變成50，因此在前面加上ID_
         new_df['STOCK_SYMBOL'] = 'ID_' + symbol
@@ -340,10 +293,10 @@ for i in range(len(date_list)):
             except:
                 file = result
     
-            file.to_csv(path_export + '/stock_ratio.csv', 
-                          index=False, encoding='utf-8-sig')
+            # file.to_csv(path_export + '/stock_ratio.csv', 
+            #               index=False, encoding='utf-8-sig')
             
-            result = pd.DataFrame()
+            # result = pd.DataFrame()
             print('update_file')
     
     
@@ -352,10 +305,10 @@ for i in range(len(date_list)):
         file = pd.read_csv(path_export + '/stock_ratio.csv')
         file = file.append(result)
     
-        file.to_csv(path_export + '/stock_ratio.csv', 
-                      index=False, encoding='utf-8-sig')
+        # file.to_csv(path_export + '/stock_ratio.csv', 
+        #               index=False, encoding='utf-8-sig')
         
-        result = pd.DataFrame()        
+        # result = pd.DataFrame()        
         print('update_file')
             
     print(str(i) + '/' + str(len(date_list)))

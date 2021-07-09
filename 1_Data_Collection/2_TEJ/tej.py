@@ -87,6 +87,11 @@ def check():
 
 import tejapi
 tejapi.ApiConfig.api_key = "22DZ20gwIuY3tfezbVnf1zjnp8cfnB"
+
+# 斜槓方案
+# tejapi.ApiConfig.api_key = 'L22pqrVRPtdVR7xY2EUGHPwEbUXJV9'
+
+
 info = tejapi.ApiConfig.info()
 info['todayRows']
 
@@ -103,8 +108,12 @@ import datetime
 def query_data():
     
     # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
-    begin = 20200901
-    end = 20200930
+    begin = 20200701
+    end = 20200710
+    
+    # begin = 20210708
+    # end = 20210708
+        
     
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')
@@ -114,7 +123,7 @@ def query_data():
     end_str = end_str.strftime('%Y-%m-%d')    
 
     
-    # 2個月7萬筆
+    # 1個月約38000筆
     data = tejapi.get('TWN/EWTINST1C', 
                       mdate={'gte':begin_str, 'lte':end_str},
                       paginate=True)

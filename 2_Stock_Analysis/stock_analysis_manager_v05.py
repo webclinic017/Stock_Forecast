@@ -463,6 +463,12 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     loc_main = loc_main.merge(calendar, how='left', on='WORK_DATE')    
     
     
+    
+    # Add Symbol As Categorical Data ......
+    # 造成精準度下降，而且要跑很久
+    loc_main.loc[loc_main.index, 'SYMBOL_VAR'] = loc_main['STOCK_SYMBOL']
+    
+    
     # TEJ ......
     tej_data = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
                                      trade=True, local=local)
@@ -992,6 +998,10 @@ def master(_predict_begin, _predict_end=None,
     # - Fix trade value
     # - Add TEJ data
     # - Precision stable version
+    # v0.5
+    # - Add symbol vars
+
+
     
     global version
     version = 0.4
