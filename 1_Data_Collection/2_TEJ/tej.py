@@ -108,11 +108,11 @@ import datetime
 def query_data():
     
     # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
-    begin = 20200701
-    end = 20200710
+    begin = 20200421
+    end = 20200430
     
     # begin = 20210708
-    # end = 20210708
+    # end = 20210709
         
     
     begin_str = cbyz.ymd(begin)

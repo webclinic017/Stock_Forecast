@@ -293,10 +293,10 @@ for i in range(len(date_list)):
             except:
                 file = result
     
-            # file.to_csv(path_export + '/stock_ratio.csv', 
-            #               index=False, encoding='utf-8-sig')
+            file.to_csv(path_export + '/stock_ratio.csv', 
+                          index=False, encoding='utf-8-sig')
             
-            # result = pd.DataFrame()
+            result = pd.DataFrame()
             print('update_file')
     
     
@@ -305,14 +305,19 @@ for i in range(len(date_list)):
         file = pd.read_csv(path_export + '/stock_ratio.csv')
         file = file.append(result)
     
-        # file.to_csv(path_export + '/stock_ratio.csv', 
-        #               index=False, encoding='utf-8-sig')
+        file.to_csv(path_export + '/stock_ratio.csv', 
+                      index=False, encoding='utf-8-sig')
         
-        # result = pd.DataFrame()        
+        result = pd.DataFrame()        
         print('update_file')
             
     print(str(i) + '/' + str(len(date_list)))
 
+
+
+
+
+result.to_csv(path_export + '/last.csv', index=False)
 
 
 

@@ -364,6 +364,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                                            except_cols='STOCK_SYMBOL')
     
         ma_except_cols = ma_except_cols + new_cols
+        lag_except_cols = lag_except_cols + new_cols
 
 
     # Add K line
@@ -376,17 +377,12 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     
     # Add Support Resistance
     global data_period
-    data, suppot_resist_cols = \
+    data, support_resist_cols = \
         stk.add_support_resistance(df=data, cols='CLOSE',
                                    rank_thld=int(data_period * 2 / 360),
                                    prominence=4, days=True)
 
-    ma_except_cols = ma_except_cols + suppot_resist_cols    
-    
-    # Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0
-    print('# Update, lag_except_cols這個方式不合理，這會導致預測區間的SUPPORT和RESISTANCE都是0')
-    lag_except_cols = lag_except_cols + suppot_resist_cols
-        
+    ma_except_cols = ma_except_cols + support_resist_cols
     
             
     # Industry Trade Values ......
@@ -404,7 +400,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
         data = data.drop('INDUSTRY_ONE_HOT', axis=1)
 
     
-    return data, ma_except_cols, lag_except_cols
+    return data, ma_except_cols, lag_except_cols, support_resist_cols
 
 
 
@@ -422,6 +418,8 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     
     
     identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
+    ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']    
+    lag_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']    
 
 
     # Stock Info .......
@@ -433,12 +431,16 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
 
 
     # Load Historical Data ......
-    loc_data, market_except_ma, market_except_lag = \
+    loc_data, market_except_ma, \
+        market_except_lag, support_resist_cols = \
                                 sam_load_data(data_begin=shift_begin,
                                               data_end=data_end,
                                               industry=industry,
                                               trade_value=trade_value) 
                             
+    support_resist_cols = [s + '_LAG' for s in support_resist_cols]
+                            
+    
     # Predict Symbols ......
     if len(stock_symbol) == 0:
         all_symbols = loc_data['STOCK_SYMBOL'].unique().tolist()
@@ -466,7 +468,13 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     
     # Add Symbol As Categorical Data ......
     # 造成精準度下降，而且要跑很久
-    loc_main.loc[loc_main.index, 'SYMBOL_VAR'] = loc_main['STOCK_SYMBOL']
+    # loc_main.loc[loc_main.index, 'SYMBOL_VAR'] = loc_main['STOCK_SYMBOL']
+    
+    # symbol_var_cols = loc_main['SYMBOL_VAR'].unique().tolist()
+    # symbol_var_cols = ['SYMBOL_VAR_' + s for s in symbol_var_cols]
+    
+    # ma_except_cols = ma_except_cols + symbol_var_cols
+    # lag_except_cols = lag_except_cols + symbol_var_cols
     
     
     # TEJ ......
@@ -492,6 +500,7 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
         
     obj_cols = obj_cols['index'].tolist()
     
+    
     # Assign columns munually
     obj_cols = obj_cols + ['K_LINE_TYPE']
     loc_main = cbyz.df_get_dummies(loc_main, cols=obj_cols, 
@@ -499,7 +508,6 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     
     
     # Calculate MA ......
-    ma_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
     ma_except_cols = ma_except_cols + market_except_ma + identify_cols
     
     ma_cols_raw = cbyz.df_get_cols_except(df=loc_main, 
@@ -514,6 +522,7 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     loc_main = loc_main.drop(ma_drop_cols, axis=1)
     gc.collect()
     
+    
 
     if predict_period > min(ma_values):
         # Update, raise error here
@@ -522,12 +531,9 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
         del loc_main
 
 
-
     # Shift ......
     # Add lag, or there will be na in the predict period
     # 1. 有些變數不計算MA，但是必須要算lag，不然會出錯，如INDUSTRY
-    lag_except_cols = ['YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
-    
     lag_except_cols = lag_except_cols + market_except_lag \
                         + identify_cols + model_y
 
@@ -546,8 +552,11 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     gc.collect()
     
     
-    # Convert NA
-    loc_main = cbyz.df_conv_na(df=loc_main, cols=lag_except_cols, value=0)
+    # Fill NA
+    # support_resist_cols
+    fillna_cols = market_except_lag
+    loc_main = cbyz.df_fillna(df=loc_main, cols=fillna_cols, 
+                              group_by=['STOCK_SYMBOL'], method='mean')
     
     
     # Variables ......
@@ -1004,12 +1013,12 @@ def master(_predict_begin, _predict_end=None,
 
     
     global version
-    version = 0.4
+    version = 0.5
 
     
     # _data_period = 90
     # _data_period = 365 
-    # _data_period = 225
+    # _data_period = 400
     # _predict_begin = 20210705
     # _predict_end = None
     # _stock_type = 'tw'
@@ -1079,6 +1088,7 @@ def master(_predict_begin, _predict_end=None,
     data_raw = get_model_data(ma_values=ma_values, 
                               industry=True, 
                               trade_value=True)
+    
     
     model_data_raw = data_raw['MODEL_DATA_RAW']
     model_data = data_raw['MODEL_DATA']

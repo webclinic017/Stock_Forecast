@@ -510,7 +510,6 @@ def eval_metrics(export_file=False, upload=False):
 
 
 
-
 def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5, 
            data_period=5, _stock_symbol=None, _stock_type='tw',
            signal=None, budget=None, split_budget=False):
@@ -529,7 +528,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # Bug, symbol var不需要算ma
     
     
-    # 用五天作預測，前三天為hist時，在cal_profit中的hist只有第一天有資料，後面是na
     # Excel add tick column
     
     # Bug
@@ -539,13 +537,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # excel format
     
     # Parameters
-    # _bt_last_begin = 20210705
-    _bt_last_begin = 20210707
+    _bt_last_begin = 20210708
+    # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 2
     _bt_times = 3
-    data_period = 305
+    data_period = 400
     # data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
@@ -611,7 +609,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                execute_begin=2107082013,
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=True) 
+               file_name=None, upload_metrics=False) 
     
     
     actions = actions[actions['MODEL']=='model_6']
