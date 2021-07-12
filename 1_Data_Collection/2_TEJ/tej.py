@@ -104,15 +104,17 @@ info['todayRows']
 
 import datetime
 
+# 7/13 - 檢查0712的資料是不是1772筆
+
 
 def query_data():
     
     # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
-    begin = 20200111
-    end = 20200120
+    begin = 20191101
+    end = 20191130
     
-    # begin = 20210708
-    # end = 20210709
+    # begin = 20210712
+    # end = 20210712
         
     
     begin_str = cbyz.ymd(begin)

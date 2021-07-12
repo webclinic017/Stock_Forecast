@@ -476,6 +476,14 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     # ma_except_cols = ma_except_cols + symbol_var_cols
     # lag_except_cols = lag_except_cols + symbol_var_cols
     
+
+    # TODC Shareholdings Spread ......
+    sharehold = stk.tdcc_get_sharehold_spread(shift_begin, end_date=None,
+                                              local=local) 
+    
+    loc_main = loc_main.merge(sharehold, how='left', 
+                              on=['STOCK_SYMBOL', 'WORK_DATE'])      
+    
     
     # TEJ ......
     tej_data = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
@@ -1009,7 +1017,8 @@ def master(_predict_begin, _predict_end=None,
     # - Precision stable version
     # v0.5
     # - Add symbol vars
-
+    # v0.6
+    # - Add TODC shareholding spread data
 
     
     global version
@@ -1018,6 +1027,7 @@ def master(_predict_begin, _predict_end=None,
     
     # _data_period = 90
     # _data_period = 365 
+    # _data_period = int(365 * 0.86)    
     # _data_period = int(365 * 1.55)
     # _predict_begin = 20210705
     # _predict_end = None

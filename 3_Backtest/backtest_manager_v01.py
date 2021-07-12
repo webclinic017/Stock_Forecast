@@ -67,8 +67,8 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-import stock_analysis_manager_v05 as sam
-# import stock_analysis_manager_dev as sam
+# import stock_analysis_manager_v05 as sam
+import stock_analysis_manager_v06 as sam
 
 
 
@@ -522,7 +522,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     # v0.0 - First Version
     # v0.1
-    
+    # - 拿掉5MA之後的精準度有提升
     
     # Backtest也可以用parameter做A/B    
     # Bug, symbol var不需要算ma
@@ -538,21 +538,23 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # Parameters
     # 把要預測的時間放在第三天
-    _bt_last_begin = 20210709
+    _bt_last_begin = 20210712
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 2
-    _bt_times = 1
-    data_period = 475
+    _bt_times = 3
+    data_period = int(365 * 1.5)
+    data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
-    _ma_values = [5,10,20]
-    _volume_thld = 450
+    # _ma_values = [5,10,20]
+    _ma_values = [10,20]
+    _volume_thld = 800
 
 
     global interval, bt_times, volume_thld

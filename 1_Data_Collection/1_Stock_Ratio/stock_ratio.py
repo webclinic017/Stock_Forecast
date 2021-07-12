@@ -331,28 +331,75 @@ if len(result) > 0:
 
 
 
-def tdcc_shareholdings_spread():
+def tdcc_upload_shareholdings_spread():
     
     
-    file = pd.read_csv(path_export + '/stock_ratio.csv')
+    cols = ['WORK_DATE', 'STOCK_SYMBOL', 'LEVEL', 
+                    'COUNT', 'VOLUME', 'RATIO']    
     
-    file = file.rename(columns={'序':'INDEX',
-                                '持股/單位數分級':'LEVEL',
-                                '人數':'COUNT',
-                                '股數/單位數':'UNIT_RATIO',
-                                '占集保庫存數比例 (%)':'RATIO'})
+    # .......
+    file0 = pd.read_csv(path_resource + '/stock_ratio.csv')
+    file0.columns = ['LEVEL', 'LEVE_DESCR', 'COUNT', 'VOLUME', 
+                     'RATIO', 'STOCK_SYMBOL', 'WORK_DATE', ]
     
-    file = file[~file['LEVEL'].str.contains('合')]
+    file0 = file0[cols]
+    file0['STOCK_SYMBOL'] = file0['STOCK_SYMBOL'].str.replace('ID_', '')
+    
+    
+    # ......
+    file1 = pd.read_csv(path_resource + '/集保戶股權分散表_0625.csv')
+    file2 = pd.read_csv(path_resource + '/集保戶股權分散表_0702.csv')
+    file3 = pd.read_csv(path_resource + '/集保戶股權分散表_0709.csv')    
+    
+    
+    # .......
+    file = file1.append(file2).append(file3)
+    file.columns = cols
+    
+    file = file.append(file0)
+    file = file[file['RATIO']<100]
+    
+    # 有些資料在「持股/單位數分級」會有一列是「差異數調整」，這種情況下的「人數」會是na
+    file = file[~file['COUNT'].isna()]
+    
+    
+    file = cbyz.df_conv_col_type(df=file, cols=['VOLUME'], to='int')
+    
+    
+    # 
+    file = file \
+        .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+        .reset_index(drop=True)
+        
+
+    cbyz.df_chk_col_na(df=file)
+    
+
+    ar.db_upload(data=file, 
+                 table_name='sharehold_spread',
+                 local=local)    
+
+
+    # chunk = 100000
+    # times = int(len(file) / chunk) + 1
+    # total = 0
+    
+    # for i in range(times):
+        
+    #     temp = file.loc[i * chunk : (i + 1) * chunk - 1]
+    #     total = total + len(temp)
+        
+    #     ar.db_upload(data=temp, 
+    #                  table_name='shareholdings_spread',
+    #                  local=local)    
+    
+    #     print(i)
+
+
     
     return
 
 
 
-
-
-
-
-
-
-
+    
 
