@@ -537,13 +537,14 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # excel format
     
     # Parameters
-    _bt_last_begin = 20210708
+    # 把要預測的時間放在第三天
+    _bt_last_begin = 20210709
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 2
-    _bt_times = 3
-    data_period = 400
+    _bt_times = 1
+    data_period = 475
     # data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
@@ -601,7 +602,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     global bt_main, actions
     
-    # 算回測precision的時候，可以低估，但不可以高估    
+    # 算回測precision的時候，可以低估，但不可以高估
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
     
@@ -609,7 +610,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                execute_begin=2107082013,
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False) 
+               file_name=None, upload_metrics=True) 
     
     
     actions = actions[actions['MODEL']=='model_6']

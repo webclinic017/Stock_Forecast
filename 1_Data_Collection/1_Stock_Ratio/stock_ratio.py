@@ -285,7 +285,8 @@ for i in range(len(date_list)):
         time.sleep(0.4)
 
 
-        if s % 50 == 0 and len(result) > 0:
+        if len(result) > 0 and \
+            (i == len(symbols) - 1 or s % 50 == 0):
             
             try:
                 file = pd.read_csv(path_export + '/stock_ratio.csv')
@@ -300,34 +301,58 @@ for i in range(len(date_list)):
             print('update_file')
     
     
-    # 避免最後一輪迴圈的時候，可能有剩餘的資料沒有記錄到 ......
-    if len(result) > 0:
-        file = pd.read_csv(path_export + '/stock_ratio.csv')
-        file = file.append(result)
+    # # 避免最後一輪迴圈的時候，可能有剩餘的資料沒有記錄到 ......
+    # if len(result) > 0:
+    #     file = pd.read_csv(path_export + '/stock_ratio.csv')
+    #     file = file.append(result)
     
-        file.to_csv(path_export + '/stock_ratio.csv', 
-                      index=False, encoding='utf-8-sig')
+    #     file.to_csv(path_export + '/stock_ratio.csv', 
+    #                   index=False, encoding='utf-8-sig')
         
-        result = pd.DataFrame()        
-        print('update_file')
+    #     result = pd.DataFrame()        
+    #     print('update_file')
             
     print(str(i) + '/' + str(len(date_list)))
 
 
+# Update, 把這寫成function
+# 避免最後有些資料還沒有儲存，卻因為continue結束迴圈......
+if len(result) > 0:
+    file = pd.read_csv(path_export + '/stock_ratio.csv')
+    file = file.append(result)
 
-
-
-result.to_csv(path_export + '/last.csv', index=False)
-
-
-
-
-# Fail
-# for i in range(10):
+    file.to_csv(path_export + '/stock_ratio.csv', 
+                  index=False, encoding='utf-8-sig')
     
-#     if i == 5:
-#         i = i - 1
-#         continue
-        
-#     print(i)
+    result = pd.DataFrame()        
+    print('update_file')
+
+
+
+
+
+def tdcc_shareholdings_spread():
+    
+    
+    file = pd.read_csv(path_export + '/stock_ratio.csv')
+    
+    file = file.rename(columns={'序':'INDEX',
+                                '持股/單位數分級':'LEVEL',
+                                '人數':'COUNT',
+                                '股數/單位數':'UNIT_RATIO',
+                                '占集保庫存數比例 (%)':'RATIO'})
+    
+    file = file[~file['LEVEL'].str.contains('合')]
+    
+    return
+
+
+
+
+
+
+
+
+
+
 

@@ -1018,13 +1018,13 @@ def master(_predict_begin, _predict_end=None,
     
     # _data_period = 90
     # _data_period = 365 
-    # _data_period = 400
+    # _data_period = 475
     # _predict_begin = 20210705
     # _predict_end = None
     # _stock_type = 'tw'
     # # ma_values = [2,5,20,60]
     # ma_values = [5,10,20]    
-    # _predict_period = 2
+    # _predict_period = 5
     # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
     # _stock_symbol = []
     # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
