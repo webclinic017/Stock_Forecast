@@ -477,20 +477,26 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     # lag_except_cols = lag_except_cols + symbol_var_cols
     
 
-    # TODC Shareholdings Spread ......
-    sharehold = stk.tdcc_get_sharehold_spread(shift_begin, end_date=None,
-                                              local=local) 
+    # # TODC Shareholdings Spread ......
+    # sharehold = stk.tdcc_get_sharehold_spread(shift_begin, end_date=None,
+    #                                           local=local) 
     
-    loc_main = loc_main.merge(sharehold, how='left', 
-                              on=['STOCK_SYMBOL', 'WORK_DATE'])      
+    # loc_main = loc_main.merge(sharehold, how='left', 
+    #                           on=['STOCK_SYMBOL', 'WORK_DATE'])      
     
     
-    # TEJ ......
-    tej_data = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
-                                     trade=True, local=local)
+    # TEJ 三大法人持股成本 ......
+    ewtinst1c = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
+                                      trade=True, local=local)
 
-    loc_main = loc_main.merge(tej_data, how='left', 
+    loc_main = loc_main.merge(ewtinst1c, how='left', 
                               on=['STOCK_SYMBOL', 'WORK_DATE'])  
+
+
+    # 指數日成本 ......
+    ewiprcd = stk.tej_get_ewiprcd()
+    loc_main = loc_main.merge(ewiprcd, how='left', on=['WORK_DATE'])  
+
 
 
     # COVID-19 ......
@@ -521,7 +527,7 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     ma_cols_raw = cbyz.df_get_cols_except(df=loc_main, 
                                          except_cols=ma_except_cols)
      
-    loc_main, ma_cols = stk.add_ma(df=loc_main, cols=ma_cols_raw, 
+    loc_main, ma_cols = cbyz.df_add_ma(df=loc_main, cols=ma_cols_raw, 
                                    group_by=['STOCK_SYMBOL'], 
                                    date_col='WORK_DATE', values=ma_values,
                                    wma=False)
@@ -1018,7 +1024,8 @@ def master(_predict_begin, _predict_end=None,
     # v0.5
     # - Add symbol vars
     # v0.6
-    # - Add TODC shareholding spread data
+    # - Add TODC shareholding spread data, but temporaily commented
+    # - Add TEJ 指數日行情
 
     
     global version

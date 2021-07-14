@@ -10,8 +10,6 @@ History
 
 
 
-
-
 # Worklist
 # 1.Add price increse but model didn't catch
 # 2.Retrieve one symbol historical data to ensure calendar
@@ -342,8 +340,13 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
             .rename(columns={'FORECAST_PRECISION_MEAN':'RECORD_PRECISION_MEAN',
                              'FORECAST_PRECISION_MAX':'RECORD_PRECISION_MAX'})
         
-
+    # Tick
     actions.loc[actions.index, 'TICK'] = np.nan
+    
+    # Hold 
+    global hold
+    hold = [str(i) for i in hold]
+    actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(hold), 1, 0)
 
     
     # Rearrange Columns ......            
@@ -357,13 +360,13 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
         
     
     cols_1 = ['BACKTEST_ID', 'STOCK_SYMBOL', 'STOCK_NAME', 
-              'MODEL', 'WORK_DATE', 'LAST_DATE']
+              'TICK', 'HOLD', 'WORK_DATE', 'LAST_DATE']
 
     model_y_last = [s + '_LAST' for s in model_y]
     model_y_hist = [s + '_HIST' for s in model_y]    
     cols_2 = ['RMSE_MEAN']
     
-    new_cols = cols_1 + ['TICK',] + profit_cols + model_y + model_y_last \
+    new_cols = cols_1 + profit_cols + model_y + model_y_last \
                 + model_y_hist + cols_2
 
 
@@ -532,20 +535,24 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
-    # 沒有榮創
     # add hold columns
     # excel format
     
+    
+    # Bug
+    # Excel中Last Priced地方不應該一直copy最後一筆資料
+    
+    
     # Parameters
     # 把要預測的時間放在第三天
-    _bt_last_begin = 20210712
+    _bt_last_begin = 20210713
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
-    _interval = 2
+    _interval = 3
     _bt_times = 3
-    data_period = int(365 * 1.5)
-    data_period = int(365 * 0.86) # Shareholding    
+    data_period = int(365 * 1.7)
+    # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
@@ -553,8 +560,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = []
     _stock_type = 'tw'
     # _ma_values = [5,10,20]
-    _ma_values = [10,20]
-    _volume_thld = 800
+    _ma_values = [5,10,20]
+    _volume_thld = 500
 
 
     global interval, bt_times, volume_thld
@@ -576,6 +583,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     # Set Date ......
     global calendar, bt_last_begin, bt_last_end
+
+    
     set_calendar(_bt_last_begin, predict_period)
 
     
@@ -608,16 +617,19 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
     
+    global hold
+    hold = [1474, 1718, 2002, 2504, 2867, 3576, 5521, 8105]    
+    
     
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
-               execute_begin=2107082013,
+               execute_begin=2107100000,
                export_file=True, load_file=True, path=path_temp,
                file_name=None, upload_metrics=True) 
     
     
-    actions = actions[actions['MODEL']=='model_6']
-    actions = cbyz.df_add_size(df=actions, group_by='STOCK_SYMBOL',
-                               col_name='ROWS')
+    # actions = actions[actions['MODEL']=='model_6']
+    # actions = cbyz.df_add_size(df=actions, group_by='STOCK_SYMBOL',
+    #                            col_name='ROWS')
 
 
     # Export ......
@@ -640,15 +652,15 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
                           startrow=1, endrow=9999,
-                          startcol=7, endcol=11)
+                          startcol=8, endcol=12)
 
     cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
                           startrow=1, endrow=9999,
-                          startcol=6, endcol=6)    
+                          startcol=7, endcol=7)    
     
     cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
                           startrow=1, endrow=9999,
-                          startcol=12, endcol=15)    
+                          startcol=13, endcol=16)    
     writer.save()
 
 
@@ -749,7 +761,7 @@ def check():
 def check_price():
     
     
-    chk = bt_results[bt_results['STOCK_SYMBOL']=='2399']
+    chk = bt_results[bt_results['STOCK_SYMBOL']=='5521']
     chk
 
     chk = bt_results[bt_results['STOCK_SYMBOL']=='2702']

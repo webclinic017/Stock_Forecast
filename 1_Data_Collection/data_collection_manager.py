@@ -56,6 +56,76 @@ pd.set_option('display.max_columns', 30)
 
 # Load Data ----------------
 
+
+
+
+def tw_get_capital_flows():
+
+    '''
+    資金流向
+
+    '''    
+
+    from bs4 import BeautifulSoup
+    import requests
+    from selenium import webdriver
+    from selenium.webdriver.common.keys import Keys
+    from bs4 import BeautifulSoup
+    from selenium.webdriver.support.ui import Select
+    
+    
+    # CMoney - 這個網站的產業命名和別人不一樣，而且只有小數點一位
+    # link = 'https://www.cmoney.tw/finance/f00010.aspx'
+          
+    # 理財網
+    # link = 'https://www.moneydj.com/Z/ZB/ZBA/ZBA.djhtm'
+    
+    # 玉山證券
+    # link = 'https://www.esunsec.com.tw/tw-market/z/zb/zba/zba.djhtm'
+    # iframe
+    link = 'https://sjmain.esunsec.com.tw/z/zb/zba/zba.djhtm'
+    
+    
+    
+    webdriver_path = '/Users/Aron/Documents/GitHub/Arsenal/geckodriver'
+    driver = webdriver.Firefox(executable_path=webdriver_path)
+    driver.get(link)
+    
+    
+    
+    element = driver.find_elements_by_css_selector("#SysJustIFRAMEDIV")[0]
+    html = element.get_attribute('innerHTML')
+    soup = BeautifulSoup(html, 'html.parser')   
+    
+    table = soup.find_all('table')
+    data = pd.read_html(str(table))
+    
+    data = data[['分類', '成交比重']]
+    data.columns = ['INDUSTRY', 'CAPITAL_TREND']
+    data['WORK_DATE'] = cbyz.date_get_today()
+    data = data[['WORK_DATE', 'INDUSTRY', 'CAPITAL_TREND']]
+    
+    
+    data = data[data['INDUSTRY']!='加權指數']
+
+    ar.db_upload(data=data, 
+                 table_name='tw_capital_flows',
+                 local=local)    
+    
+    # 分類 INDUSTRY
+    # 指數 INDUSTRY_INDEX
+    # 漲跌  
+    # 漲跌（幅）  
+    # 成交量(億)  
+    # 成交比重/流向率 CAPITAL_TREND
+    
+    
+    driver.close()
+
+
+
+
+
 def yahoo_download_data(stock_list=[], chunk_begin=None, chunk_end=None):
     '''
     讀取資料及重新整理

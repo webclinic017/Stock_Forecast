@@ -1013,12 +1013,12 @@ def master(_predict_begin, _predict_end=None,
 
     
     global version
-    version = 0.6
+    version = 0.5
 
     
     # _data_period = 90
     # _data_period = 365 
-    # _data_period = int(365 * 1.55)
+    # _data_period = int(365 * 1.75)
     # _predict_begin = 20210705
     # _predict_end = None
     # _stock_type = 'tw'

@@ -89,7 +89,8 @@ import tejapi
 tejapi.ApiConfig.api_key = "22DZ20gwIuY3tfezbVnf1zjnp8cfnB"
 
 # 斜槓方案
-# tejapi.ApiConfig.api_key = 'L22pqrVRPtdVR7xY2EUGHPwEbUXJV9'
+tejapi.ApiConfig.api_key = 'L22pqrVRPtdVR7xY2EUGHPwEbUXJV9'
+tejapi.ApiConfig.api_key = '22DZ20gwIuY3tfezbVnf1zjnp8cfnB'
 
 
 info = tejapi.ApiConfig.info()
@@ -100,21 +101,21 @@ info['todayRows']
 # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
 
 
-
-
 import datetime
-
-# 7/13 - 檢查0712的資料是不是1772筆
 
 
 def query_data():
+
+    # 不要太早抓資料，因為TEJ的資料可能會變
+
     
     # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
-    begin = 20191101
-    end = 20191130
+    begin = 20190801
+    end = 20190805
     
-    # begin = 20210712
-    # end = 20210712
+    # 0713要重抓
+    # begin = 20210713
+    # end = 20210713
         
     
     begin_str = cbyz.ymd(begin)
@@ -138,7 +139,10 @@ def query_data():
 
 def upload():    
     
-    files = cbyz.os_get_dir_list(path=path_export, level=0, extensions='csv',
+    table = 'ewiprcd'
+    
+    file_path = path_export + '/' + table
+    files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
                              remove_temp=True)
     
     files = files['FILES']
@@ -147,12 +151,88 @@ def upload():
     for i in range(len(files)):
     
         name = files.loc[i, 'FILE_NAME']
-        file = pd.read_csv(path_export + '/' + name)
+        file = pd.read_csv(file_path + '/' + name)
 
         file['mdate'] = pd.to_datetime(file.mdate)
         file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
     
-        ar.db_upload(data=file, table_name='ewtinst1c')
+        ar.db_upload(data=file, table_name=table)
+
+
+
+
+def query_trans_data():
+    '''
+    證券交易資料表
+    '''
+
+    begin = 20210601
+    end = 20210620
+    
+    
+    begin_str = cbyz.ymd(begin)
+    begin_str = begin_str.strftime('%Y-%m-%d')
+
+
+    end_str = cbyz.ymd(end)
+    end_str = end_str.strftime('%Y-%m-%d')    
+    
+    # 2崇4541筆
+    # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
+    data = tejapi.get('TWN/EWPRCD',
+                      mdate={'gte':begin_str, 'lte':end_str},
+                      paginate=True)
+
+
+    data.to_csv(path_export + '/ewprcd_data_' + begin_str + '_' + end_str + '.csv', 
+                index=False)
+
+
+
+
+
+def query_ewiprcd():
+    '''
+    指數資料
+    '''
+
+    begin = 20190101
+    end = 20201231
+    
+    begin_str = cbyz.ymd(begin)
+    begin_str = begin_str.strftime('%Y-%m-%d')
+
+
+    end_str = cbyz.ymd(end)
+    end_str = end_str.strftime('%Y-%m-%d')    
+    
+    data = tejapi.get('TWN/EWIPRCD',
+                      mdate={'gte':begin_str, 'lte':end_str})
+
+
+    data.to_csv(path_export + '/ewiprcd_data_' + begin_str + '_' + end_str + '.csv', 
+                index=False)
+    
+    
+    
+
+
+
+def query_index2():
+    '''
+    指數資料
+    '''
+    
+    # 證券屬性表 - 3210筆 
+    # data = tejapi.get('TWN/EWNPRCSTD')
+    # data.to_csv(path_export + '/ewnprcstd_data.csv', index=False,
+    #             encoding='utf-8-sig')
+
+
+    # 指數屬性表 - 115筆 
+    # data = tejapi.get('TWN/EWIPRCSTD')
+    # data.to_csv(path_export + '/ewiprcstd_data.csv', index=False,
+    #             encoding='utf-8-sig')
 
 
 
@@ -160,5 +240,12 @@ def upload():
 
 
 
-
-
+def check():
+    
+    file = pd.read_csv(path_export + '/ewiprcd/ewiprcd_data_2019-01-01_2020-12-31.csv')
+    file2 = pd.read_csv(path_export + '/ewiprcd/ewiprcd_data_2021-01-01_2021-07-13.csv')
+    
+    final = file.append(file2)
+    final.to_csv(path_export + '/ewiprcd/ewiprcd_data_2019-01-01_2021-07-13.csv', index=False)
+    
+    
