@@ -618,7 +618,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [1474, 1718, 2002, 2504, 2867, 3576, 5521, 8105]    
+    hold = [1474, 1718, 2002, 2504, 3576, 5521, 8105, 1809]    
     
     
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
