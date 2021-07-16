@@ -13,6 +13,7 @@ import numpy as np
 import sys, time, os, gc
 
 
+
 local = False
 local = True
 
@@ -41,6 +42,8 @@ import arsenal as ar
 import arsenal_stock as stk
 
 
+
+
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
  
@@ -58,6 +61,22 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
+# %% API ------
+# 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
+# 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
+
+import tejapi
+# tejapi.ApiConfig.api_key = "22DZ20gwIuY3tfezbVnf1zjnp8cfnB"
+
+# 斜槓方案
+# 7/15 - 8/14之間使用
+tejapi.ApiConfig.api_key = 'FEuiQV1vbtVb51LqN2Th1A5HVDMx2R'
+info = tejapi.ApiConfig.info()
+info['todayRows']
+
+
+
+# %% Function ------
 
 
 def master():
@@ -85,26 +104,12 @@ def check():
 
 
 
-import tejapi
-tejapi.ApiConfig.api_key = "22DZ20gwIuY3tfezbVnf1zjnp8cfnB"
-
-# 斜槓方案
-tejapi.ApiConfig.api_key = 'L22pqrVRPtdVR7xY2EUGHPwEbUXJV9'
-tejapi.ApiConfig.api_key = '22DZ20gwIuY3tfezbVnf1zjnp8cfnB'
 
 
-info = tejapi.ApiConfig.info()
-info['todayRows']
 
 
-# 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
-# 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
 
-
-import datetime
-
-
-def query_data():
+def query_ewtinst1c():
 
     # 不要太早抓資料，因為TEJ的資料可能會變
 
@@ -113,9 +118,10 @@ def query_data():
     begin = 20190801
     end = 20190805
     
-    # 0713要重抓
-    # begin = 20210713
-    # end = 20210713
+
+    # 0715還沒下載
+    begin = 20210715
+    end = 20210715
         
     
     begin_str = cbyz.ymd(begin)
@@ -127,11 +133,12 @@ def query_data():
 
     
     # 1個月約38000筆
+    # 20210715 - 每日1775筆才是對的；21:35只有抓到1772筆資料
     data = tejapi.get('TWN/EWTINST1C', 
                       mdate={'gte':begin_str, 'lte':end_str},
                       paginate=True)
     
-    data.to_csv(path_export + '/data_' + begin_str + '_' + end_str + '.csv', 
+    data.to_csv(path_export + '/ewtinst1c_data_' + begin_str + '_' + end_str + '.csv', 
                 index=False)
     
     
@@ -139,7 +146,7 @@ def query_data():
 
 def upload():    
     
-    table = 'ewiprcd'
+    table = 'ewtinst1c'
     
     file_path = path_export + '/' + table
     files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
@@ -161,13 +168,16 @@ def upload():
 
 
 
-def query_trans_data():
+def query_ewprcd():
     '''
     證券交易資料表
+    - 一個月51034筆
     '''
+    
+    table_name = 'ewprcd'
 
-    begin = 20210601
-    end = 20210620
+    begin = 20190901
+    end = 20190930
     
     
     begin_str = cbyz.ymd(begin)
@@ -184,8 +194,43 @@ def query_trans_data():
                       paginate=True)
 
 
-    data.to_csv(path_export + '/ewprcd_data_' + begin_str + '_' + end_str + '.csv', 
+    data.to_csv(path_export + '/ewprcd/ewprcd_data_' \
+                + begin_str + '_' + end_str + '.csv', 
                 index=False)
+
+
+
+
+
+def query_ewifinq():
+    '''
+    財務報表，一年7779筆
+    '''
+    
+    table_name = 'ewifinq'
+
+    begin = 20190101
+    end = 20191231
+    
+    
+    begin_str = cbyz.ymd(begin)
+    begin_str = begin_str.strftime('%Y-%m-%d')
+
+
+    end_str = cbyz.ymd(end)
+    end_str = end_str.strftime('%Y-%m-%d')    
+    
+    
+    data = tejapi.get('TWN/EWIFINQ',
+                      mdate={'gte':begin_str, 'lte':end_str},
+                      paginate=True)
+
+
+    data.to_csv(path_export + '/ewifinq/ewifinq_data_' \
+                + begin_str + '_' + end_str + '.csv', 
+                index=False)
+
+
 
 
 
@@ -193,7 +238,7 @@ def query_trans_data():
 
 def query_ewiprcd():
     '''
-    指數資料
+    指數資料，不好用
     '''
 
     begin = 20190101

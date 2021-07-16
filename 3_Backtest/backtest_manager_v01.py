@@ -66,7 +66,8 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 # import stock_analysis_manager_v05 as sam
-import stock_analysis_manager_v06 as sam
+# import stock_analysis_manager_v06 as sam
+import stock_analysis_manager_v07 as sam
 
 
 
@@ -540,16 +541,17 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     # Bug
-    # Excel中Last Priced地方不應該一直copy最後一筆資料
+    # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
+
     
     
     # Parameters
     # 把要預測的時間放在第三天
-    _bt_last_begin = 20210713
+    _bt_last_begin = 20210715
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
-    _interval = 3
+    _interval = 4
     _bt_times = 3
     data_period = int(365 * 1.7)
     # data_period = int(365 * 0.86) # Shareholding    
@@ -560,7 +562,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = []
     _stock_type = 'tw'
     # _ma_values = [5,10,20]
-    _ma_values = [5,10,20]
+    _ma_values = [5,10,20,40]
     _volume_thld = 500
 
 
@@ -609,7 +611,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # path=None
     # file_name=None        
     
-    # 評估是否把cal_profit拆開，並把eval_metrics插在中間，讓本次回測的結果可以顯示在Excel中
 
     global bt_main, actions
     
@@ -622,9 +623,9 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
-               execute_begin=2107100000,
+               execute_begin=2107120000,
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=True) 
+               file_name=None, upload_metrics=False) 
     
     
     # actions = actions[actions['MODEL']=='model_6']
