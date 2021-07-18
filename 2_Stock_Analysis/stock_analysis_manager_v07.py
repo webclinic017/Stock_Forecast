@@ -1172,15 +1172,13 @@ def master(_predict_begin, _predict_end=None,
     version = 0.7
 
     
-    # _data_period = 90
-    # _data_period = 365 
     # _data_period = int(365 * 0.86)    
-    # _data_period = int(365 * 1.55)
+    # _data_period = int(365 * 2)
     # _predict_begin = 20210705
     # _predict_end = None
     # _stock_type = 'tw'
     # # ma_values = [2,5,20,60]
-    # ma_values = [5,10,20,40]
+    # ma_values = [5,10,20,40,60]
     # _predict_period = 5
     # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
     # _stock_symbol = []

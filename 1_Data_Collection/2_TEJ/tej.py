@@ -104,48 +104,11 @@ def check():
 
 
 
-
-
-
-
-
-def query_ewtinst1c():
-
-    # 不要太早抓資料，因為TEJ的資料可能會變
-
-    
-    # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
-    begin = 20190801
-    end = 20190805
-    
-
-    # 0715還沒下載
-    begin = 20210715
-    end = 20210715
-        
-    
-    begin_str = cbyz.ymd(begin)
-    begin_str = begin_str.strftime('%Y-%m-%d')
-
-
-    end_str = cbyz.ymd(end)
-    end_str = end_str.strftime('%Y-%m-%d')    
-
-    
-    # 1個月約38000筆
-    # 20210715 - 每日1775筆才是對的；21:35只有抓到1772筆資料
-    data = tejapi.get('TWN/EWTINST1C', 
-                      mdate={'gte':begin_str, 'lte':end_str},
-                      paginate=True)
-    
-    data.to_csv(path_export + '/ewtinst1c_data_' + begin_str + '_' + end_str + '.csv', 
-                index=False)
-    
-    
     
 
 def upload():    
     
+    table = 'ewtinst1c' # 三大法人持股成本
     table = 'ewtinst1c'
     
     file_path = path_export + '/' + table
@@ -166,7 +129,42 @@ def upload():
         ar.db_upload(data=file, table_name=table)
 
 
+# %% Query ------
 
+
+def query_ewtinst1c():
+
+    # 不要太早抓資料，因為TEJ的資料可能會變
+
+    
+    # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
+    begin = 20190101
+    end = 20190228
+    
+
+    # 0715還沒下載
+    # begin = 20210715
+    # end = 20210716
+        
+    
+    begin_str = cbyz.ymd(begin)
+    begin_str = begin_str.strftime('%Y-%m-%d')
+
+
+    end_str = cbyz.ymd(end)
+    end_str = end_str.strftime('%Y-%m-%d')    
+
+    
+    # 1個月約38000筆
+    # 20210715 - 每日1775筆才是對的；21:35只有抓到1772筆資料
+    data = tejapi.get('TWN/EWTINST1C', 
+                      mdate={'gte':begin_str, 'lte':end_str},
+                      paginate=True)
+    
+    data.to_csv(path_export + '/ewtinst1c/ewtinst1c_data_' + begin_str + '_' + end_str + '.csv', 
+                index=False)
+    
+    
 
 def query_ewprcd():
     '''
@@ -176,8 +174,8 @@ def query_ewprcd():
     
     table_name = 'ewprcd'
 
-    begin = 20190901
-    end = 20190930
+    begin = 20180901
+    end = 20180930
     
     
     begin_str = cbyz.ymd(begin)

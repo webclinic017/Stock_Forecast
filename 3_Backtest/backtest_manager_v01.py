@@ -309,6 +309,11 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     if len(chk) > len(model_y):
         print('Err01. cal_profit - main_data has na in columns.')
         
+        
+    if len(main_data) == 0:
+        print(('Error 1. main_data is empty. Check the market data has been'
+               ' updated or not, it may be the reason cause last price na.'))
+        
 
     # Generate Actions ......
     bt_main, actions = \
@@ -544,16 +549,15 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
 
     
-    
     # Parameters
     # 把要預測的時間放在第三天
-    _bt_last_begin = 20210715
+    _bt_last_begin = 20210719
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 4
     _bt_times = 3
-    data_period = int(365 * 1.7)
+    data_period = int(365 * 2)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
     # data_period = 365 * 5
@@ -562,7 +566,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = []
     _stock_type = 'tw'
     # _ma_values = [5,10,20]
-    _ma_values = [5,10,20,40]
+    _ma_values = [5,10,20,40,60]
     _volume_thld = 500
 
 
@@ -623,7 +627,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
-               execute_begin=2107120000,
+               execute_begin=2107140000,
                export_file=True, load_file=True, path=path_temp,
                file_name=None, upload_metrics=False) 
     
