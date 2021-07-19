@@ -141,10 +141,9 @@ def query_ewtinst1c():
     begin = 20190101
     end = 20190228
     
-
-    # 0715還沒下載
-    # begin = 20210715
-    # end = 20210716
+    # Now
+    begin = 20210719
+    end = 20210719
         
     
     begin_str = cbyz.ymd(begin)
@@ -174,8 +173,8 @@ def query_ewprcd():
     
     table_name = 'ewprcd'
 
-    begin = 20180901
-    end = 20180930
+    begin = 20180101
+    end = 20180831
     
     
     begin_str = cbyz.ymd(begin)
@@ -192,7 +191,7 @@ def query_ewprcd():
                       paginate=True)
 
 
-    data.to_csv(path_export + '/ewprcd/ewprcd_data_' \
+    data.to_csv(path_export + '/' + table_name + '/' + table_name +'_' \
                 + begin_str + '_' + end_str + '.csv', 
                 index=False)
 
@@ -228,6 +227,36 @@ def query_ewifinq():
                 + begin_str + '_' + end_str + '.csv', 
                 index=False)
 
+
+
+
+def query_ewsale():
+    '''
+    月營收資料表，一個月2112筆資料。
+    '''
+    
+    table_name = 'ewsale'
+
+    begin = 20180101
+    end = 20190531
+    
+    
+    begin_str = cbyz.ymd(begin)
+    begin_str = begin_str.strftime('%Y-%m-%d')
+
+
+    end_str = cbyz.ymd(end)
+    end_str = end_str.strftime('%Y-%m-%d')    
+    
+    
+    data = tejapi.get('TWN/EWSALE',
+                      mdate={'gte':begin_str, 'lte':end_str},
+                      paginate=True)
+
+
+    data.to_csv(path_export + '/ewsale/ewsale_data_' \
+                + begin_str + '_' + end_str + '.csv', 
+                index=False)
 
 
 

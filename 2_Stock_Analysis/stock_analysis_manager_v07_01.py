@@ -76,97 +76,6 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 # %% Inner Function ------
 
 
-def add_ma_normalize(df, cols=[], cols_except=[], group_by=[], 
-                     date_col='WORK_DATE'):
-
-    global ma_values
-    
-    # Convert To List ......
-    cols = cbyz.conv_to_list(cols)
-    cols_except = cbyz.conv_to_list(cols_except)
-    group_by = cbyz.conv_to_list(group_by)
-    
-    
-    # Confirm Columns ......
-    if len(cols) > 0:
-        cols = cols
-        
-    elif len(cols_except) > 0:
-        cols = cbyz.df_get_cols_except(df=df, except_cols=cols_except)
-    
-    
-    # Calculate MA ......
-    loc_main, ma_cols = cbyz.df_add_ma(df=df, cols=cols, 
-                                   group_by=group_by, 
-                                   date_col=date_col, values=ma_values,
-                                   wma=False)
-    
-    loc_main = loc_main.drop(cols, axis=1)
-
-
-    # Normalize ......
-    loc_main, _, _, _ = cbyz.df_normalize(df=loc_main,
-                                          cols=ma_cols,
-                                          groupby=group_by,
-                                          show_progress=True)        
-
-    return loc_main, ma_cols
-
-
-# .............
-
-
-def get_sale_mon_data():
-    
-    '''
-    除權息時間
-    Optimize
-    '''
-    
-    file_raw = pd.DataFrame()
-    years = list(range(2018, 2022))
-
-    for y in years:
-        new_file = pd.read_excel(path_resource + '/sale_mon/SaleMonDetail_' \
-                                 + str(y) + '.xlsx')
-        file_raw = file_raw.append(new_file)
-        
-        
-    new_cols = range(len(file_raw.columns))
-    new_cols = ['SALE_MON_' + str(c) for c in new_cols]
-
-    file_raw.columns = new_cols
-
-    file_raw = file_raw[['SALE_MON_1', 'SALE_MON_4', 'SALE_MON_5', 'SALE_MON_6']]
-    file_raw.columns = ['STOCK_SYMBOL', 'WORK_DATE', 
-                        'EX_DIVIDENDS_PRICE', 'EX_DIVIDENDS_DONE']
-    file_raw = file_raw.dropna()
-    
-    
-    file1 = file_raw[['STOCK_SYMBOL', 'WORK_DATE', 'EX_DIVIDENDS_PRICE']]
-    file1['WORK_DATE'] = '20' + file1['WORK_DATE']
-    file1['WORK_DATE'] = file1['WORK_DATE'].str.replace("'", "")
-    file1['WORK_DATE'] = file1['WORK_DATE'].str.replace("/", "")
-    file1 = cbyz.df_conv_col_type(df=file1, cols='WORK_DATE', to='int')
-    file1 = cbyz.df_conv_col_type(df=file1, cols='EX_DIVIDENDS_PRICE',
-                                  to='float')    
-
-    file1['SALE_MON_DATE'] = 1
-
-    # 填息
-    file2 = file_raw[['STOCK_SYMBOL', 'EX_DIVIDENDS_DONE']]
-    file2.columns = ['STOCK_SYMBOL', 'WORK_DATE']
-    file2['WORK_DATE'] = '20' + file2['WORK_DATE']
-    file2['WORK_DATE'] = file2['WORK_DATE'].str.replace("'", "")
-    file2['WORK_DATE'] = file2['WORK_DATE'].str.replace("/", "")
-    file2 = cbyz.df_conv_col_type(df=file2, cols='WORK_DATE', to='int')
-    file2['EX_DIVIDENDS_DONE'] = 1
-    
-    return file1, file2
-
-# .............
-
-
 def select_stock_symbols(df):
 
 
@@ -384,6 +293,7 @@ def get_google_treneds(begin_date=None, end_date=None,
                                        stock_type=stock_type,
                                        local=local)
 
+    
     # Word List ......
     file_path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Resource/google_trends_industry.xlsx'
     file = pd.read_excel(file_path, sheet_name='words')
@@ -461,25 +371,6 @@ def get_google_treneds(begin_date=None, end_date=None,
                                     columns='WORD_TREND', 
                                     values='VALUE') \
                 .reset_index()
-                
-                
-                
-    # Calculate MA ......
-    
-    # Bug
-  # File "/Users/Aron/Documents/GitHub/Codebase_YZ/codebase_yz.py", line 2527, in df_add_ma
-    # temp_main['variable'] = temp_main['variable'].astype(int)    
-    
-    
-    global ma_values
-    cols = cbyz.df_get_cols_except(df=loc_main, except_cols=['WORK_DATE'])
-    loc_main, ma_cols = cbyz.df_add_ma(df=loc_main, cols=cols, 
-                                       group_by=[], 
-                                       date_col='WORK_DATE', values=ma_values,
-                                       wma=False)
-    
-                
-                
     
     # Convert NA
     cols = cbyz.df_get_cols_except(df=loc_main, except_cols=['WORK_DATE'])
@@ -608,20 +499,6 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 
     ma_except_cols = ma_except_cols + support_resist_cols
     
-    
-    
-    # Add Data Index ......
-    date_index = loc_data[['WORK_DATE']].drop_duplicates() \
-                .sort_values(by='WORK_DATE') \
-                .reset_index(drop=True) \
-                .reset_index() \
-                .rename(columns={'index':'DATE_INDEX'})
-
-
-    loc_data = loc_data.merge(date_index, how='left', on='WORK_DATE')    
-    
-    
-    
             
     # Industry Trade Values ......
     if industry and trade_value:
@@ -642,7 +519,8 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 
 
 
-# %% Process ------
+# ..............
+
 
 
 def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
@@ -676,10 +554,10 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
                                               trade_value=trade_value) 
                             
     support_resist_cols = [s + '_LAG' for s in support_resist_cols]
-    
-    
+                
+
+
     # Add Data Index ......
-    # Update, move into the sam_load_data
     date_index = loc_data[['WORK_DATE']].drop_duplicates() \
                 .sort_values(by='WORK_DATE') \
                 .reset_index(drop=True) \
@@ -688,7 +566,7 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
 
 
     loc_data = loc_data.merge(date_index, how='left', on='WORK_DATE')
-                            
+
     
     # Predict Symbols ......
     if len(stock_symbol) == 0:
@@ -733,40 +611,11 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     
     # loc_main = loc_main.merge(sharehold, how='left', 
     #                           on=['STOCK_SYMBOL', 'WORK_DATE'])      
-
-
-
-    # 除權息資料
-    temp_cols = ['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE', 'EX_DIVIDENDS_DONE']
-    sale_mon_data1, sale_mon_data2 = get_sale_mon_data()
-    
-    loc_main = loc_main \
-        .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'STOCK_SYMBOL']) \
-        .merge(sale_mon_data2, how='left', on=['WORK_DATE', 'STOCK_SYMBOL'])
-    
-    loc_main['EX_DIVIDENDS_PRICE'] = loc_main['EX_DIVIDENDS_PRICE'] \
-                                    / loc_main['CLOSE']
-    
-    
-    loc_main = cbyz.df_conv_na(df=loc_main, 
-                               cols=temp_cols)
-
-    ma_except_cols = ma_except_cols + temp_cols
-    lag_except_cols  = lag_except_cols + temp_cols
-
-
-
     
     
     # TEJ 三大法人持股成本 ......
     ewtinst1c = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
                                       trade=True, local=local)
-    
-    ewtinst1c, ewtinst1c_cols = \
-        add_ma_normalize(df=ewtinst1c, cols=[], 
-                         cols_except=['WORK_DATE', 'STOCK_SYMBOL'], 
-                         group_by=['STOCK_SYMBOL'], 
-                         date_col='WORK_DATE')    
 
     loc_main = loc_main.merge(ewtinst1c, how='left', 
                               on=['STOCK_SYMBOL', 'WORK_DATE'])  
@@ -782,22 +631,18 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     # - Increase prediction time a lot, and made mape decrease.
     # - Pytrends已經normalize過後才pivot，但後面又normalize一次
     # pytrends, pytrends_cols = get_google_treneds(begin_date=shift_begin, 
-    #                                               end_date=data_end, 
-    #                                               normalize=True, 
-    #                                               stock_type=stock_type, 
-    #                                               local=local)
+    #                                              end_date=data_end, 
+    #                                              normalize=True, 
+    #                                              stock_type=stock_type, 
+    #                                              local=local)
     
     # loc_main = loc_main.merge(pytrends, how='left', on=['WORK_DATE'])      
     
     
     # COVID-19 ......
-    covid19 = cbyz.get_covid19_data()
-    covid19, covid19_cols = add_ma_normalize(df=covid19, cols=[], 
-                                             cols_except=['WORK_DATE'], 
-                                             group_by=[], date_col='WORK_DATE')
-    
+    covid19 = ar.get_covid19_data()
     loc_main = loc_main.merge(covid19, how='left', on='WORK_DATE')
-    loc_main = cbyz.df_conv_na(df=loc_main, cols=covid19_cols)
+    loc_main = cbyz.df_conv_na(df=loc_main, cols=['COVID19'])
 
     
     # One Hot Encoding ......
@@ -817,19 +662,19 @@ def get_model_data(ma_values=[5,20], industry=False, trade_value=False):
     
     
     # Calculate MA ......
-    # ma_except_cols = ma_except_cols + market_except_ma + identify_cols
+    ma_except_cols = ma_except_cols + market_except_ma + identify_cols
     
-    # ma_cols_raw = cbyz.df_get_cols_except(df=loc_main, 
-    #                                      except_cols=ma_except_cols)
+    ma_cols_raw = cbyz.df_get_cols_except(df=loc_main, 
+                                         except_cols=ma_except_cols)
      
-    # loc_main, ma_cols = cbyz.df_add_ma(df=loc_main, cols=ma_cols_raw, 
-    #                                group_by=['STOCK_SYMBOL'], 
-    #                                date_col='WORK_DATE', values=ma_values,
-    #                                wma=False)
+    loc_main, ma_cols = cbyz.df_add_ma(df=loc_main, cols=ma_cols_raw, 
+                                   group_by=['STOCK_SYMBOL'], 
+                                   date_col='WORK_DATE', values=ma_values,
+                                   wma=False)
     
-    # ma_drop_cols = cbyz.li_remove_items(ma_cols_raw, model_y)
-    # loc_main = loc_main.drop(ma_drop_cols, axis=1)
-    # gc.collect()
+    ma_drop_cols = cbyz.li_remove_items(ma_cols_raw, model_y)
+    loc_main = loc_main.drop(ma_drop_cols, axis=1)
+    gc.collect()
     
     
 
@@ -1324,8 +1169,6 @@ def master(_predict_begin, _predict_end=None,
     # v0.7
     # - Add Google Trends
     # - Disable Pytrends and ewiprcd
-    # v0.8
-    # - Optimize data processing
     
     
     # Worklist .....
@@ -1338,32 +1181,27 @@ def master(_predict_begin, _predict_end=None,
     
     
     global version
-    version = 0.8
+    version = 0.7
 
     
-    _data_period = 90
-    _data_period = 365 
-    _data_period = int(365 * 0.86)    
-    _data_period = int(365 * 1.55)
-    _predict_begin = 20210705
-    _predict_end = None
-    _stock_type = 'tw'
-    # ma_values = [2,5,20,60]
-    _ma_values = [5,10,20,40]
-    _predict_period = 5
-    _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
-    _stock_symbol = []
-    _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    _model_y = ['PRICE_CHANGE_RATIO']      
-    _model_y= ['CLOSE']
-    _volume_thld = 1000
+    # _data_period = int(365 * 0.86)    
+    # _data_period = int(365 * 2)
+    # _predict_begin = 20210705
+    # _predict_end = None
+    # _stock_type = 'tw'
+    # # ma_values = [2,5,20,60]
+    # ma_values = [5,10,20,40,60]
+    # _predict_period = 5
+    # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
+    # _stock_symbol = []
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # _model_y = ['PRICE_CHANGE_RATIO']      
+    # _model_y= ['CLOSE']
+    # _volume_thld = 1000
     
     
     global volume_thld
     volume_thld = _volume_thld
-    
-    global ma_values
-    ma_values = _ma_values
 
 
     global shift_begin, shift_end, data_begin, data_end, data_period
@@ -1446,18 +1284,6 @@ def check():
 
 
 # %% Dev ------
-
-
-df = covid19.copy()
-
-
-group_by = []
-
-date_col='WORK_DATE'
-
-cols_except = 'WORK_DATE'
-
-
 
 
 def tw_fix_symbol_error():

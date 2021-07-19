@@ -316,7 +316,6 @@ def master(overwrite=False, upload=True):
 
     # Upload ------
     if upload:
-        
         if stock_type == 'tw':
             ar.db_upload(data=data, 
                          table_name='stock_data_tw',

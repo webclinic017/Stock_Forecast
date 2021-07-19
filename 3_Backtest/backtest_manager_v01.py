@@ -67,7 +67,8 @@ import arsenal as ar
 import arsenal_stock as stk
 # import stock_analysis_manager_v05 as sam
 # import stock_analysis_manager_v06 as sam
-import stock_analysis_manager_v07 as sam
+# import stock_analysis_manager_v07 as sam
+import stock_analysis_manager_v07_02 as sam
 
 
 
@@ -542,11 +543,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
     # add hold columns
-    # excel format
-    
-    
-    # Bug
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
+
+
+    # Worklist
+    # 1. Add date index to indentify feature of time series
+    #    > Add this to sam v7 and v8  
+
 
     
     # Parameters
@@ -556,7 +559,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 4
-    _bt_times = 3
+    _bt_times = 2
     data_period = int(365 * 2)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
@@ -565,8 +568,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
-    # _ma_values = [5,10,20]
-    _ma_values = [5,10,20,40,60]
+    _ma_values = [5,10,20]
+    # _ma_values = [5,10,20,40]
     _volume_thld = 500
 
 
@@ -589,8 +592,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     # Set Date ......
     global calendar, bt_last_begin, bt_last_end
-
-    
     set_calendar(_bt_last_begin, predict_period)
 
     
@@ -623,13 +624,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [1474, 1718, 2002, 2504, 3576, 5521, 8105, 1809]    
+    hold = [1474, 1718, 2002, 8105, 2356]
     
     
     cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
                execute_begin=2107140000,
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False) 
+               file_name=None, upload_metrics=True) 
     
     
     # actions = actions[actions['MODEL']=='model_6']
