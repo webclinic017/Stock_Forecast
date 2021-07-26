@@ -129,21 +129,29 @@ def upload():
         ar.db_upload(data=file, table_name=table)
 
 
+
+
 # %% Query ------
 
 
 def query_ewtinst1c():
 
+    '''
+    三大法人持股成本
+    '''    
+
     # 不要太早抓資料，因為TEJ的資料可能會變
 
     
     # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
-    begin = 20190101
-    end = 20190228
+    begin = 20180101
+    end = 20180531
+    
     
     # Now
-    begin = 20210719
-    end = 20210719
+    # 0722刪掉重上傳
+    begin = 20210721
+    end = 20210723
         
     
     begin_str = cbyz.ymd(begin)
@@ -163,6 +171,15 @@ def query_ewtinst1c():
     data.to_csv(path_export + '/ewtinst1c/ewtinst1c_data_' + begin_str + '_' + end_str + '.csv', 
                 index=False)
     
+    
+    # Delete incomplete data.
+    sql = (" delete from ewtinst1c "
+           " where date_format(mdate, '%Y%m%d') >= 20210721 ")
+    
+    ar.db_execute(sql, commit=True)
+ 
+
+# ...............
     
 
 def query_ewprcd():

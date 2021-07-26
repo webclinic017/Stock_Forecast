@@ -248,7 +248,7 @@ def master(overwrite=False, upload=True):
     
     # 檢查兩筆，如果數字都一樣的話就不更新
     if stock_type == 'tw':
-        repre_symbols = ['2330', '3008']
+        repre_symbols = ['2330', '3008', '0050']
         # repre_symbols = ['1101', '1102']        
     
 
@@ -270,9 +270,6 @@ def master(overwrite=False, upload=True):
         chk_data = chk_data[['WORK_DATE', 'STOCK_SYMBOL', 
                                'OPEN', 'CLOSE', 'HIGH', 'LOW']]
         
-        chk_data = chk_data.melt(id_vars=['WORK_DATE', 'STOCK_SYMBOL'])        
-        
-        
         # Hist Data
         today = data['WORK_DATE'].max()
         chk_date = cbyz.date_cal(today, -14, 'd')
@@ -289,20 +286,16 @@ def master(overwrite=False, upload=True):
                     
         hist_data = hist_data[['WORK_DATE', 'STOCK_SYMBOL', 
                                'OPEN', 'CLOSE', 'HIGH', 'LOW']]
-                    
-        hist_data = hist_data.melt(id_vars=['WORK_DATE', 'STOCK_SYMBOL'])
         
         
-        chk_main = chk_data.merge(hist_data, on=['STOCK_SYMBOL', 'variable'])
-        chk_main['DIFF'] = chk_main['value_x'] - chk_main['value_y']
-        chk_main = chk_main[chk_main['DIFF']==0]
+        chk_diff = ar.df_chk_diff(chk_data, hist_data, on='STOCK_SYMBOL',
+                                  chk_na=False)
         
-        
-        if len(chk_main) == 0:
+        if not chk_diff:
             return ''
         
     # Check
-    # data['WORK_DATE'] = 20210716
+    # data['WORK_DATE'] = 20210723
     # data[data['STOCK_SYMBOL']=='2399']
     
         

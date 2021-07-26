@@ -239,15 +239,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     hist_data_raw = hist_data_raw[['WORK_DATE', 'STOCK_SYMBOL'] + model_y]
     
  
-    
-    # hist_data = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
-    # hist_data_raw = hist_data_raw.rename(columns={'WORK_DATE':'LAST_DATE'})
-
-
-    # calendar = hist_data_raw[['WORK_DATE']] \
-    #             .append(forecast_calendar) \
-    #             .drop_duplicates()
-    
     # Get Last Date ....        
     date_last = calendar[calendar['TRADE_DATE']>0]
     date_last = cbyz.df_add_shift(df=date_last, cols='WORK_DATE', shift=1)
@@ -265,7 +256,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     else:
         temp_symbol = hist_data_raw['STOCK_SYMBOL'].unique().tolist()
         symbol_df = pd.DataFrame({'STOCK_SYMBOL':temp_symbol})        
-
 
         
     # Merge hist data ......
@@ -324,10 +314,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
                                   last_date='LAST_DATE', 
                                   y=model_y, y_last=last_cols,
                                   y_thld=y_thld, time_thld=time_thld,
-                                  rmse_thld=rmse_thld, 
-                                  export_file=export_file, 
-                                  load_file=load_file, file_name=file_name,
-                                  path=path)
+                                  rmse_thld=rmse_thld)
         
     # Evaluate Precision ......
     eval_metrics(export_file=False, upload=upload_metrics)            
@@ -347,16 +334,22 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
         records = records \
             .rename(columns={'FORECAST_PRECISION_MEAN':'RECORD_PRECISION_MEAN',
                              'FORECAST_PRECISION_MAX':'RECORD_PRECISION_MAX'})
-        
-    # Tick
-    actions.loc[actions.index, 'TICK'] = np.nan
+            
+    # Add name ......
+    stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
     
+    stock_info = stock_info[['STOCK_SYMBOL', 'STOCK_NAME']]
+    actions = actions.merge(stock_info, how='left', on='STOCK_SYMBOL')      
+
+
     # Hold 
     global hold
     hold = [str(i) for i in hold]
     actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(hold), 1, 0)
-
     
+    actions.loc[actions.index, 'BUY_SIGNAL'] = np.nan    
+
+
     # Rearrange Columns ......            
     if 'CLOSE' in model_y:
         profit_cols = ['CLOSE_PROFIT_PREDICT', 
@@ -368,7 +361,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
         
     
     cols_1 = ['BACKTEST_ID', 'STOCK_SYMBOL', 'STOCK_NAME', 
-              'TICK', 'HOLD', 'WORK_DATE', 'LAST_DATE']
+              'BUY_SIGNAL', 'HOLD', 'WORK_DATE', 'LAST_DATE']
 
     model_y_last = [s + '_LAST' for s in model_y]
     model_y_hist = [s + '_HIST' for s in model_y]    
@@ -389,6 +382,29 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
             - actions['RECORD_PRECISION_MAX']
     
         actions = actions[new_cols]
+
+        
+    # Buy Signal ......
+    
+    # Decrease On First Day ...
+    cond1 = actions[(actions['WORK_DATE']==bt_last_begin) \
+                   & (actions['CLOSE_PROFIT_RATIO_PREDICT']<0)]
+    cond1 = cond1['STOCK_SYMBOL'].unique().tolist()
+    
+    # Estimated Profit ...
+    cond2 = actions[(actions['WORK_DATE']>bt_last_begin) \
+                   & (actions['CLOSE_PROFIT_RATIO_PREDICT']>=y_thld)]
+    cond2 = cond2['STOCK_SYMBOL'].unique().tolist()    
+    
+    # Max Error ...
+    cond3 = actions[actions['DIFF_MAX']<=rmse_thld]
+    cond3 = cond3['STOCK_SYMBOL'].unique().tolist()       
+    
+    
+    buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
+    actions['BUY_SIGNAL'] = np.where(actions['STOCK_SYMBOL'].isin(buy_signal_symbols),
+                                     1, 0)
+
     
 
 
@@ -534,6 +550,9 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # v0.0 - First Version
     # v0.1
     # - 拿掉5MA之後的精準度有提升
+    # v0.2
+    # - Add buy_signal
+    
     
     # Backtest也可以用parameter做A/B    
     
@@ -565,11 +584,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 15. excel中沒有 富鼎(8261)
     # 16. Add buy signal
     # 17. 長期的forecast by week
+    # 18. When backtest, check if the symbol reached the target price in the 
+    #     next N weeks.
 
 
     
     # Parameters
-    _bt_last_begin = 20210726
+    _bt_last_begin = 20210719
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
@@ -623,17 +644,18 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # Update, 需把Y為close和Y為price_change的情況分開處理
     # Update, stock_info每日比對檔案自動匯
     
-    # y_thld=-100
+    # y_thld=0.05
     # time_thld=predict_period
-    # rmse_thld=5
+    # rmse_thld=0.1
     # export_file=True
     # load_file=True
-    # path=None
+    # path=path_temp
     # file_name=None        
     
 
     global bt_main, actions
     
+    # Optimize, 這裡的rmse_thld實際上是mape
     # 算回測precision的時候，可以低估，但不可以高估
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
@@ -642,10 +664,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     hold = [1474, 2002, 8105, 2356, 6153]
     
     
-    cal_profit(y_thld=-100, time_thld=predict_period, rmse_thld=5,
-               execute_begin=2107200000, 
+    cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=0.1,
+               execute_begin=2107230000, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False) 
+               file_name=None, upload_metrics=True) 
     
     
     # actions = actions[actions['MODEL']=='model_6']
