@@ -397,7 +397,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     cond2 = cond2['STOCK_SYMBOL'].unique().tolist()    
     
     # Max Error ...
-    cond3 = actions[actions['DIFF_MAX']<=rmse_thld]
+    cond3 = actions[actions['DIFF_MAX']>=rmse_thld]
     cond3 = cond3['STOCK_SYMBOL'].unique().tolist()       
     
     
@@ -586,11 +586,14 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 17. 長期的forecast by week
     # 18. When backtest, check if the symbol reached the target price in the 
     #     next N weeks.
+    # 19. Analysis, 近60日投報率，用產業或主題作分群 / 財報
+    # 20. Add Sell Signal
+    # 21. 產業上中下游關係，SNA
 
 
     
     # Parameters
-    _bt_last_begin = 20210719
+    _bt_last_begin = 20210728
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
@@ -604,7 +607,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
-    _ma_values = [5,10,20]
+    _ma_values = [10,20]
+    # _ma_values = [5,10,20]
     # _ma_values = [5,10,20,40]
     _volume_thld = 500
 
@@ -646,7 +650,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # y_thld=0.05
     # time_thld=predict_period
-    # rmse_thld=0.1
+    # rmse_thld=-0.05
     # export_file=True
     # load_file=True
     # path=path_temp
@@ -664,8 +668,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     hold = [1474, 2002, 8105, 2356, 6153]
     
     
-    cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=0.1,
-               execute_begin=2107230000, 
+    cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=-0.05,
+               execute_begin=2107220000, 
                export_file=True, load_file=True, path=path_temp,
                file_name=None, upload_metrics=True) 
     

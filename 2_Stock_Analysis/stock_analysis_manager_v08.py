@@ -3,10 +3,6 @@
 """
 Created on Sat Nov 14 17:23:08 2020
 
-20210704 - Add COVID-19 / Sdd Industry Trade Value
-20210704 - 1. Exclude low volume symbols
-
-
 @author: Aron
 """
 
@@ -78,9 +74,9 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[], 
                  date_col='WORK_DATE', 
-                 ma=True, normalize=True, lag=True, ma_except=[], 
-                 norm_except=[],
-                 lag_except=[], drop_except=[]):
+                 ma=True, normalize=True, lag=True, 
+                 ma_cols=[], ma_except=[], norm_cols=[], norm_except=[],
+                 lag_cols=[], lag_except=[], drop_except=[]):
 
     global ma_values, predict_period
     
@@ -89,9 +85,18 @@ def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[],
     norm_group_by = cbyz.conv_to_list(norm_group_by)
     lag_group_by = cbyz.conv_to_list(lag_group_by)
     
+    # MA
+    ma_cols = cbyz.conv_to_list(ma_cols)
     ma_except = cbyz.conv_to_list(ma_except)
+    
+    # Normalize
+    norm_cols = cbyz.conv_to_list(norm_cols)
     norm_except = cbyz.conv_to_list(norm_except)
+    
+    # Lag
+    lag_cols = cbyz.conv_to_list(lag_cols)
     lag_except = cbyz.conv_to_list(lag_except)
+    
     drop_except = cbyz.conv_to_list(drop_except)
     
     date_col_list = [date_col]
@@ -103,7 +108,13 @@ def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[],
     
     # Calculate MA ......
     if ma:
-        cols = cbyz.li_remove_items(cols, ma_group_by + ma_except + date_col_list)
+        
+        if len(ma_cols) == 0:
+            cols = cbyz.li_remove_items(cols, 
+                                        ma_group_by+ma_except+date_col_list)
+        else:
+            cols = ma_cols
+            
         loc_main, ma_cols = cbyz.df_add_ma(df=loc_main, cols=cols, 
                                            group_by=ma_group_by, 
                                            date_col=date_col, values=ma_values,
@@ -116,8 +127,10 @@ def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[],
 
     # Normalize ......
     if normalize:
-        norm_cols = cbyz.df_get_cols_except(df=loc_main, 
-                                            except_cols=norm_group_by + norm_except)
+        
+        if len(norm_cols) == 0:
+            norm_cols = cbyz.df_get_cols_except(df=loc_main, 
+                                                except_cols=norm_group_by + norm_except)
         
         loc_main, _, _, _ = cbyz.df_normalize(df=loc_main,
                                               cols=norm_cols,
@@ -126,8 +139,10 @@ def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[],
     
     # Lag ......
     if lag:
-        lag_cols = cbyz.df_get_cols_except(df=loc_main, 
-                                           except_cols=lag_group_by+lag_except)
+        
+        if len(lag_cols) == 0:        
+            lag_cols = cbyz.df_get_cols_except(df=loc_main, 
+                                               except_cols=lag_group_by+lag_except)
         
         loc_main, _ = cbyz.df_add_shift(df=loc_main, cols=lag_cols, 
                                         shift=predict_period,
@@ -582,7 +597,8 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
             .reset_index(drop=True)
             
     market_data_raw = stk.add_k_line(market_data_raw)
-    market_data_raw = cbyz.df_get_dummies(df=market_data_raw, cols='K_LINE_COLOR')
+    market_data_raw = cbyz.df_get_dummies(df=market_data_raw, 
+                                          cols='K_LINE_COLOR')
     
     
     # Add Support Resistance ......
@@ -643,7 +659,7 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                                      'LISTING_DAYS', 'INDUSTRY_ONE_HOT']]    
     
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
-    stock_info = data_process(df=stock_info, 
+    stock_info, _ = data_process(df=stock_info, 
                               ma_group_by=[],
                               norm_group_by=[],
                               lag_group_by=[],
@@ -764,10 +780,8 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
 
     # Load Historical Data ......
     market_data = sam_load_data(data_begin=shift_begin, data_end=data_end,
-                             industry=industry, trade_value=trade_value) 
+                                industry=industry, trade_value=trade_value) 
                             
-    # support_resist_cols = [s + '_LAG' for s in support_resist_cols]
-    
     
     # Predict Symbols ......
     if len(stock_symbol) == 0:
@@ -877,27 +891,48 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
 
     
     # TEJ 三大法人持股成本 ......
-    ewtinst1c = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
+    ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
                                       trade=True, local=local)
     
+    ewtinst1c = ewtinst1c_raw.copy()
+    
+    # 獲利率用全部的來norm，所以要分兩段
+    
+    
+    hroi_cols = cbyz.df_get_cols_contain(df=ewtinst1c, 
+                                         string=['_HROI', '_SELL', 'BUY'])
+    
+    cols = cbyz.df_get_cols_except(df=ewtinst1c, 
+                                   except_cols=hroi_cols \
+                                       + ['STOCK_SYMBOL', 'WORK_DATE'])
+    
+    # Keep Needed Symbols Only
     ewtinst1c = ewtinst1c.merge(stock_symbol_df, on=['STOCK_SYMBOL'])
     
-    
-    
-    
-    
-    ewtinst1c, ewtinst1c_cols = data_process(df=ewtinst1c, 
-                                             ma_group_by=['STOCK_SYMBOL'],
-                                             norm_group_by=['STOCK_SYMBOL'],
-                                             lag_group_by=['STOCK_SYMBOL'], 
-                                             ma=True, normalize=True, lag=True, 
-                                             ma_except=[], lag_except=[], 
-                                             drop_except=[])
+    ewtinst1c, cols1 = data_process(df=ewtinst1c, 
+                                    ma_group_by=['STOCK_SYMBOL'],
+                                    norm_group_by=['STOCK_SYMBOL'],
+                                    lag_group_by=['STOCK_SYMBOL'], 
+                                    ma=True, normalize=True, lag=True, 
+                                    ma_cols=cols, ma_except=[], 
+                                    norm_cols=cols, norm_except=[],
+                                    lag_cols=cols, lag_except=[], 
+                                    drop_except=[])
+
+    ewtinst1c, cols2 = data_process(df=ewtinst1c, 
+                                    ma_group_by=['STOCK_SYMBOL'],
+                                    norm_group_by=[],
+                                    lag_group_by=[],
+                                    ma=True, normalize=True, lag=True, 
+                                    ma_cols=hroi_cols, ma_except=[], 
+                                    norm_cols=hroi_cols, norm_except=[],
+                                    lag_cols=hroi_cols, lag_except=[], 
+                                    drop_except=[])
 
     loc_main = loc_main.merge(ewtinst1c, how='left', 
                               on=['STOCK_SYMBOL', 'WORK_DATE'])  
     
-    loc_main = cbyz.df_conv_na(df=loc_main, cols=ewtinst1c_cols)    
+    loc_main = cbyz.df_conv_na(df=loc_main, cols=cols1+cols2)    
 
 
     # 指數日成本 ......
@@ -1589,17 +1624,6 @@ def check():
 
 
 # %% Dev ------
-
-
-df = covid19.copy()
-
-
-group_by = []
-
-date_col='WORK_DATE'
-
-cols_except = 'WORK_DATE'
-
 
 
 

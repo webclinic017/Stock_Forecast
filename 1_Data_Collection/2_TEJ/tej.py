@@ -150,8 +150,8 @@ def query_ewtinst1c():
     
     # Now
     # 0722刪掉重上傳
-    begin = 20210721
-    end = 20210723
+    begin = 20210727
+    end = 20210727
         
     
     begin_str = cbyz.ymd(begin)
@@ -174,7 +174,7 @@ def query_ewtinst1c():
     
     # Delete incomplete data.
     sql = (" delete from ewtinst1c "
-           " where date_format(mdate, '%Y%m%d') >= 20210721 ")
+           " where date_format(mdate, '%Y%m%d') >= " + str(begin))
     
     ar.db_execute(sql, commit=True)
  
