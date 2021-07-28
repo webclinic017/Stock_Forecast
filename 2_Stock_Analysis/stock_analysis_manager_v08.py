@@ -72,94 +72,94 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 # %% Inner Function ------
 
 
-def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[], 
-                 date_col='WORK_DATE', 
-                 ma=True, normalize=True, lag=True, 
-                 ma_cols=[], ma_except=[], norm_cols=[], norm_except=[],
-                 lag_cols=[], lag_except=[], drop_except=[]):
+# def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[], 
+#                  date_col='WORK_DATE', 
+#                  ma=True, normalize=True, lag=True, 
+#                  ma_cols=[], ma_except=[], norm_cols=[], norm_except=[],
+#                  lag_cols=[], lag_except=[], drop_except=[]):
 
-    global ma_values, predict_period
+#     global ma_values, predict_period
     
-    # Convert To List ......
-    ma_group_by = cbyz.conv_to_list(ma_group_by)
-    norm_group_by = cbyz.conv_to_list(norm_group_by)
-    lag_group_by = cbyz.conv_to_list(lag_group_by)
+#     # Convert To List ......
+#     ma_group_by = cbyz.conv_to_list(ma_group_by)
+#     norm_group_by = cbyz.conv_to_list(norm_group_by)
+#     lag_group_by = cbyz.conv_to_list(lag_group_by)
     
-    # MA
-    ma_cols = cbyz.conv_to_list(ma_cols)
-    ma_except = cbyz.conv_to_list(ma_except)
+#     # MA
+#     ma_cols = cbyz.conv_to_list(ma_cols)
+#     ma_except = cbyz.conv_to_list(ma_except)
     
-    # Normalize
-    norm_cols = cbyz.conv_to_list(norm_cols)
-    norm_except = cbyz.conv_to_list(norm_except)
+#     # Normalize
+#     norm_cols = cbyz.conv_to_list(norm_cols)
+#     norm_except = cbyz.conv_to_list(norm_except)
     
-    # Lag
-    lag_cols = cbyz.conv_to_list(lag_cols)
-    lag_except = cbyz.conv_to_list(lag_except)
+#     # Lag
+#     lag_cols = cbyz.conv_to_list(lag_cols)
+#     lag_except = cbyz.conv_to_list(lag_except)
     
-    drop_except = cbyz.conv_to_list(drop_except)
+#     drop_except = cbyz.conv_to_list(drop_except)
     
-    date_col_list = [date_col]
-    drop_except = drop_except + date_col_list
+#     date_col_list = [date_col]
+#     drop_except = drop_except + date_col_list
     
-    cols = list(df.columns)    
-    loc_main = df.copy()
+#     cols = list(df.columns)    
+#     loc_main = df.copy()
     
     
-    # Calculate MA ......
-    if ma:
+#     # Calculate MA ......
+#     if ma:
         
-        if len(ma_cols) == 0:
-            cols = cbyz.li_remove_items(cols, 
-                                        ma_group_by+ma_except+date_col_list)
-        else:
-            cols = ma_cols
+#         if len(ma_cols) == 0:
+#             cols = cbyz.li_remove_items(cols, 
+#                                         ma_group_by+ma_except+date_col_list)
+#         else:
+#             cols = ma_cols
             
-        loc_main, ma_cols = cbyz.df_add_ma(df=loc_main, cols=cols, 
-                                           group_by=ma_group_by, 
-                                           date_col=date_col, values=ma_values,
-                                           wma=False)
+#         loc_main, ma_cols = cbyz.df_add_ma(df=loc_main, cols=cols, 
+#                                            group_by=ma_group_by, 
+#                                            date_col=date_col, values=ma_values,
+#                                            wma=False)
         
-        drop_cols = cbyz.li_remove_items(cols, drop_except)
-        loc_main = loc_main.drop(drop_cols, axis=1)
-        cols = ma_cols
+#         drop_cols = cbyz.li_remove_items(cols, drop_except)
+#         loc_main = loc_main.drop(drop_cols, axis=1)
+#         cols = ma_cols
 
 
-    # Normalize ......
-    if normalize:
+#     # Normalize ......
+#     if normalize:
         
-        if len(norm_cols) == 0:
-            norm_cols = cbyz.df_get_cols_except(df=loc_main, 
-                                                except_cols=norm_group_by + norm_except)
+#         if len(norm_cols) == 0:
+#             norm_cols = cbyz.df_get_cols_except(df=loc_main, 
+#                                                 except_cols=norm_group_by + norm_except)
         
-        loc_main, _, _, _ = cbyz.df_normalize(df=loc_main,
-                                              cols=norm_cols,
-                                              groupby=norm_group_by,
-                                              show_progress=True)        
+#         loc_main, _, _, _ = cbyz.df_normalize(df=loc_main,
+#                                               cols=norm_cols,
+#                                               groupby=norm_group_by,
+#                                               show_progress=True)        
     
-    # Lag ......
-    if lag:
+#     # Lag ......
+#     if lag:
         
-        if len(lag_cols) == 0:        
-            lag_cols = cbyz.df_get_cols_except(df=loc_main, 
-                                               except_cols=lag_group_by+lag_except)
+#         if len(lag_cols) == 0:        
+#             lag_cols = cbyz.df_get_cols_except(df=loc_main, 
+#                                                except_cols=lag_group_by+lag_except)
         
-        loc_main, _ = cbyz.df_add_shift(df=loc_main, cols=lag_cols, 
-                                        shift=predict_period,
-                                        group_by=lag_group_by,
-                                        suffix='_LAG', 
-                                        remove_na=False)    
+#         loc_main, _ = cbyz.df_add_shift(df=loc_main, cols=lag_cols, 
+#                                         shift=predict_period,
+#                                         group_by=lag_group_by,
+#                                         suffix='_LAG', 
+#                                         remove_na=False)    
 
-        drop_cols = cbyz.li_remove_items(lag_cols, drop_except)
-        loc_main = loc_main.drop(drop_cols, axis=1)
+#         drop_cols = cbyz.li_remove_items(lag_cols, drop_except)
+#         loc_main = loc_main.drop(drop_cols, axis=1)
 
 
-    cols = cbyz.df_get_cols_except(df=loc_main, 
-                                   except_cols=ma_group_by \
-                                       +norm_group_by+lag_group_by)
+#     cols = cbyz.df_get_cols_except(df=loc_main, 
+#                                    except_cols=ma_group_by \
+#                                        +norm_group_by+lag_group_by)
         
 
-    return loc_main, cols
+#     return loc_main, cols
 
 
 # .............
@@ -552,8 +552,8 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     
     global stock_symbol
     global market_data_raw
+    global predict_period
     
-
 
     # Market Data ...
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
@@ -600,7 +600,6 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
     market_data_raw = cbyz.df_get_dummies(df=market_data_raw, 
                                           cols='K_LINE_COLOR')
     
-    
     # Add Support Resistance ......
     global data_period
     market_data_raw, support_resist_cols = \
@@ -628,30 +627,38 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
 
     # Process Market Data
     data = market_data_raw.drop('TOTAL_TRADE_VALUE', axis=1)
-    data, _ = data_process(df=data, 
-                           ma_group_by=['STOCK_SYMBOL'],
-                           norm_group_by=['STOCK_SYMBOL'],
-                           lag_group_by=['STOCK_SYMBOL'],
-                           ma=True, normalize=True, lag=True,
-                           ma_except=['DATE_INDEX'], lag_except=[],
-                           drop_except=model_y)
-
+    data, _ = cbyz.ml_data_process(df=data, ma=True, normalize=True, lag=True, 
+                                   ma_group_by=['STOCK_SYMBOL'], 
+                                   norm_group_by=['STOCK_SYMBOL'], 
+                                   lag_group_by=['STOCK_SYMBOL'], 
+                                   ma_cols_contains=[], ma_except_contains=[],
+                                   norm_cols_contains=[], norm_except_contains=[],
+                                   lag_cols_contains=[], lag_except_contains=[], 
+                                   drop_except_contains=[],
+                                   ma_values=ma_values, 
+                                   lag_period=predict_period)
 
     # Total Trade
     if trade_value:
         total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']]
-        total_trade, _ = data_process(df=total_trade,
-                                      ma_group_by=[], 
-                                      norm_group_by=[],   
-                                      lag_group_by=[],   
-                                      ma=True, normalize=True, lag=True, 
-                                      ma_except=[], lag_except=[], 
-                                      drop_except=['WORK_DATE'])
-    
+        
+        total_trade, _ = \
+            cbyz.ml_data_process(df=total_trade, ma=True, normalize=True, 
+                                 lag=True, ma_group_by=[],
+                                 norm_group_by=[], lag_group_by=[],
+                                 ma_cols_contains=[], 
+                                 ma_except_contains=['WORK_DATE'],
+                                 norm_cols_contains=[], 
+                                 norm_except_contains=['WORK_DATE'],
+                                 lag_cols_contains=[], 
+                                 lag_except_contains=['WORK_DATE'], 
+                                 drop_except_contains=[],
+                                 ma_values=ma_values, 
+                                 lag_period=predict_period)
+        
         data = data.merge(total_trade, how='left', on=['WORK_DATE'])  
 
 
-    
     # Stock Info ...
     stock_info_raw = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
     stock_info_raw = stock_info_raw[['STOCK_SYMBOL', 'CAPITAL', 
@@ -659,21 +666,24 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
                                      'LISTING_DAYS', 'INDUSTRY_ONE_HOT']]    
     
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
-    stock_info, _ = data_process(df=stock_info, 
-                              ma_group_by=[],
-                              norm_group_by=[],
-                              lag_group_by=[],
-                              ma=False, normalize=True, lag=False,
-                              ma_except=[], norm_except=['STOCK_SYMBOL'], 
-                              lag_except=[], drop_except=model_y)
+    
+    stock_info, _ = \
+        cbyz.ml_data_process(df=stock_info, ma=False, normalize=True, 
+                            lag=False, ma_group_by=[],
+                            norm_group_by=[], lag_group_by=[],
+                            ma_cols_contains=[], ma_except_contains=[],
+                            norm_cols_contains=[], 
+                            norm_except_contains=['STOCK_SYMBOL'],
+                            lag_cols_contains=[], lag_except_contains=[], 
+                            drop_except_contains=[],
+                            ma_values=ma_values, 
+                            lag_period=predict_period)
     
     data = data.merge(stock_info, how='left', on=['STOCK_SYMBOL'])      
 
 
-
     # Merge Other Data ......        
     if industry:        
-
         stock_industry = stock_info_raw[['STOCK_SYMBOL', 'INDUSTRY_ONE_HOT']]
         stock_info_dummy = cbyz.df_get_dummies(df=stock_info_raw, 
                                                cols='INDUSTRY_ONE_HOT')
@@ -738,13 +748,19 @@ def sam_load_data(data_begin, data_end=None, stock_type='tw', period=None,
         industry_data = industry_data.rename(rename_dict)
                        
         
-        industry_data, _ = data_process(df=industry_data,
-                                      ma_group_by=['INDUSTRY_ONE_HOT'], 
-                                      norm_group_by=['INDUSTRY_ONE_HOT'],   
-                                      lag_group_by=['INDUSTRY_ONE_HOT'],   
-                                      ma=True, normalize=True, lag=True, 
-                                      ma_except=[], lag_except=[], 
-                                      drop_except=[])
+        industry_data, _ = \
+             cbyz.ml_data_process(df=industry_data, 
+                                  ma=True, normalize=True, lag=True, 
+                                  ma_group_by=['INDUSTRY_ONE_HOT'],
+                                  norm_group_by=['INDUSTRY_ONE_HOT'], 
+                                  lag_group_by=['INDUSTRY_ONE_HOT'],
+                                  ma_cols_contains=[], ma_except_contains=[],
+                                  norm_cols_contains=[], 
+                                  norm_except_contains=[],
+                                  lag_cols_contains=[], lag_except_contains=[], 
+                                  drop_except_contains=[],
+                                  ma_values=ma_values, 
+                                  lag_period=predict_period)
         
         # Merge ...
         data = data \
@@ -862,24 +878,38 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
                                      cols=['EX_DIVIDENDS_PRICE', 
                                            'SALE_MON_DATE'])
     
-    sale_mon_data1, _ = data_process(df=sale_mon_data1,
-                                     ma_group_by=[], 
-                                     norm_group_by=['STOCK_SYMBOL'],
-                                     lag_group_by=[],   
-                                     ma=False, normalize=True, lag=False, 
-                                     norm_except=[], ma_except=[], lag_except=[],
-                                     drop_except=[])
+    sale_mon_data1, _ = \
+             cbyz.ml_data_process(df=sale_mon_data1, 
+                                  ma=False, normalize=True, lag=False, 
+                                  ma_group_by=[],
+                                  norm_group_by=['STOCK_SYMBOL'], 
+                                  lag_group_by=[],
+                                  ma_cols_contains=[], ma_except_contains=[],
+                                  norm_cols_contains=[], 
+                                  norm_except_contains=[],
+                                  lag_cols_contains=[], lag_except_contains=[], 
+                                  drop_except_contains=[],
+                                  ma_values=ma_values, 
+                                  lag_period=predict_period)    
+    
     
     # Data 2 - 填息 ...
-    sale_mon_data2, _ = data_process(df=sale_mon_data2, 
-                                     ma_group_by=['STOCK_SYMBOL'], 
-                                     norm_group_by=['STOCK_SYMBOL'],   
-                                     lag_group_by=['STOCK_SYMBOL'], 
-                                     ma=False, normalize=True, lag=False, 
-                                     ma_except=['EX_DIVIDENDS_DONE'], 
-                                     lag_except=['EX_DIVIDENDS_DONE'], 
-                                     drop_except=[])
-    
+    sale_mon_data2, _ = \
+        cbyz.ml_data_process(df=sale_mon_data2, 
+                             ma=False, normalize=True, lag=False, 
+                             ma_group_by=['STOCK_SYMBOL'],
+                             norm_group_by=['STOCK_SYMBOL'], 
+                             lag_group_by=['STOCK_SYMBOL'],
+                             ma_cols_contains=[], 
+                             ma_except_contains=['EX_DIVIDENDS_DONE'],
+                             norm_cols_contains=[], 
+                             norm_except_contains=[],
+                             lag_cols_contains=[], 
+                             lag_except_contains=['EX_DIVIDENDS_DONE'], 
+                             drop_except_contains=[],
+                             ma_values=ma_values, 
+                             lag_period=predict_period)    
+        
     loc_main = loc_main \
         .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'STOCK_SYMBOL']) \
         .merge(sale_mon_data2, how='left', on=['WORK_DATE', 'STOCK_SYMBOL'])

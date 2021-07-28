@@ -124,9 +124,9 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     # Prepare For Backtest Records ......
     print('backtest_predict - 這裡有bug，應該用global calendar')
     bt_info_raw = cbyz.date_get_seq(begin_date=bt_last_begin,
-                                seq_length=bt_times,
-                                unit='d', interval=-interval,
-                                simplify_date=True)
+                                    seq_length=bt_times,
+                                    unit='d', interval=-interval,
+                                    simplify_date=True)
     
     bt_info = bt_info_raw[['WORK_DATE']] \
             .reset_index() \
@@ -593,12 +593,12 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20210728
+    _bt_last_begin = 20210729
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 10
-    _bt_times = 5
+    _bt_times = 1
     data_period = int(365 * 2)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
