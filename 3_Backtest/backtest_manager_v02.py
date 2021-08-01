@@ -332,8 +332,8 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     
     if len(records)  > 0:
         records = records \
-            .rename(columns={'FORECAST_PRECISION_MEAN':'RECORD_PRECISION_MEAN',
-                             'FORECAST_PRECISION_MAX':'RECORD_PRECISION_MAX'})
+            .rename(columns={'FORECAST_PRECISION_MEDIAN':'RECORD_PRECISION_MEDIAN',
+                             'FORECAST_PRECISION_STD':'RECORD_PRECISION_STD'})
             
     # Add name ......
     stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
@@ -356,8 +356,8 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
                        'CLOSE_PROFIT_RATIO_PREDICT']
         
     profit_cols = profit_cols \
-        + ['RECORD_PRECISION_MEAN', 'RECORD_PRECISION_MAX', 
-           'DIFF_MEAN', 'DIFF_MAX']
+        + ['RECORD_PRECISION_MEDIAN', 'RECORD_PRECISION_STD', 
+           'DIFF_MEDIAN', 'DIFF_STD']
         
     
     cols_1 = ['BACKTEST_ID', 'STOCK_SYMBOL', 'STOCK_NAME', 'INDUSTRY',
@@ -376,10 +376,10 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
         actions = actions.merge(records, how='left', on=['STOCK_SYMBOL'])
     
         actions.loc[:, 'DIFF_MEAN'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
-            - actions['RECORD_PRECISION_MEAN']
+            - actions['RECORD_PRECISION_MEDIAN']
     
         actions.loc[:, 'DIFF_MAX'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
-            - actions['RECORD_PRECISION_MAX']
+            - actions['RECORD_PRECISION_STD']
     
         actions = actions[new_cols]
 
@@ -596,8 +596,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
-    _interval = 3
-    _bt_times = 3
+    _interval = 2
+    _bt_times = 5
     data_period = int(365 * 2)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
@@ -606,7 +606,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
-    _ma_values = [10,20]
+    _ma_values = [5,10,20]
     # _ma_values = [5,10,20]
     # _ma_values = [5,10,20,40]
     _volume_thld = 500

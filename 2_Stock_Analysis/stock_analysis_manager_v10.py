@@ -1143,6 +1143,9 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
     
     main_data = main_data[~main_data['STOCK_SYMBOL'].isin(symbols_removed)] \
                 .reset_index(drop=True)
+                
+                
+    main_data = main_data.dropna(subset=model_x)
 
 
     # Check - X裡面不應該有na，但Y的預測區間會是na ......
@@ -1582,16 +1585,13 @@ def master(_predict_begin, _predict_end=None,
     # Optimize ......
     # 1. Modify pipeline, calculate ma and normalize then merge
 
-
-
-
     
     global version
     version = 1.0
 
     
     # _data_period = int(365 * 2)
-    # _predict_begin = 20210726
+    # _predict_begin = 20210803
     # _predict_end = None
     # _stock_type = 'tw'
     # # ma_values = [2,5,20,60]
@@ -1706,7 +1706,13 @@ def check():
     
     debug = cbyz.df_conv_col_type(df=debug, cols=['MAX'], to='float')
     chk = debug[debug['MAX']>1]
+
+
+    # Check NA ......
+    chk_na = cbyz.df_chk_col_na(df=na_df, positive_only=True, return_obj=True,
+                                alert=True, alert_obj='main_data')
     
+        
     
 
 
