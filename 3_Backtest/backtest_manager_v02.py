@@ -69,7 +69,8 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v06 as sam
 # import stock_analysis_manager_v07 as sam
 # import stock_analysis_manager_v07_02 as sam
-import stock_analysis_manager_v07_03 as sam
+# import stock_analysis_manager_v07_03 as sam
+import stock_analysis_manager_v10 as sam
 
 
 
@@ -157,7 +158,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
                                  _stock_symbol=stock_symbol,
-                                 ma_values=ma_values,
+                                 _ma_values=ma_values,
                                  _volume_thld=volume_thld)
 
 
@@ -451,23 +452,23 @@ def eval_metrics(export_file=False, upload=False):
                  
         
         # MAPE Overview
-        new_mape = cbyz.summary(df=mape_main_abs, group_by=[], cols='MAPE')
+        new_mape = cbyz.df_summary(df=mape_main_abs, group_by=[], cols=['MAPE'])
         new_mape.loc[:, 'Y'] = y
         mape = mape.append(new_mape)
         
         
         # Group MAPE ......
-        new_mape = cbyz.summary(df=mape_main_abs, group_by='OVERESTIMATE', 
-                                 cols='MAPE')
+        new_mape = cbyz.df_summary(df=mape_main_abs, group_by=['OVERESTIMATE'], 
+                                 cols=['MAPE'])
         new_mape.loc[:, 'Y'] = y
         mape_group = mape_group.append(new_mape)
         
         
         # Extreme MAPE ......
         new_mape = mape_main_abs[mape_main_abs['MAPE'] > 0.1]
-        new_mape = cbyz.summary(df=new_mape, 
+        new_mape = cbyz.df_summary(df=new_mape, 
                                 group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
-                                cols='MAPE')
+                                cols=['MAPE'])
         
         if len(new_mape) > 0:
             new_mape.loc[:, 'Y'] = y
@@ -593,7 +594,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20210730
+    _bt_last_begin = 20210726
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)

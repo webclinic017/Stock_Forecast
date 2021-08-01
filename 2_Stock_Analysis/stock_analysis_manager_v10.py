@@ -1549,7 +1549,7 @@ def master(_predict_begin, _predict_end=None,
     
     
     global version
-    version = 0.8
+    version = 1.0
 
     
     # _data_period = 90
