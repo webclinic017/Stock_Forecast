@@ -593,7 +593,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20210729
+    _bt_last_begin = 20210730
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
