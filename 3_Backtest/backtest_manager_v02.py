@@ -229,7 +229,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     
 
     # Hist Data ......
-    # loc_begin = 20180101
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
                                  data_end=bt_last_end, 
                                  stock_type=stock_type, 
@@ -339,7 +338,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     # Add name ......
     stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
     
-    stock_info = stock_info[['STOCK_SYMBOL', 'STOCK_NAME']]
+    stock_info = stock_info[['STOCK_SYMBOL', 'STOCK_NAME', 'INDUSTRY']]
     actions = actions.merge(stock_info, how='left', on='STOCK_SYMBOL')      
 
 
@@ -361,7 +360,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
            'DIFF_MEAN', 'DIFF_MAX']
         
     
-    cols_1 = ['BACKTEST_ID', 'STOCK_SYMBOL', 'STOCK_NAME', 
+    cols_1 = ['BACKTEST_ID', 'STOCK_SYMBOL', 'STOCK_NAME', 'INDUSTRY',
               'BUY_SIGNAL', 'HOLD', 'WORK_DATE', 'LAST_DATE']
 
     model_y_last = [s + '_LAST' for s in model_y]
@@ -572,7 +571,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 3. 除權息會拉抬N天的服價，把N用weight的方式考慮進去
     # 4. data_process中的lag，應該是要針對vars處理，還是針對y處理？
     # 5. 美股指數
-    # 6. Remove limit up/down
     # 7. Add machine learning error function
     # 8. 之前的code是不是沒有把股本正確normalize / Add EPS
     # 9. Add DIFF_MAPE_MIN
@@ -594,12 +592,12 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20210726
+    _bt_last_begin = 20210802
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
-    _interval = 10
-    _bt_times = 1
+    _interval = 3
+    _bt_times = 3
     data_period = int(365 * 2)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
@@ -698,17 +696,17 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     digi_format = workbook.add_format({'num_format':'0.0'})
     percent_format = workbook.add_format({'num_format':'0.0%'})
 
-    cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
-                          startrow=1, endrow=9999,
-                          startcol=8, endcol=12)
-
     cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
                           startrow=1, endrow=9999,
-                          startcol=7, endcol=7)    
+                          startcol=8, endcol=8)    
+    
+    cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
+                          startrow=1, endrow=9999,
+                          startcol=9, endcol=13)
     
     cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
                           startrow=1, endrow=9999,
-                          startcol=13, endcol=16)    
+                          startcol=14, endcol=17)  
     writer.save()
 
 

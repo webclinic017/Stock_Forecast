@@ -1215,7 +1215,7 @@ def predict():
 
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, _data_period=180, 
-           _stock_symbol=[], _stock_type='tw', ma_values=[3,5,20,60],
+           _stock_symbol=[], _stock_type='tw', _ma_values=[3,5,20,60],
            _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE'],
            _volume_thld=1000):
     '''
@@ -1280,6 +1280,8 @@ def master(_predict_begin, _predict_end=None,
     # _model_y= ['CLOSE']
     # _volume_thld = 1000
     
+    ma_values=_ma_values
+    
     
     global volume_thld
     volume_thld = _volume_thld
@@ -1319,7 +1321,7 @@ def master(_predict_begin, _predict_end=None,
     
     
     # 0707 - industry可以提高提精準，trade_value會下降
-    data_raw = get_model_data(ma_values=ma_values, 
+    data_raw = get_model_data(ma_values=_ma_values, 
                               industry=True, 
                               trade_value=True)
     
