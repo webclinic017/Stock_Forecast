@@ -70,7 +70,8 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v07 as sam
 # import stock_analysis_manager_v07_02 as sam
 # import stock_analysis_manager_v07_03 as sam
-import stock_analysis_manager_v10 as sam
+# import stock_analysis_manager_v10 as sam
+import stock_analysis_manager_v10_1 as sam
 
 
 
@@ -597,7 +598,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 2
-    _bt_times = 3
+    _bt_times = 1
     data_period = int(365 * 2)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
