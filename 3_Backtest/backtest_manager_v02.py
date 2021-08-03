@@ -375,10 +375,10 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     if len(records) > 0:
         actions = actions.merge(records, how='left', on=['STOCK_SYMBOL'])
     
-        actions.loc[:, 'DIFF_MEAN'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
+        actions.loc[:, 'DIFF_MEDIAN'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
             - actions['RECORD_PRECISION_MEDIAN']
     
-        actions.loc[:, 'DIFF_MAX'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
+        actions.loc[:, 'DIFF_STD'] = actions['CLOSE_PROFIT_RATIO_PREDICT'] \
             - actions['RECORD_PRECISION_STD']
     
         actions = actions[new_cols]
@@ -397,7 +397,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     cond2 = cond2['STOCK_SYMBOL'].unique().tolist()    
     
     # Max Error ...
-    cond3 = actions[actions['DIFF_MAX']>=rmse_thld]
+    cond3 = actions[actions['DIFF_STD']>=rmse_thld]
     cond3 = cond3['STOCK_SYMBOL'].unique().tolist()       
     
     
@@ -664,7 +664,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [1474, 2002, 8105, 2356, 6153]
+    hold = [1474, 2002, 8105, 2356]
     
     
     cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=-0.05,
