@@ -326,6 +326,11 @@ def sam_load_data(industry=True, trade_value=True):
                             lag_period=predict_period)
         
         
+    # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
+    y_lag = [y + '_LAG' for y in model_y]
+    loc_main = loc_main.drop(y_lag, axis=1)
+    
+        
     # Total Market Trade
     if trade_value:
         total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
@@ -905,7 +910,6 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
     #                           on=['STOCK_SYMBOL', 'WORK_DATE'])      
 
 
-
     # Government Invest ......
     gov_invest = stk.opd_get_gov_invest(path=path_resource)
     main_data = main_data.merge(gov_invest, how='left', on=['STOCK_SYMBOL'])
@@ -1220,8 +1224,6 @@ def get_model(y_index, cv=5, load_model=False, export_model=True, path=None):
     
 
 
-
-
     y = model_y[y_index].lower()
     model_path = path_export + '/saved_model_' + y + '.sav'    
     
@@ -1249,7 +1251,7 @@ def get_model(y_index, cv=5, load_model=False, export_model=True, path=None):
         'xbgoost': {
             'model': xgb.XGBRegressor(),
             'params': {
-                'n_estimators': [200, 400],
+                'n_estimators': [200, 250],
                 'gamma':[0, 0.5],
                 'max_depth':[4, 6]
             },
@@ -1303,7 +1305,7 @@ def get_model(y_index, cv=5, load_model=False, export_model=True, path=None):
 # ..............
 
 
-def predict(load_model=False):
+def predict(load_model=False, cv=5):
     
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end    
@@ -1320,8 +1322,8 @@ def predict(load_model=False):
     
     for i in range(0, len(model_y)):
 
-        model = get_model(y_index=i, cv=2, load_model=load_model, 
-                              export_model=True, path=path_export)
+        model = get_model(y_index=i, cv=cv, load_model=load_model, 
+                          export_model=True, path=path_export)
 
 
         # Feature Importance ......
@@ -1378,7 +1380,7 @@ def master(_predict_begin, _predict_end=None,
            _predict_period=15, _data_period=180, 
            _stock_symbol=[], _stock_type='tw', _ma_values=[3,5,20,60],
            _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE'],
-           _volume_thld=1000, load_model=False):
+           _volume_thld=1000, load_model=False, cv=2):
     '''
     主工作區
     '''
@@ -1429,26 +1431,26 @@ def master(_predict_begin, _predict_end=None,
 
     
     global version
-    version = 1.01
+    version = 1.02
 
-    
-    _data_period = int(365 * 2)
-    _predict_begin = 20210802
-    _predict_end = None
-    _stock_type = 'tw'
-    # ma_values = [2,5,20,60]
-    _ma_values = [5,10,20]
-    _predict_period = 5
-    _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
-    _stock_symbol = []
-    _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # _model_y = ['PRICE_CHANGE_RATIO']      
-    # _model_y= ['CLOSE']
-    _volume_thld = 1000
-    
-    
-    industry=True
-    trade_value=True
+
+    # industry=True
+    # trade_value=True      
+    # _data_period = int(365 * 2)
+    # _predict_begin = 20210802
+    # _predict_end = None
+    # _stock_type = 'tw'
+    # # ma_values = [2,5,20,60]
+    # _ma_values = [5,10,20]
+    # _predict_period = 5
+    # _stock_symbol = ['2301', '2474', '1714', '2385', '3043']
+    # _stock_symbol = []
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # # _model_y = ['PRICE_CHANGE_RATIO']      
+    # # _model_y= ['CLOSE']
+    # _volume_thld = 1000
+    # load_model = False
+    # cv = 5
     
     
     global volume_thld
@@ -1505,7 +1507,7 @@ def master(_predict_begin, _predict_end=None,
     
     
     global predict_results
-    predict_results = predict(load_model=load_model)
+    predict_results = predict(load_model=load_model, cv=cv)
     predict_results
     # features = predict_results[2]
     

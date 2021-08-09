@@ -150,8 +150,8 @@ def query_ewtinst1c():
     
     # Now
     # 0722刪掉重上傳
-    begin = 20210803
-    end = 20210803
+    begin = 20210805
+    end = 20210806
         
     
     begin_str = cbyz.ymd(begin)

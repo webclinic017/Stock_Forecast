@@ -71,7 +71,7 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v07_02 as sam
 # import stock_analysis_manager_v07_03 as sam
 # import stock_analysis_manager_v10 as sam
-import stock_analysis_manager_v10_1 as sam
+import stock_analysis_manager_v10_2 as sam
 
 
 
@@ -118,7 +118,7 @@ def set_calendar(_bt_last_begin, predict_period):
     
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
-                     bt_times, data_period):
+                     bt_times, data_period, load_model=False):
     
     
     global stock_symbol, stock_type, bt_info
@@ -160,7 +160,8 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                                  _data_period=data_period, 
                                  _stock_symbol=stock_symbol,
                                  _ma_values=ma_values,
-                                 _volume_thld=volume_thld)
+                                 _volume_thld=volume_thld,
+                                 load_model=load_model)
 
 
         new_results = results_raw[0]
@@ -184,10 +185,19 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                                       except_cols=['STOCK_SYMBOL', 'WORK_DATE', 
                                                    'MODEL', 'BACKTEST_ID'])
 
+    # rmse = rmse \
+    #     .sort_values(by=['MODEL', 'Y']) \
+    #     .reset_index(drop=True)
+    
+    
+
+    rmse['MODEL'] = 'Auto_Tuning'
+    
+    
+    
     rmse = rmse \
         .sort_values(by=['MODEL', 'Y']) \
-        .reset_index(drop=True)
-    
+        .reset_index(drop=True)    
 
 # ............
 
@@ -276,7 +286,9 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     main_data = bt_results.merge(main_data_pre, how='left', 
                                  on=['WORK_DATE', 'STOCK_SYMBOL'])
 
-
+    print('Tempraily Used')
+    main_data['MODEL'] = 'Auto_Tuning'
+    
     main_data = main_data[['BACKTEST_ID', 'STOCK_SYMBOL', 'MODEL', 
                            'WORK_DATE', 'LAST_DATE'] \
                           + model_y + hist_cols + last_cols]
@@ -337,7 +349,11 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
                              'FORECAST_PRECISION_STD':'RECORD_PRECISION_STD'})
             
     # Add name ......
+    # 早上08:56執行會出錯
     stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
+    # stock_info = pd.read_csv('/Users/Aron/Documents/GitHub/Data/Stock_Forecast/3_Backtest/Temp/tw_get_stock_info.csv')
+    # stock_info['STOCK_SYMBOL'] = stock_info['STOCK_SYMBOL'].astype('str')
+    
     
     stock_info = stock_info[['STOCK_SYMBOL', 'STOCK_NAME', 'INDUSTRY']]
     actions = actions.merge(stock_info, how='left', on='STOCK_SYMBOL')      
@@ -593,13 +609,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20210803
+    _bt_last_begin = 20210809
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
     _interval = 2
     _bt_times = 1
-    data_period = int(365 * 2)
+    data_period = int(365 * 3)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
     # data_period = 365 * 5
@@ -641,7 +657,8 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      predict_period=predict_period, 
                      interval=interval,
                      bt_times=bt_times,
-                     data_period=data_period)
+                     data_period=data_period,
+                     load_model=False)
 
     
     # Profit ------    

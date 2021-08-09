@@ -295,7 +295,7 @@ def master(overwrite=False, upload=True):
             return ''
         
     # Check
-    # data['WORK_DATE'] = 20210730
+    # data['WORK_DATE'] = 20210806
     # data[data['STOCK_SYMBOL']=='2399']
     
         
