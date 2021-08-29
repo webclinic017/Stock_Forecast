@@ -283,10 +283,8 @@ def master(overwrite=False, upload=True):
         hist_data = hist_data[hist_data['DATE_MAX']==hist_data['WORK_DATE']] \
                     .reset_index(drop=True)
                     
-                    
         hist_data = hist_data[['WORK_DATE', 'STOCK_SYMBOL', 
                                'OPEN', 'CLOSE', 'HIGH', 'LOW']]
-        
         
         chk_diff = ar.df_chk_diff(chk_data, hist_data, on='STOCK_SYMBOL',
                                   chk_na=False)
@@ -295,7 +293,7 @@ def master(overwrite=False, upload=True):
             return ''
         
     # Check
-    # data['WORK_DATE'] = 20210806
+    # data['WORK_DATE'] = 20210813
     # data[data['STOCK_SYMBOL']=='2399']
     
         

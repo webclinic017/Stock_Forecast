@@ -65,13 +65,8 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-# import stock_analysis_manager_v05 as sam
-# import stock_analysis_manager_v06 as sam
-# import stock_analysis_manager_v07 as sam
-# import stock_analysis_manager_v07_02 as sam
-# import stock_analysis_manager_v07_03 as sam
-# import stock_analysis_manager_v10 as sam
-import stock_analysis_manager_v10_2 as sam
+# import stock_analysis_manager_v1_02 as sam
+import stock_analysis_manager_v1_03 as sam
 
 
 
@@ -349,7 +344,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
                              'FORECAST_PRECISION_STD':'RECORD_PRECISION_STD'})
             
     # Add name ......
-    # 早上08:56執行會出錯
     stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
     # stock_info = pd.read_csv('/Users/Aron/Documents/GitHub/Data/Stock_Forecast/3_Backtest/Temp/tw_get_stock_info.csv')
     # stock_info['STOCK_SYMBOL'] = stock_info['STOCK_SYMBOL'].astype('str')
@@ -605,11 +599,12 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 19. Analysis, 近60日投報率，用產業或主題作分群 / 財報
     # 20. Add Sell Signal
     # 21. 產業上中下游關係，SNA
+    # 22. Update, load last version of model
 
 
     
     # Parameters
-    _bt_last_begin = 20210809
+    _bt_last_begin = 20210827
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
@@ -658,7 +653,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      interval=interval,
                      bt_times=bt_times,
                      data_period=data_period,
-                     load_model=False)
+                     load_model=True)
 
     
     # Profit ------    
@@ -682,13 +677,14 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [1474, 2002, 8105, 2356]
+    hold = [1474, 2002, 8105, 2069]
     
     
+    # Check, rmse_thld=-0.05是否合理
     cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=-0.05,
-               execute_begin=2107220000, 
+               execute_begin=2108110000, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=True) 
+               file_name=None, upload_metrics=False) 
     
     
     # actions = actions[actions['MODEL']=='model_6']
