@@ -203,6 +203,8 @@ def get_market_data_raw(industry=True, trade_value=True):
                             trade_value=trade_value,
                             local=local, tej=True)
         
+        # backup = market_data_raw.copy()
+        # market_data_raw = backup.copy()
 
     # Exclude New Symbols ......
     # Exclude the symbols that listing date shorter than data_period
@@ -533,19 +535,11 @@ def select_stock_symbols():
 
     '''    
 
-
-
     global market_data_raw
     global stock_info_raw
 
-
-    # Select Rules
-    # 1. 先找百元以下的，才有資金可以買一整張
-    # 2. 不要找疫情後才爆漲到歷史新高的
-
     # global predict_date
     # predict_begin = cbyz.date_cal(predict_date[0], -3, 'm')
-
 
     # data_end = cbyz.date_get_today()
     # data_begin = cbyz.date_cal(data_end, -1, 'm')
@@ -557,17 +551,27 @@ def select_stock_symbols():
 
 
     # Exclude Low Value ......
-    low_volume = market_data_raw \
+    global volume_thld
+    global data_end
+    loc_begin = cbyz.date_cal(data_end, -30, 'd')
+    
+    low_volume = df[(df['WORK_DATE']>=loc_begin) \
+                    & (df['WORK_DATE']<=data_end)]
+    
+    low_volume = low_volume \
         .groupby(['STOCK_SYMBOL']) \
         .agg({'VOLUME':'min'}) \
-        .reset_index() 
-
-    global volume_thld
-    low_volume = low_volume[low_volume['VOLUME']<volume_thld * 1000]
+        .reset_index()
+        
+        
+    low_volume = low_volume[low_volume['VOLUME']<=volume_thld * 1000]
+    low_volume = low_volume[['STOCK_SYMBOL']].drop_duplicates()
     
-    if volume_thld > 0 and len(low_volume) > 0:
-        low_volume = low_volume[['STOCK_SYMBOL']]
-        df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
+    df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
+    
+    # if volume_thld > 0 and len(low_volume) > 0:
+    #     low_volume = low_volume[['STOCK_SYMBOL']]
+    #     df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
 
 
     return df
@@ -1208,17 +1212,6 @@ def get_model(y_index, cv=5, load_model=False, export_model=True, path=None):
             return loaded_model
 
     # 參數設定 ......
-    # model_params = {
-        # 'xbgoost': {
-        #     'model': xgb.XGBRegressor(),
-        #     'params': {
-        #         'n_estimators': [200, 400],
-        #         'gamma':[0, 0.5],
-        #         'max_depth':[4, 6]
-        #     },
-        # }
-    # }
-
     model_params = {
         'xbgoost': {
             'model': xgb.XGBRegressor(),
@@ -1414,23 +1407,23 @@ def master(_predict_begin, _predict_end=None,
     version = 1.03
 
 
-    industry=True
-    trade_value=True      
-    _data_period = int(365 * 2)
-    _predict_begin = 20210830
-    _predict_end = None
-    _stock_type = 'tw'
-    # ma_values = [2,5,20,60]
-    _ma_values = [5,10,20]
-    _predict_period = 5
-    _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    _stock_symbol = []
-    _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # _model_y = ['PRICE_CHANGE_RATIO']      
-    # _model_y= ['CLOSE']
-    _volume_thld = 1000
-    load_model = False
-    cv = 2
+    # industry=True
+    # trade_value=True      
+    # _data_period = int(365 * 2)
+    # _predict_begin = 20210830
+    # _predict_end = None
+    # _stock_type = 'tw'
+    # # ma_values = [2,5,20,60]
+    # _ma_values = [5,10,20]
+    # _predict_period = 5
+    # _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    # _stock_symbol = []
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
+    # # _model_y = ['PRICE_CHANGE_RATIO']      
+    # # _model_y= ['CLOSE']
+    # _volume_thld = 700
+    # load_model = False
+    # cv = 2
     
     
     global volume_thld

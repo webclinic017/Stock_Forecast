@@ -152,8 +152,8 @@ def query(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False):
         tables.append('ewprcd') # 證券交易資料表
 
 
-    begin = 20210826
-    end = 20210829
+    begin = 20210831
+    end = 20210831
 
 
     # begin = 20210819

@@ -240,7 +240,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
                                  stock_type=stock_type, 
                                  stock_symbol=stock_symbol, 
                                  price_change=True,
-                                 local=local)
+                                 local=local, tej=True)
     
     hist_data_raw = hist_data_raw[['WORK_DATE', 'STOCK_SYMBOL'] + model_y]
     
@@ -331,6 +331,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     # Forecast Records ......
     # records_begin = cbyz.date_cal(bt_last_begin, -2, 'm')
     print('暫時移除records_begin')
+    print('Bug - get_forecast_records中的Action Score根本沒用到')
     records = stk.get_forecast_records(forecast_begin=None, 
                                         forecast_end=None, 
                                         execute_begin=execute_begin, 
@@ -376,7 +377,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
 
     model_y_last = [s + '_LAST' for s in model_y]
     model_y_hist = [s + '_HIST' for s in model_y]    
-    cols_2 = ['RMSE_MEAN']
+    cols_2 = ['RMSE_MEDIAN']
     
     new_cols = cols_1 + profit_cols + model_y + model_y_last \
                 + model_y_hist + cols_2
@@ -408,13 +409,13 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     cond2 = cond2['STOCK_SYMBOL'].unique().tolist()    
     
     # Max Error ...
-    cond3 = actions[actions['DIFF_STD']>=rmse_thld]
+    cond3 = actions[actions['DIFF_STD']<rmse_thld]
     cond3 = cond3['STOCK_SYMBOL'].unique().tolist()       
     
     
     buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
-    actions['BUY_SIGNAL'] = np.where(actions['STOCK_SYMBOL'].isin(buy_signal_symbols),
-                                     1, 0)
+    actions['BUY_SIGNAL'] = \
+        np.where(actions['STOCK_SYMBOL'].isin(buy_signal_symbols), 1, 0)
 
     
 
@@ -576,6 +577,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
 
     # Worklist
+    # 0. Call notification function in backtest manager, and add stop loss 
+    #    in excel
+    # 1. Export Features
+    # 2. Price change of OHLC
     # 1. Add date index to indentify feature of time series
     #    > Add this to sam v7 and v8
     # 2. Add DIFF_MAPE_MEDIAN
@@ -600,11 +605,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 20. Add Sell Signal
     # 21. 產業上中下游關係，SNA
     # 22. Update, load last version of model
+    # 23. 在Excel中排除交易量低的
+    # 24. 把股性分群
 
 
     
     # Parameters
-    _bt_last_begin = 20210827
+    _bt_last_begin = 20210901
     # _bt_last_begin = 20210707
     predict_period = 5
     # interval = random.randrange(90, 180)
@@ -618,10 +625,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     _stock_symbol = []
     _stock_type = 'tw'
-    _ma_values = [5,10,20]
     # _ma_values = [5,10,20]
     # _ma_values = [5,10,20,40]
-    _volume_thld = 500
+    _ma_values = [5,10,20,60]
+    _volume_thld = 750
 
 
     global interval, bt_times, volume_thld
@@ -662,7 +669,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # y_thld=0.05
     # time_thld=predict_period
-    # rmse_thld=-0.05
+    # rmse_thld=0.05
     # export_file=True
     # load_file=True
     # path=path_temp
@@ -677,14 +684,15 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [1474, 2002, 8105, 2069]
+    hold = [2002, 8105, 2606]
     
     
     # Check, rmse_thld=-0.05是否合理
-    cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=-0.05,
+    print('Bug - get_forecast_records中的Action Score根本沒用到')
+    cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=0.03,
                execute_begin=2108110000, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False) 
+               file_name=None, upload_metrics=True) 
     
     
     # actions = actions[actions['MODEL']=='model_6']
