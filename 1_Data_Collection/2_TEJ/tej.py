@@ -106,37 +106,13 @@ def check():
 
     
 
-def upload():    
-    
-    table = 'ewtinst1c' # 三大法人持股成本
-    table = 'ewprcd'   # 證券交易資料表
-    
-    file_path = path_export + '/' + table
-    files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
-                             remove_temp=True)
-    
-    files = files['FILES']
-    
-    
-    for i in range(len(files)):
-    
-        name = files.loc[i, 'FILE_NAME']
-        file = pd.read_csv(file_path + '/' + name)
-
-        file['mdate'] = pd.to_datetime(file.mdate)
-        file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
-    
-        ar.db_upload(data=file, table_name=table)
-
-
 
 
 # %% Query ------
 
 
-
-
-def query(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False):
+def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False, 
+           upload=True):
     '''
     證券交易資料表
     - 一個月51034筆
@@ -144,20 +120,17 @@ def query(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False):
     
     tables = []
     
-    if ewprcd2:
-        tables.append('ewprcd2') # 報酬率資訊表
-    elif ewtinst1c:
+    if ewtinst1c:
         tables.append('ewtinst1c') # 三大法人持股成本
     elif ewprcd:
         tables.append('ewprcd') # 證券交易資料表
+    elif ewprcd2:
+        tables.append('ewprcd2') # 報酬率資訊表
 
 
-    begin = 20210831
-    end = 20210831
+    begin = 20210901
+    end = 20210901
 
-
-    # begin = 20210819
-    # end = 20210819
 
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')
@@ -178,6 +151,7 @@ def query(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False):
             ar.db_execute(sql, commit=True)    
     
     
+    # Query ......
     # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
     # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
     for i in range(len(tables)):
@@ -191,6 +165,31 @@ def query(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False):
                     + begin_str + '_' + end_str + '.csv', 
                     index=False)
 
+    # Upload ......
+    # Update, auto delete the latest file
+    if upload:
+        
+        for i in range(len(tables)):
+            
+            table = tables[i]
+            
+            # Get file list
+            file_path = path_export + '/' + table
+            files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
+                                     remove_temp=True)
+
+            files = files['FILES']
+        
+        
+            for j in range(len(files)):
+                
+                name = files.loc[j, 'FILE_NAME']
+                file = pd.read_csv(file_path + '/' + name)
+        
+                file['mdate'] = pd.to_datetime(file.mdate)
+                file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            
+                ar.db_upload(data=file, table_name=table)
 
      
 
@@ -343,50 +342,6 @@ def query_ewsale():
 
 
 
-
-
-def query_ewiprcd():
-    '''
-    指數資料，不好用
-    '''
-
-    begin = 20190101
-    end = 20201231
-    
-    begin_str = cbyz.ymd(begin)
-    begin_str = begin_str.strftime('%Y-%m-%d')
-
-
-    end_str = cbyz.ymd(end)
-    end_str = end_str.strftime('%Y-%m-%d')    
-    
-    data = tejapi.get('TWN/EWIPRCD',
-                      mdate={'gte':begin_str, 'lte':end_str})
-
-
-    data.to_csv(path_export + '/ewiprcd_data_' + begin_str + '_' + end_str + '.csv', 
-                index=False)
-    
-    
-    
-
-
-
-def query_index2():
-    '''
-    指數資料
-    '''
-    
-    # 證券屬性表 - 3210筆 
-    # data = tejapi.get('TWN/EWNPRCSTD')
-    # data.to_csv(path_export + '/ewnprcstd_data.csv', index=False,
-    #             encoding='utf-8-sig')
-
-
-    # 指數屬性表 - 115筆 
-    # data = tejapi.get('TWN/EWIPRCSTD')
-    # data.to_csv(path_export + '/ewiprcstd_data.csv', index=False,
-    #             encoding='utf-8-sig')
 
 
 

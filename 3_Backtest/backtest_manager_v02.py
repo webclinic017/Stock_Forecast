@@ -66,7 +66,8 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 # import stock_analysis_manager_v1_02 as sam
-import stock_analysis_manager_v1_03 as sam
+# import stock_analysis_manager_v1_03 as sam
+import stock_analysis_manager_v1_04 as sam
 
 
 
@@ -579,7 +580,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # Worklist
     # 0. Call notification function in backtest manager, and add stop loss 
     #    in excel
-    # 1. Export Features
     # 2. Price change of OHLC
     # 1. Add date index to indentify feature of time series
     #    > Add this to sam v7 and v8
@@ -590,14 +590,9 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 7. Add machine learning error function
     # 8. 之前的code是不是沒有把股本正確normalize / Add EPS
     # 9. Add DIFF_MAPE_MIN
-    # 10. Last Price, add limit up
-    # 11. 預測結果出來後，通常會再下跌一波，下跌完才上漲，所以要挑的應該是第N天下跌，
-    #     N+1開始上漲，抓轉折點
     # 12. Set the result of long-term MA as a table
     # 13. Update, optimize capitial_level with kmeans
-    # 14. Capture 反彈趨勢
     # 15. excel中沒有 富鼎(8261)
-    # 16. Add buy signal
     # 17. 長期的forecast by week
     # 18. When backtest, check if the symbol reached the target price in the 
     #     next N weeks.
@@ -660,7 +655,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      interval=interval,
                      bt_times=bt_times,
                      data_period=data_period,
-                     load_model=True)
+                     load_model=False)
 
     
     # Profit ------    
@@ -678,13 +673,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     global bt_main, actions
     
-    # Optimize, 這裡的rmse_thld實際上是mape
+    # Optimize, 這裡的rmse_thld實際上是mape, 改成precision
     # 算回測precision的時候，可以低估，但不可以高估
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [2002, 8105, 2606]
+    hold = [8105, 2606, 2610]
     
     
     # Check, rmse_thld=-0.05是否合理
@@ -694,10 +689,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                export_file=True, load_file=True, path=path_temp,
                file_name=None, upload_metrics=True) 
     
-    
-    # actions = actions[actions['MODEL']=='model_6']
-    # actions = cbyz.df_add_size(df=actions, group_by='STOCK_SYMBOL',
-    #                            col_name='ROWS')
 
 
     # Export ......
@@ -731,19 +722,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                           startcol=14, endcol=17)  
     writer.save()
 
-
     
-    # Full Data
-    # full_data = sam.sam_load_data(data_begin=None, data_end=None, 
-    #                               stock_type=stock_type, period=None, 
-    #                               stock_symbol=stock_symbol, 
-    #                               lite=False, full=True)
-
-
-    # full_data = full_data['FULL_DATA']    
-
-    
-    return ''
 
 
 
