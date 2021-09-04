@@ -76,99 +76,6 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 # %% Inner Function ------
 
 
-# def data_process(df, ma_group_by=[], norm_group_by=[], lag_group_by=[], 
-#                  date_col='WORK_DATE', 
-#                  ma=True, normalize=True, lag=True, 
-#                  ma_cols=[], ma_except=[], norm_cols=[], norm_except=[],
-#                  lag_cols=[], lag_except=[], drop_except=[]):
-
-#     global ma_values, predict_period
-    
-#     # Convert To List ......
-#     ma_group_by = cbyz.conv_to_list(ma_group_by)
-#     norm_group_by = cbyz.conv_to_list(norm_group_by)
-#     lag_group_by = cbyz.conv_to_list(lag_group_by)
-    
-#     # MA
-#     ma_cols = cbyz.conv_to_list(ma_cols)
-#     ma_except = cbyz.conv_to_list(ma_except)
-    
-#     # Normalize
-#     norm_cols = cbyz.conv_to_list(norm_cols)
-#     norm_except = cbyz.conv_to_list(norm_except)
-    
-#     # Lag
-#     lag_cols = cbyz.conv_to_list(lag_cols)
-#     lag_except = cbyz.conv_to_list(lag_except)
-    
-#     drop_except = cbyz.conv_to_list(drop_except)
-    
-#     date_col_list = [date_col]
-#     drop_except = drop_except + date_col_list
-    
-#     cols = list(df.columns)    
-#     main_data = df.copy()
-    
-    
-#     # Calculate MA ......
-#     if ma:
-        
-#         if len(ma_cols) == 0:
-#             cols = cbyz.li_remove_items(cols, 
-#                                         ma_group_by+ma_except+date_col_list)
-#         else:
-#             cols = ma_cols
-            
-#         main_data, ma_cols = cbyz.df_add_ma(df=main_data, cols=cols, 
-#                                            group_by=ma_group_by, 
-#                                            date_col=date_col, values=ma_values,
-#                                            wma=False)
-        
-#         drop_cols = cbyz.li_remove_items(cols, drop_except)
-#         main_data = main_data.drop(drop_cols, axis=1)
-#         cols = ma_cols
-
-
-#     # Normalize ......
-#     if normalize:
-        
-#         if len(norm_cols) == 0:
-#             norm_cols = cbyz.df_get_cols_except(df=main_data, 
-#                                                 except_cols=norm_group_by + norm_except)
-        
-#         main_data, _, _, _ = cbyz.df_normalize(df=main_data,
-#                                               cols=norm_cols,
-#                                               groupby=norm_group_by,
-#                                               show_progress=True)        
-    
-#     # Lag ......
-#     if lag:
-        
-#         if len(lag_cols) == 0:        
-#             lag_cols = cbyz.df_get_cols_except(df=main_data, 
-#                                                except_cols=lag_group_by+lag_except)
-        
-#         main_data, _ = cbyz.df_add_shift(df=main_data, cols=lag_cols, 
-#                                         shift=predict_period,
-#                                         group_by=lag_group_by,
-#                                         suffix='_LAG', 
-#                                         remove_na=False)    
-
-#         drop_cols = cbyz.li_remove_items(lag_cols, drop_except)
-#         main_data = main_data.drop(drop_cols, axis=1)
-
-
-#     cols = cbyz.df_get_cols_except(df=main_data, 
-#                                    except_cols=ma_group_by \
-#                                        +norm_group_by+lag_group_by)
-        
-
-#     return main_data, cols
-
-
-# .............
-
-
 def get_market_data_raw(industry=True, trade_value=True):
     
     
@@ -264,7 +171,7 @@ def get_market_data_raw(industry=True, trade_value=True):
                     .reset_index() \
                     .rename(columns={'index':'DATE_INDEX'})
     
-    calendar_proc, _, _, _, _ = \
+    calendar_proc, _, _ = \
         cbyz.ml_data_process(df=calendar_proc, 
                                   ma=False, normalize=True, lag=False, 
                                   ma_group_by=[],
@@ -308,7 +215,7 @@ def sam_load_data(industry=True, trade_value=True):
     # Process Market Data
     loc_main = market_data_raw.drop('TOTAL_TRADE_VALUE', axis=1)
     
-    loc_main, _, norm_orig, norm_group, norm_method = \
+    loc_main, _, norm_orig = \
         cbyz.ml_data_process(df=loc_main, ma=True, normalize=True, lag=True, 
                             ma_group_by=['STOCK_SYMBOL'],   
                             norm_group_by=['STOCK_SYMBOL'], 
@@ -337,7 +244,7 @@ def sam_load_data(industry=True, trade_value=True):
         total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
             .drop_duplicates(subset=['WORK_DATE'])
         
-        total_trade, _, _, _, _ = \
+        total_trade, _, _ = \
             cbyz.ml_data_process(df=total_trade, ma=True, normalize=True, 
                                  lag=True, ma_group_by=[],
                                  norm_group_by=[], 
@@ -360,7 +267,7 @@ def sam_load_data(industry=True, trade_value=True):
     
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
     
-    stock_info, _, _, _, _ = \
+    stock_info, _, _ = \
         cbyz.ml_data_process(df=stock_info, ma=False, normalize=True, 
                             lag=False, ma_group_by=[],
                             norm_group_by=[], lag_group_by=[],
@@ -453,7 +360,7 @@ def sam_load_data(industry=True, trade_value=True):
         industry_data = industry_data.rename(columns=rename_dict)
                        
         
-        industry_data, _, _, _, _ = \
+        industry_data, _, _ = \
              cbyz.ml_data_process(df=industry_data, 
                                   ma=True, normalize=True, lag=True, 
                                   ma_group_by=['INDUSTRY_ONE_HOT'],
@@ -476,7 +383,7 @@ def sam_load_data(industry=True, trade_value=True):
             .merge(industry_data, how='left', on=['WORK_DATE', 'INDUSTRY_ONE_HOT']) \
             .drop('INDUSTRY_ONE_HOT', axis=1)
         
-    return loc_main, norm_orig, norm_group, norm_method 
+    return loc_main, norm_orig
 
 
 
@@ -850,15 +757,29 @@ def get_google_treneds(begin_date=None, end_date=None,
 
 
 
-def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
+def get_model_data(industry=True, trade_value=True):
     
     
-    global shift_begin, shift_end, data_begin, data_end
+    
+    global shift_begin, shift_end, data_begin, data_end, ma_values
     global predict_date, predict_period, calendar    
     global stock_symbol
     global model_y
-    global market_data_raw    
+    global market_data_raw  
+    global params, error_msg
     
+    
+    params['industry'] = industry
+    params['trade_value'] = trade_value
+
+
+    # Check ......
+    if predict_period > min(ma_values):
+        # Update, raise error here
+        print('get_model_data - predict_period is longer than ma values, ' \
+              + 'and it will cause na.')
+        del main_data    
+
 
     # Stock Info .......
     # stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)  
@@ -870,11 +791,11 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, 'str')
 
 
-    get_market_data_raw(industry=True, trade_value=True)
+    get_market_data_raw(industry=industry, trade_value=trade_value)
     
 
     # Load Historical Data ......
-    main_data, norm_orig, norm_group, norm_method  = \
+    main_data, norm_orig  = \
         sam_load_data(industry=industry, 
                       trade_value=trade_value) 
         
@@ -931,7 +852,7 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
                                      cols=['EX_DIVIDENDS_PRICE', 
                                            'SALE_MON_DATE'])
     
-    sale_mon_data1, _, _, _, _ = \
+    sale_mon_data1, _, _ = \
              cbyz.ml_data_process(df=sale_mon_data1, 
                                   ma=False, normalize=True, lag=False, 
                                   ma_group_by=[],
@@ -947,7 +868,7 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
     
     
     # Data 2 - 填息 ...
-    sale_mon_data2, _, _, _, _ = \
+    sale_mon_data2, _, _ = \
         cbyz.ml_data_process(df=sale_mon_data2, 
                              ma=False, normalize=True, lag=False, 
                              ma_group_by=['STOCK_SYMBOL'],
@@ -990,7 +911,7 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
     # Keep Needed Symbols Only
     ewtinst1c = ewtinst1c.merge(stock_symbol_df, on=['STOCK_SYMBOL'])
     
-    ewtinst1c, _, _, _, _ = \
+    ewtinst1c, _, _ = \
         cbyz.ml_data_process(df=ewtinst1c, 
                              ma=True, normalize=True, lag=True, 
                              ma_group_by=[], norm_group_by=[], 
@@ -1005,7 +926,7 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
                              ma_values=ma_values, 
                              lag_period=predict_period)    
 
-    ewtinst1c, cols, _, _, _ = \
+    ewtinst1c, cols, _ = \
         cbyz.ml_data_process(df=ewtinst1c, 
                              ma=True, normalize=True, lag=True, 
                              ma_group_by=['STOCK_SYMBOL'],
@@ -1047,9 +968,9 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
     
     
     # COVID-19 ......
-    covid19 = cbyz.get_covid19_data()
+    covid19, _ = cbyz.get_covid19_data()
     
-    covid19, covid19_cols, _, _, _ = \
+    covid19, covid19_cols, _ = \
                 cbyz.ml_data_process(df=covid19, 
                              ma=True, normalize=True, lag=True, 
                              ma_group_by=[],
@@ -1068,14 +989,6 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
         
     main_data = main_data.merge(covid19, how='left', on='WORK_DATE')
     main_data = cbyz.df_conv_na(df=main_data, cols=covid19_cols)
-
-    
-
-    if predict_period > min(ma_values):
-        # Update, raise error here
-        print('get_model_data - predict_period is longer than ma values, ' \
-              + 'and it will cause na.')
-        del main_data
 
 
     # Variables ......
@@ -1117,11 +1030,21 @@ def get_model_data(ma_values=[5,20], industry=True, trade_value=True):
                                 return_obj=True, alert=True, 
                                 alert_obj='main_data')
     
-
+    # Check min max ......
+    chk = cbyz.df_chk_col_min_max(df=main_data_final)
+    chk = chk[~chk['COLUMN'].isin(model_addt_vars)]
+    
+    col_min = chk['MIN_VALUE'].min()
+    col_max = chk['MAX_VALUE'].max()
+    
+    if col_min < 0 or col_max > 1:
+        msg = 'df_chk_col_min_max error'
+        print(msg)
+        error_msg.append(msg)
+        
     export_dict = {'MODEL_DATA':main_data_final,
                    'MODEL_X':model_x,
-                   'NORM_ORIG':norm_orig,
-                   'NORM_GROUP':norm_group}
+                   'NORM_ORIG':norm_orig}
     
     
     return export_dict
@@ -1196,13 +1119,14 @@ def split_data():
 
 
 
-def get_model(y_index, cv=5, load_model=False, export_model=True, path=None):
+def get_model(y_index, cv=2, dev=False, 
+              load_model=False, export_model=True, path=None):
     
     print('Update, copy predict_and_tuning from order_forecast')
     
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end    
-    global model_data, predict_date, model_x, model_y, norm_orig, norm_group
+    global model_data, predict_date, model_x, model_y, norm_orig
    
     
     import xgboost as xgb    
@@ -1224,27 +1148,39 @@ def get_model(y_index, cv=5, load_model=False, export_model=True, path=None):
             return loaded_model
 
     # 參數設定 ......
-    model_params = {
-        'xbgoost': {
-            'model': xgb.XGBRegressor(),
-            'params': {
-                # 'n_estimators': [200, 250],
-                # 'gamma':[0, 0.5],
-                # 'max_depth':[4, 6],
-                # 'objective':['reg:tweedie', 'reg:squarederror']
-                'n_estimators': [200],
-                'gamma':[0],
-                'max_depth':[4],                
-            },
-        },  
-        # 'random_foreest': {
-        #     'model': RandomForestRegressor(),
-        #     'params': {
-        #         'max_depth': [2, 3],
-        #     }
-        # }
-    }            
+    if dev:
+        model_params = {
+            'random_foreest': {
+                'model': RandomForestRegressor(),
+                'params': {
+                    'max_depth': [2, 3],
+                }
+            }
+        }            
+                    
         
+    else:
+        model_params = {
+            'xbgoost': {
+                'model': xgb.XGBRegressor(),
+                'params': {
+                    # 'n_estimators': [200, 250],
+                    # 'gamma':[0, 0.5],
+                    # 'max_depth':[4, 6],
+                    # 'objective':['reg:tweedie', 'reg:squarederror']
+                    'n_estimators': [200],
+                    'gamma':[0],
+                    'max_depth':[4],                
+                },
+            },  
+            # 'random_foreest': {
+            #     'model': RandomForestRegressor(),
+            #     'params': {
+            #         'max_depth': [2, 3],
+            #     }
+            # }
+        }            
+            
     # 自動測試 ......
     scores = []
     best_score = 0
@@ -1286,11 +1222,11 @@ def get_model(y_index, cv=5, load_model=False, export_model=True, path=None):
 # ..............
 
 
-def predict(load_model=False, cv=5):
+def predict(load_model=False, cv=5, dev=False):
     
     global shift_begin, shift_end, data_begin, data_end
     global predict_begin, predict_end    
-    global model_data, predict_date, model_x, model_y, norm_orig, norm_group
+    global model_data, predict_date, model_x, model_y, norm_orig
     
     split_data()
     
@@ -1304,7 +1240,7 @@ def predict(load_model=False, cv=5):
     for i in range(0, len(model_y)):
 
         model = get_model(y_index=i, cv=cv, load_model=load_model, 
-                          export_model=True, path=path_export)
+                          export_model=True, path=path_export, dev=dev)
 
 
         # Feature Importance ......
@@ -1352,8 +1288,7 @@ def predict(load_model=False, cv=5):
                     .reset_index()
     
     results = cbyz.df_normalize_restore(df=results_pivot, 
-                                        original=norm_orig,
-                                        groupby=norm_group)
+                                        original=norm_orig)
     
     
     return results, rmse, features
@@ -1405,11 +1340,19 @@ def master(_predict_begin, _predict_end=None,
     # - Merge predict and tuning function from uber eats order forecast
     # - Add small capitall back
     # - Add TEJ market data function, multiply 1000
-    
     # v1.04
     # - Add price change for OHLC
     # - Fix industry bug
     
+    # v1.05
+    # - Update for new df_normalize
+    # - Test price_change_ratio as y
+    # - Add check for min max
+    
+    # - Update predict_and_tunning
+    # - Add test serial and detail
+    # -NA issues, replace OHLC na in market data function, and add replace 
+    # na with interpolation. And why 0101 not excluded?
     
     
     # Worklist .....
@@ -1419,11 +1362,10 @@ def master(_predict_begin, _predict_end=None,
     # 6. 加上PRICE_CHANGE_ABS / PRICE_CHANGE加上STD
     # 6. 技術分析型態學
     # 7. Upload to PythonAnywhere
-    
 
     
     global version, exe_serial
-    version = 1.04
+    version = 1.05
     exe_serial = cbyz.get_time_serial(with_time=True)
 
 
@@ -1438,19 +1380,25 @@ def master(_predict_begin, _predict_end=None,
     # _predict_period = 5
     # _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     # _stock_symbol = []
-    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # # _model_y = ['PRICE_CHANGE_RATIO']      
-    # # _model_y= ['CLOSE']
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'CLOSE_CHANGE_RATIO']
+    # # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
     # _volume_thld = 700
     # load_model = False
-    # cv = 2
+    # cv = 5
+    
+    
+    global params, error_msg
+    params = {}
+    error_msg = []
     
     
     global volume_thld
     volume_thld = _volume_thld
+    params['volume_thld'] = volume_thld
     
     global ma_values
     ma_values = _ma_values
+    params['ma_values'] = ma_values
 
 
     global shift_begin, shift_end, data_begin, data_end, data_period
@@ -1471,6 +1419,10 @@ def master(_predict_begin, _predict_end=None,
                                predict_period=predict_period,
                                shift=data_shift)  
     
+    params['data_period'] = data_period
+    params['predict_period'] = predict_period
+    
+    
     # .......
     global stock_symbol, stock_type
     stock_type = _stock_type
@@ -1481,26 +1433,26 @@ def master(_predict_begin, _predict_end=None,
     # ......
     global model_data
     global model_x, model_y, model_addt_vars
-    global norm_orig, norm_group
+    global norm_orig
         
     model_y = _model_y
+    model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']    
     
     
     # 0707 - industry可以提高提精準，trade_value會下降
-    data_raw = get_model_data(ma_values=ma_values, 
-                              industry=True, 
+    data_raw = get_model_data(industry=True, 
                               trade_value=True)
     
     
     model_data = data_raw['MODEL_DATA']
     model_x = data_raw['MODEL_X']
     norm_orig = data_raw['NORM_ORIG']
-    norm_group = data_raw['NORM_GROUP']
-    model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']
+
     
+
     
     global predict_results
-    predict_results = predict(load_model=load_model, cv=cv)
+    predict_results = predict(load_model=load_model, cv=cv, dev=False)
     predict_results
     # features = predict_results[2]
     
@@ -1548,7 +1500,6 @@ def check():
     
         
     
-# %% Archive ------
 
 
 

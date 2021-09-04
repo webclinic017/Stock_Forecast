@@ -186,10 +186,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     #     .reset_index(drop=True)
     
     
-
     rmse['MODEL'] = 'Auto_Tuning'
-    
-    
     
     rmse = rmse \
         .sort_values(by=['MODEL', 'Y']) \
@@ -558,6 +555,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
     '''
     
+    # hist_cols = [i + '_HIST' for i in model_y]
+    # TypeError: can only concatenate tuple (not "str") to tuple
+    # model_y
+    # Out[5]: [('STOCK_SYMBOL', ''), ('WORK_DATE', ''), ('BACKTEST_ID', '')]
 
 
     # v0.0 - First Version
@@ -606,13 +607,12 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20210901
+    _bt_last_begin = 20210903
     # _bt_last_begin = 20210707
     predict_period = 5
-    # interval = random.randrange(90, 180)
     _interval = 2
     _bt_times = 1
-    data_period = int(365 * 3)
+    data_period = int(365 * 3.5)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
     # data_period = 365 * 5
@@ -655,7 +655,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      interval=interval,
                      bt_times=bt_times,
                      data_period=data_period,
-                     load_model=False)
+                     load_model=True)
 
     
     # Profit ------    
