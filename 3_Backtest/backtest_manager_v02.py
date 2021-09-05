@@ -67,7 +67,8 @@ import arsenal as ar
 import arsenal_stock as stk
 # import stock_analysis_manager_v1_02 as sam
 # import stock_analysis_manager_v1_03 as sam
-import stock_analysis_manager_v1_04 as sam
+# import stock_analysis_manager_v1_04 as sam
+import stock_analysis_manager_v1_05 as sam
 
 
 
@@ -114,7 +115,8 @@ def set_calendar(_bt_last_begin, predict_period):
     
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
-                     bt_times, data_period, load_model=False):
+                     bt_times, data_period, load_model=False, cv=2,
+                     fast=False):
     
     
     global stock_symbol, stock_type, bt_info
@@ -150,28 +152,29 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         begin = bt_seq[i]
 
-        results_raw = sam.master(_predict_begin=begin,
+        new_result = sam.master(_predict_begin=begin,
                                  _predict_end=None, 
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
                                  _stock_symbol=stock_symbol,
                                  _ma_values=ma_values,
                                  _volume_thld=volume_thld,
-                                 load_model=load_model)
+                                 load_model=load_model,
+                                 cv=cv, fast=fast)
 
 
-        new_results = results_raw[0]
-        new_results['BACKTEST_ID'] = i
+        # new_results = results_raw[0]
+        # new_results['BACKTEST_ID'] = i
         
-        new_rmse = results_raw[1]
-        new_rmse['BACKTEST_ID'] = i
+        # new_rmse = results_raw[1]
+        # new_rmse['BACKTEST_ID'] = i
         
-        new_features = results_raw[2]
-        new_features['BACKTEST_ID'] = i
+        # new_features = results_raw[2]
+        # new_features['BACKTEST_ID'] = i
         
-        bt_results_raw = bt_results_raw.append(new_results)
-        rmse = rmse.append(new_rmse)
-        features = features.append(new_features)
+        bt_results_raw = bt_results_raw.append(new_result)
+        # rmse = rmse.append(new_rmse)
+        # features = features.append(new_features)
 
 
     # Organize ......
@@ -186,11 +189,11 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     #     .reset_index(drop=True)
     
     
-    rmse['MODEL'] = 'Auto_Tuning'
+    # rmse['MODEL'] = 'Auto_Tuning'
     
-    rmse = rmse \
-        .sort_values(by=['MODEL', 'Y']) \
-        .reset_index(drop=True)    
+    # rmse = rmse \
+    #     .sort_values(by=['MODEL', 'Y']) \
+    #     .reset_index(drop=True)    
 
 # ............
 
@@ -607,7 +610,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20210903
+    _bt_last_begin = 20210906
     # _bt_last_begin = 20210707
     predict_period = 5
     _interval = 2
@@ -623,7 +626,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # _ma_values = [5,10,20]
     # _ma_values = [5,10,20,40]
     _ma_values = [5,10,20,60]
-    _volume_thld = 750
+    _volume_thld = 700
 
 
     global interval, bt_times, volume_thld
@@ -655,7 +658,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
                      interval=interval,
                      bt_times=bt_times,
                      data_period=data_period,
-                     load_model=True)
+                     load_model=False)
 
     
     # Profit ------    
@@ -687,7 +690,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=0.03,
                execute_begin=2108110000, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=True) 
+               file_name=None, upload_metrics=True, cv=2, fast=False)
     
 
 

@@ -128,8 +128,8 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
         tables.append('ewprcd2') # 報酬率資訊表
 
 
-    begin = 20210901
-    end = 20210901
+    begin = 20170701
+    end = 20171231
 
 
     begin_str = cbyz.ymd(begin)
@@ -137,6 +137,10 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
 
     end_str = cbyz.ymd(end)
     end_str = end_str.strftime('%Y-%m-%d')    
+    
+    
+    # delete = True
+    # upload = True
     
     
     # Delete Data ......

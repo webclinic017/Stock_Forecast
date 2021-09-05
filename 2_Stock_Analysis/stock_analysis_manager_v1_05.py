@@ -1295,13 +1295,244 @@ def predict(load_model=False, cv=5, dev=False):
 
 
 
+
+
+
+def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None, 
+                       fast=False):
+    '''
+    1. 這個function會匯出模型、scores和features，並且會在檔名加上系統時間，因此
+       不會覆蓋檔案。
+   2. 讀取模型的時候，會找檔名包含saved_model，且修改日期最新的檔案。
+   3. 這支function會在多個專案中重複使用，因為可能會預測多個Y，所以把model_y視為
+      list處理。
+
+    Parameters
+    ----------
+    cv : TYPE, optional
+        DESCRIPTION. The default is 5.
+    load_model : TYPE, optional
+        DESCRIPTION. The default is False.
+    export_model : TYPE, optional
+        DESCRIPTION. The default is True.
+    path : TYPE, optional
+        DESCRIPTION. The default is None.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+
+    # 模型套件
+    import pickle
+    import xgboost as xgb
+    from sklearn.ensemble import RandomForestRegressor    
+    
+    # 預測用的全域變數
+    global model_x, model_y
+    global model_data
+    global norm_orig
+
+
+    # .........
+    global exe_serial
+    
+    result = pd.DataFrame()
+    features = pd.DataFrame()
+    precision = pd.DataFrame()      
+    
+    scores = pd.DataFrame()
+    best_params = pd.DataFrame()
+    
+    
+    for i in range(len(model_y)):
+
+        cur_y = model_y[i]
+        suffix = cur_y.lower() + '_' + exe_serial        
+        model_name = 'model_'+ cur_y.lower()
+        new_model_name = 'saved_model_' + suffix        
+        
+        
+        # 區分訓練集和測試集 ...
+        train_data = model_data \
+                    .dropna(subset=model_x + [cur_y], axis=0) \
+                    .reset_index(drop=True)
+        
+        X = train_data[model_x]
+        y = train_data[cur_y]
+    
+        X_train, X_test, y_train, y_test = train_test_split(X, y)
+    
+
+        # 預測資料集 ......  
+        X_predict = model_data[model_data[cur_y].isna()]
+        X_predict = X_predict.dropna(subset=model_x, axis=0)    
+        X_predict_lite = X_predict[model_x]
+
+
+        # ...
+        load_fail = True
+    
+        if load_model and path != None:
+            files = cbyz.os_get_dir_list(path, level=0, extensions='sav', 
+                                         remove_temp=True)    
+            files = files['FILES']
+            files = files[files['FILE_NAME'].str.contains(model_name)] 
+            
+            # 只保留修改時間最晚的檔案
+            files['MAX_MODIFIED_TIME'] = files['MODIFIED_TIME'].max()
+            files = files[files['MAX_MODIFIED_TIME']==files['MODIFIED_TIME']] \
+                    .drop_duplicates(subset=['MODIFIED_TIME']) \
+                    .reset_index(drop=True)
+            try:
+                model = pickle.load(open(files.loc[0, 'PATH'], 'rb'))    
+            except Exception as e:
+                print(e)
+            else:
+                print('get_model讀取儲存的模型 - ' + model_name)
+                load_fail = False
+
+        
+        # 重新訓練模型 ......
+        if load_fail:
+            from sklearn.model_selection import GridSearchCV    
+            
+            # 參數設定 ...
+            if fast:
+                model_params = {
+                    'xgboost': {
+                        'model': xgb.XGBRegressor(),
+                        'params': {
+                            'n_estimators': [400],
+                            'gamma':[0],
+                            'max_depth':[4],
+                            'objective':['reg:squarederror']
+                        },
+                    }
+                }
+                
+            else:
+                model_params = {
+                    'xgboost': {
+                        'model': xgb.XGBRegressor(),
+                        'params': {
+                            'n_estimators': [200, 400],
+                            'gamma':[0, 0.5],
+                            'max_depth':[4, 6],
+                            'objective':['reg:tweedie', 'reg:squarederror']
+                        },
+                    },        
+                    'random_forest': {
+                        'model': RandomForestRegressor(),
+                        'params': {
+                            'max_depth': [2, 3],
+                        }
+                    }
+                }
+            
+            
+            # 自動測試 ...
+            scores_li = []
+            best_score = 0
+            model = None
+            
+            for model_name, mp in model_params.items():
+                
+                # Cross Validation
+                temp_model = GridSearchCV(mp['model'], mp['params'], cv=cv, 
+                                          return_train_score=False)
+                temp_model.fit(X_train, y_train)
+                
+                scores_li.append({
+                    'model': model_name,
+                    'best_score': temp_model.best_score_,
+                    'best_params': temp_model.best_params_
+                })
+                
+                # 保留分數最高的模型
+                if temp_model.best_score_ > best_score:
+                    best_score = temp_model.best_score_
+                    model = temp_model
+                    
+            
+            # Record Scores
+            new_scores = pd.DataFrame(scores_li, 
+                                      columns=['MODEL', 'BEST_SCORE', 
+                                               'BEST_PARAMS'])
+            new_scores['Y'] = cur_y
+            scores = scores.append(new_scores)
+            
+            
+            # Record Parameters
+            new_best_params = pd.DataFrame.from_dict(model.best_params_, 
+                                                     orient='index',
+                                                     columns=['VALUE'])
+        
+            new_best_params = new_best_params.reset_index() \
+                                .rename(columns={'index':'KEY'})            
+            
+            new_best_params['Y'] = cur_y
+            best_params = best_params.append(new_best_params)            
+            
+
+        # 儲存模型 ...
+        if export_model and path != None:
+            
+            # Export Model
+            pickle.dump(model, open(path + '/' + new_model_name + '.sav', 'wb'))
+
+        # 預測 ......
+
+        # Feature Importance ......
+        new_features = {'FEATURES':list(X_train.columns),
+                        'IMPORTANCE':model.best_estimator_.feature_importances_}
+        
+        new_features = pd.DataFrame(new_features)        
+        new_features['Y'] = cur_y
+        features = features.append(new_features)
+    
+        # RMSE ......
+        preds_test = model.predict(X_test)
+        new_precision = np.sqrt(mean_squared_error(y_test, preds_test))
+        new_precision = pd.DataFrame(data=[new_precision], 
+                                     columns=['PRECISION'])
+
+        new_precision['Y'] = cur_y        
+        precision = precision.append(new_precision)
+    
+        # Results ......
+        preds = model.predict(X_predict_lite)
+        new_result = X_predict[model_addt_vars].reset_index(drop=True)
+        new_result[cur_y] = preds
+        new_result = cbyz.df_normalize_restore(df=new_result, 
+                                               original=norm_orig)
+        
+        if len(result) == 0:
+            result = new_result.copy()
+        else:
+            result = result.merge(new_result, how='left', on=model_addt_vars)
+        
+    
+    result.to_csv(path + '/results_' + exe_serial + '.csv', index=False)
+    features.to_csv(path + '/features_' + exe_serial + '.csv', index=False)
+    precision.to_csv(path + '/precision_' + exe_serial + '.csv', index=False)        
+    scores.to_csv(path + '/scores_' + exe_serial + '.csv', index=False)
+    best_params.to_csv(path + '/best_params_' + exe_serial + '.csv', index=False)
+
+
+    return result
+
+
+
 # %% Master ------
 
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, _data_period=180, 
            _stock_symbol=[], _stock_type='tw', _ma_values=[3,5,20,60],
-           _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE'],
-           _volume_thld=1000, load_model=False, cv=2):
+           _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE', 'CLOSE_CHANGE_RATIO'],
+           _volume_thld=1000, load_model=False, cv=2, fast=False):
     '''
     主工作區
     '''
@@ -1366,7 +1597,7 @@ def master(_predict_begin, _predict_end=None,
     
     global version, exe_serial
     version = 1.05
-    exe_serial = cbyz.get_time_serial(with_time=True)
+    exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
 
     # industry=True
@@ -1384,7 +1615,8 @@ def master(_predict_begin, _predict_end=None,
     # # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
     # _volume_thld = 700
     # load_model = False
-    # cv = 5
+    # cv = 2
+    # fast = False
     
     
     global params, error_msg
@@ -1449,14 +1681,28 @@ def master(_predict_begin, _predict_end=None,
     norm_orig = data_raw['NORM_ORIG']
 
     
-
+    # Predict ......
+    # global predict_results
+    # predict_results = predict(load_model=load_model, cv=cv, dev=False)
+    # predict_results
     
-    global predict_results
-    predict_results = predict(load_model=load_model, cv=cv, dev=False)
-    predict_results
-    # features = predict_results[2]
+    predict_result = predict_and_tuning(cv=cv, load_model=load_model, 
+                                        export_model=True, path=path_temp, 
+                                        fast=fast)    
     
-    return predict_results
+    # Export Log ......
+    params_df = {key:str(value) for key, value in params.items()}
+    params_df = pd.DataFrame.from_dict(params_df, orient='index', 
+                                       columns=['VALUE'])
+    
+    params_df['EXECUTE_SERIAL'] = exe_serial
+    
+    params_df = params_df.reset_index().rename(columns={'index':'PARAM'})         
+    params_df.to_csv(path_temp + '/sam_params_' + exe_serial + '.csv',
+                     index=False)
+    
+    
+    return predict_result
 
 
 
