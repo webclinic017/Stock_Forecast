@@ -128,8 +128,8 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
         tables.append('ewprcd2') # 報酬率資訊表
 
 
-    begin = 20170701
-    end = 20171231
+    begin = 20210929
+    end = 20210929
 
 
     begin_str = cbyz.ymd(begin)
@@ -139,15 +139,12 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
     end_str = end_str.strftime('%Y-%m-%d')    
     
     
-    # delete = True
-    # upload = True
-    
     
     # Delete Data ......
-    for i in range(len(tables)):
+    if delete:
+        for i in range(len(tables)):
         
-        table = tables[i]        
-        if delete:
+            table = tables[i]        
             # Delete incomplete data.
             sql = (" delete from " + table + " "
                    " where date_format(mdate, '%Y%m%d') >= " + str(begin))
@@ -168,6 +165,7 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
         data.to_csv(path_export + '/' + table + '/' + table +'_' \
                     + begin_str + '_' + end_str + '.csv', 
                     index=False)
+
 
     # Upload ......
     # Update, auto delete the latest file

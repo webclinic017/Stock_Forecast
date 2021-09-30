@@ -141,10 +141,10 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Work area ----------
-    global bt_results, rmse, features, model_y, volume_thld
+    global bt_results, precision, features, model_y, volume_thld
     
     bt_results_raw = pd.DataFrame()
-    rmse = pd.DataFrame()
+    precision = pd.DataFrame()
     features = pd.DataFrame()
     
     # Predict ......
@@ -152,7 +152,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         begin = bt_seq[i]
 
-        new_result = sam.master(_predict_begin=begin,
+        results_raw = sam.master(_predict_begin=begin,
                                  _predict_end=None, 
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
@@ -163,17 +163,17 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                                  cv=cv, fast=fast)
 
 
-        # new_results = results_raw[0]
-        # new_results['BACKTEST_ID'] = i
+        new_result = results_raw[0]
+        new_result['BACKTEST_ID'] = i
         
-        # new_rmse = results_raw[1]
-        # new_rmse['BACKTEST_ID'] = i
+        new_precision = results_raw[1]
+        new_precision['BACKTEST_ID'] = i
         
         # new_features = results_raw[2]
         # new_features['BACKTEST_ID'] = i
         
         bt_results_raw = bt_results_raw.append(new_result)
-        # rmse = rmse.append(new_rmse)
+        precision = precision.append(new_precision)
         # features = features.append(new_features)
 
 
@@ -182,24 +182,13 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     bt_results = bt_results_raw.reset_index(drop=True)
     model_y = cbyz.df_get_cols_except(df=bt_results, 
                                       except_cols=['STOCK_SYMBOL', 'WORK_DATE', 
-                                                   'MODEL', 'BACKTEST_ID'])
-
-    # rmse = rmse \
-    #     .sort_values(by=['MODEL', 'Y']) \
-    #     .reset_index(drop=True)
-    
-    
-    # rmse['MODEL'] = 'Auto_Tuning'
-    
-    # rmse = rmse \
-    #     .sort_values(by=['MODEL', 'Y']) \
-    #     .reset_index(drop=True)    
+                                                   'BACKTEST_ID'])
 
 # ............
 
 
 
-def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
+def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                export_file=True, load_file=False, path=None, file_name=None,
                upload_metrics=False):
     '''
@@ -282,10 +271,8 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     main_data = bt_results.merge(main_data_pre, how='left', 
                                  on=['WORK_DATE', 'STOCK_SYMBOL'])
 
-    print('Tempraily Used')
-    main_data['MODEL'] = 'Auto_Tuning'
-    
-    main_data = main_data[['BACKTEST_ID', 'STOCK_SYMBOL', 'MODEL', 
+    # print('Tempraily Used')
+    main_data = main_data[['BACKTEST_ID', 'STOCK_SYMBOL', 
                            'WORK_DATE', 'LAST_DATE'] \
                           + model_y + hist_cols + last_cols]
 
@@ -317,13 +304,30 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
         
 
     # Generate Actions ......
+    global precision
+   
+    
+    # file_path = r'/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Temp/'
+    # file0 = pd.read_csv(file_path + '/precision_210906_221454.csv')
+    # file0['BACKTEST_ID'] = 0
+    
+    # file1 = pd.read_csv(file_path + '/precision_210906_223047.csv')
+    # file1['BACKTEST_ID'] = 1
+    
+    # file2 = pd.read_csv(file_path + '/precision_210906_224625.csv')
+    # file2['BACKTEST_ID'] = 2
+    
+    
+    # precision = file0.append(file1).append(file2)
+    
+    
     bt_main, actions = \
-        stk.gen_predict_action(df=main_data, rmse=rmse,
+        stk.gen_predict_action(df=main_data, precision=precision,
                                   date='WORK_DATE', 
                                   last_date='LAST_DATE', 
                                   y=model_y, y_last=last_cols,
                                   y_thld=y_thld, time_thld=time_thld,
-                                  rmse_thld=rmse_thld)
+                                  prec_thld=prec_thld)
         
     # Evaluate Precision ......
     eval_metrics(export_file=False, upload=upload_metrics)            
@@ -347,10 +351,6 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
             
     # Add name ......
     stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
-    # stock_info = pd.read_csv('/Users/Aron/Documents/GitHub/Data/Stock_Forecast/3_Backtest/Temp/tw_get_stock_info.csv')
-    # stock_info['STOCK_SYMBOL'] = stock_info['STOCK_SYMBOL'].astype('str')
-    
-    
     stock_info = stock_info[['STOCK_SYMBOL', 'STOCK_NAME', 'INDUSTRY']]
     actions = actions.merge(stock_info, how='left', on='STOCK_SYMBOL')      
 
@@ -378,7 +378,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
 
     model_y_last = [s + '_LAST' for s in model_y]
     model_y_hist = [s + '_HIST' for s in model_y]    
-    cols_2 = ['RMSE_MEDIAN']
+    cols_2 = ['PRECISION_'+ s for s in model_y]    
     
     new_cols = cols_1 + profit_cols + model_y + model_y_last \
                 + model_y_hist + cols_2
@@ -410,7 +410,7 @@ def cal_profit(y_thld=2, time_thld=10, rmse_thld=0.15, execute_begin=None,
     cond2 = cond2['STOCK_SYMBOL'].unique().tolist()    
     
     # Max Error ...
-    cond3 = actions[actions['DIFF_STD']<rmse_thld]
+    cond3 = actions[actions['DIFF_STD']<prec_thld]
     cond3 = cond3['STOCK_SYMBOL'].unique().tolist()       
     
     
@@ -450,6 +450,12 @@ def eval_metrics(export_file=False, upload=False):
     
     
     for y in model_y:
+        
+        
+        print('Bug - 計算CLOSE_CHANGE_RATIO的MAPE時會有INF')
+        if y == 'CLOSE_CHANGE_RATIO':
+            continue
+        
         
         mape_main.loc[:, 'MAPE'] = (mape_main[y] \
                                 - mape_main[y + '_HIST']) \
@@ -501,7 +507,7 @@ def eval_metrics(export_file=False, upload=False):
     # Oraganize
     stock_metrics_raw = stock_metrics_raw \
                         .merge(bt_info, how='left', on='BACKTEST_ID') \
-                        .merge(rmse, how='left', on=['Y', 'BACKTEST_ID'])
+                        .merge(precision, how='left', on=['Y', 'BACKTEST_ID'])
 
     stock_metrics_raw['VERSION'] = sam.version
     stock_metrics_raw['MODEL_METRIC'] = 'RMSE'    
@@ -521,7 +527,7 @@ def eval_metrics(export_file=False, upload=False):
     
     stock_metrics_raw = stock_metrics_raw \
                         .rename(columns={'WORK_DATE':'FORECAST_DATE',
-                                         'RMSE':'MODEL_PRECISION',
+                                         'PRECISION':'MODEL_PRECISION',
                                          'MAPE':'FORECAST_PRECISION'}) \
                         .round({'MODEL_PRECISION':3,
                                 'FORECAST_PRECISION':3})
@@ -606,15 +612,16 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 22. Update, load last version of model
     # 23. 在Excel中排除交易量低的
     # 24. 把股性分群
+    # 25. Do actions by change
 
 
     
     # Parameters
-    _bt_last_begin = 20210906
+    _bt_last_begin = 20210907
     # _bt_last_begin = 20210707
     predict_period = 5
     _interval = 2
-    _bt_times = 1
+    _bt_times = 3
     data_period = int(365 * 3.5)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
@@ -652,13 +659,13 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Predict ------
-    global bt_results, rmse, features
+    global bt_results, precision, features
     backtest_predict(bt_last_begin=bt_last_begin, 
                      predict_period=predict_period, 
                      interval=interval,
                      bt_times=bt_times,
                      data_period=data_period,
-                     load_model=False)
+                     load_model=True, cv=2, fast=False)
 
     
     # Profit ------    
@@ -667,7 +674,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     
     # y_thld=0.05
     # time_thld=predict_period
-    # rmse_thld=0.05
+    # precision_thld=0.03
     # export_file=True
     # load_file=True
     # path=path_temp
@@ -676,7 +683,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     global bt_main, actions
     
-    # Optimize, 這裡的rmse_thld實際上是mape, 改成precision
+    # Optimize, 這裡的precision_thld實際上是mape, 改成precision
     # 算回測precision的時候，可以低估，但不可以高估
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
@@ -685,14 +692,15 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     hold = [8105, 2606, 2610]
     
     
-    # Check, rmse_thld=-0.05是否合理
+    # Check, precision_thld=-0.05是否合理
+    # Bug - ProgrammingError: Unknown column 'inf' in 'field list'
     print('Bug - get_forecast_records中的Action Score根本沒用到')
-    cal_profit(y_thld=0.05, time_thld=predict_period, rmse_thld=0.03,
+    print('Bug - 計算CLOSE_CHANGE_RATIO的MAPE時會有INF')
+    cal_profit(y_thld=0.05, time_thld=predict_period, prec_thld=0.03,
                execute_begin=2108110000, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=True, cv=2, fast=False)
+               file_name=None, upload_metrics=False)
     
-
 
     # Export ......
     time_serial = cbyz.get_time_serial(with_time=True)
@@ -726,54 +734,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     writer.save()
 
     
-
-
-
-
-
-# ..............=
-
-
-
-# def upload_records():
-#     '''
-#     Delete if eval_metrics works fine.
-#     '''
-    
-   
-#     file = pd.read_csv(path_export + '/Metrics/stock_20210703_123339.csv')
-#     file = pd.read_csv(path_export + '/Metrics/stock_mape_20210703_133643.csv')
-    
-#     file.columns = ['STOCK_TYPE', 'STOCK_SYMBOL', 
-#                     'EXECUTE_DATE', 'PREDICT_DATE', 
-#                     'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
-#                     'FORECAST_METRIC', 'FORECAST_PRECISION', 
-#                     'OVERESTIMATE']
-    
-    
-#     file['MODEL_METRIC'] = 'RMSE'
-#     file['MODEL_PRECISION'] = 0.058570158
-#     file['MODEL_PRECISION'] = 0.056767662
-    
-    
-#     file = file[['STOCK_TYPE', 'STOCK_SYMBOL', 
-#                 'EXECUTE_DATE', 'PREDICT_DATE', 
-#                 'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
-#                 'MODEL_METRIC', 'MODEL_PRECISION',
-#                 'FORECAST_METRIC', 'FORECAST_PRECISION', 
-#                 'OVERESTIMATE']]
-    
-    
-#     file = file.round({'MODEL_PRECISION':3,
-#                       'FORECAST_PRECISION':3})
-    
-#     # ar.db_upload(data=file, table_name='forecast_records3', 
-#     #               local=local, chunk=30000)
-    
-#     return ''
-
-
-
 
 
 # %% View ------

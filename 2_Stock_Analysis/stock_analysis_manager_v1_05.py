@@ -1419,17 +1419,19 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
                         'model': xgb.XGBRegressor(),
                         'params': {
                             'n_estimators': [200, 400],
-                            'gamma':[0, 0.5],
+                            'gamma':[0],
                             'max_depth':[4, 6],
-                            'objective':['reg:tweedie', 'reg:squarederror']
+                            'objective':['reg:squarederror']
+                            # 'objective':['reg:tweedie', 'reg:squarederror']
                         },
-                    },        
-                    'random_forest': {
-                        'model': RandomForestRegressor(),
-                        'params': {
-                            'max_depth': [2, 3],
-                        }
                     }
+                    # ,
+                    # 'random_forest': {
+                    #     'model': RandomForestRegressor(),
+                    #     'params': {
+                    #         'max_depth': [2, 3],
+                    #     }
+                    # }
                 }
             
             
@@ -1522,7 +1524,7 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
     best_params.to_csv(path + '/best_params_' + exe_serial + '.csv', index=False)
 
 
-    return result
+    return result, precision
 
 
 
@@ -1531,7 +1533,8 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
 def master(_predict_begin, _predict_end=None, 
            _predict_period=15, _data_period=180, 
            _stock_symbol=[], _stock_type='tw', _ma_values=[3,5,20,60],
-           _model_y=['OPEN', 'HIGH', 'LOW', 'CLOSE', 'CLOSE_CHANGE_RATIO'],
+           _model_y=['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+                     'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO'],
            _volume_thld=1000, load_model=False, cv=2, fast=False):
     '''
     主工作區
@@ -1575,11 +1578,13 @@ def master(_predict_begin, _predict_end=None,
     # - Add price change for OHLC
     # - Fix industry bug
     
+    
     # v1.05
     # - Update for new df_normalize
     # - Test price_change_ratio as y
     # - Add check for min max
     
+    # - 寫出全部的model log
     # - Update predict_and_tunning
     # - Add test serial and detail
     # -NA issues, replace OHLC na in market data function, and add replace 
@@ -1686,9 +1691,9 @@ def master(_predict_begin, _predict_end=None,
     # predict_results = predict(load_model=load_model, cv=cv, dev=False)
     # predict_results
     
-    predict_result = predict_and_tuning(cv=cv, load_model=load_model, 
-                                        export_model=True, path=path_temp, 
-                                        fast=fast)    
+    predict_result, precision = \
+        predict_and_tuning(cv=cv, load_model=load_model, export_model=True, 
+                           path=path_temp, fast=fast)    
     
     # Export Log ......
     params_df = {key:str(value) for key, value in params.items()}
@@ -1702,7 +1707,7 @@ def master(_predict_begin, _predict_end=None,
                      index=False)
     
     
-    return predict_result
+    return predict_result, precision
 
 
 
