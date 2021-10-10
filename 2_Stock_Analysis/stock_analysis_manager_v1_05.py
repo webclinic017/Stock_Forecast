@@ -1598,6 +1598,7 @@ def master(_predict_begin, _predict_end=None,
     # 6. 加上PRICE_CHANGE_ABS / PRICE_CHANGE加上STD
     # 6. 技術分析型態學
     # 7. Upload to PythonAnywhere
+    # 8. Update CBYZ and auto-competing model
 
     
     global version, exe_serial
@@ -1605,23 +1606,24 @@ def master(_predict_begin, _predict_end=None,
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
 
-    # industry=True
-    # trade_value=True      
-    # _data_period = int(365 * 3.5)
-    # _predict_begin = 20210902
-    # _predict_end = None
-    # _stock_type = 'tw'
-    # # ma_values = [2,5,20,60]
-    # _ma_values = [5,10,20]
-    # _predict_period = 5
-    # _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    # _stock_symbol = []
-    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'CLOSE_CHANGE_RATIO']
-    # # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
-    # _volume_thld = 700
-    # load_model = False
-    # cv = 2
-    # fast = False
+    industry=True
+    trade_value=True      
+    _data_period = int(365 * 3.5)
+    _predict_begin = 20210902
+    _predict_end = None
+    _stock_type = 'tw'
+    _ma_values = [5,10,20]
+    _predict_period = 5
+    _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    _stock_symbol = []
+    # _model_y = [ 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'CLOSE_CHANGE_RATIO']
+    _model_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+                'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+    # _model_y= [ 'OPEN', 'HIGH', 'LOW', 'CLOSE']
+    _volume_thld = 700
+    load_model = False
+    cv = 2
+    fast = False
     
     
     global params, error_msg
@@ -1684,13 +1686,12 @@ def master(_predict_begin, _predict_end=None,
     model_data = data_raw['MODEL_DATA']
     model_x = data_raw['MODEL_X']
     norm_orig = data_raw['NORM_ORIG']
-
     
+
     # Predict ......
     # global predict_results
     # predict_results = predict(load_model=load_model, cv=cv, dev=False)
     # predict_results
-    
     predict_result, precision = \
         predict_and_tuning(cv=cv, load_model=load_model, export_model=True, 
                            path=path_temp, fast=fast)    
@@ -1749,16 +1750,12 @@ def check():
     chk_na = cbyz.df_chk_col_na(df=na_df, positive_only=True, return_obj=True,
                                 alert=True, alert_obj='main_data')
     
-        
-    
-
 
 
 # %% Manually Analyze ------
 
 
 def check_price_limit():
-    
     
     loc_stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
     loc_stock_info = loc_stock_info[['STOCK_SYMBOL', 'CAPITAL_LEVEL']]

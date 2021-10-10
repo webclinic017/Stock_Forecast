@@ -69,7 +69,6 @@ import tejapi
 # tejapi.ApiConfig.api_key = "22DZ20gwIuY3tfezbVnf1zjnp8cfnB"
 
 # 斜槓方案
-# 7/15 - 8/14之間使用
 tejapi.ApiConfig.api_key = '22DZ20gwIuY3tfezbVnf1zjnp8cfnB'
 info = tejapi.ApiConfig.info()
 info['todayRows']
@@ -91,14 +90,6 @@ def master():
 
 
 
-def check():
-    '''
-    資料驗證
-    '''    
-    return ''
-
-
-
 
 # if __name__ == '__main__':
 #     master()
@@ -111,7 +102,112 @@ def check():
 # %% Query ------
 
 
-def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False, 
+def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True, 
+           ewifinq=True, ewnprcstd=True,
+           delete=False, upload=True):
+    '''
+    以月或季為單位的資料，篩選的時候還是用日期下條件，所以當成是d
+    '''
+    
+    tables = []
+    
+    if ewtinst1c:
+        # 三大法人持股成本
+        tables.append(['ewtinst1c', 'd']) 
+    elif ewprcd:
+        # 證券交易資料表，一個月51034筆
+        tables.append(['ewprcd', 'd'])  
+        
+    elif ewprcd2:
+        # 報酬率資訊表，兩個月約100000筆        
+        tables.append(['ewprcd2', 'd']) 
+        
+    elif ewsale:
+        # 月營收資料表，一個月約2000筆，等同於股票檔數
+        tables.append(['ewsale', 'd']) 
+        
+    elif ewifinq:
+        # 單季財務資料表，資料量等同於股票檔數
+        tables.append(['ewifinq', 'd'])         
+
+    elif ewnprcstd:
+        # 證券屬性表，3125筆，資料量等同於股票檔數
+        tables.append(['ewnprcstd', None]) 
+
+    # 每一天要分開query，但假日的時候不需要
+    end = cbyz.date_get_today()
+    begin = cbyz.date_cal(end, -5, 'd')
+    
+    # Manual Settings
+    # begin = 20160101
+    # end = 20161231
+    
+    begin_str = cbyz.ymd(begin)
+    begin_str = begin_str.strftime('%Y-%m-%d')
+
+    end_str = cbyz.ymd(end)
+    end_str = end_str.strftime('%Y-%m-%d')    
+    
+    
+    
+    # Delete Data ......
+    if delete:
+        
+        for i in range(len(tables)):
+            
+            table = tables[i][0]
+            
+            # Delete incomplete data.
+            sql = (" delete from " + table + " "
+                   " where date_format(mdate, '%Y%m%d') >= " + str(begin))
+            
+            ar.db_execute(sql, commit=True)    
+    
+    
+    # Query ......
+    # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
+    # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
+    for i in range(len(tables)):
+        
+        table = tables[i][0]
+        time_unit = tables[i][1]
+        
+        if time_unit == 'd':
+            data = tejapi.get('TWN/' + table.upper(),
+                              mdate={'gte':begin_str, 'lte':end_str},
+                              paginate=True)
+            
+            file_path = '/' + table + '/' + table +'_'  \
+                        + begin_str + '_' + end_str + '.csv'
+            
+        elif time_unit == None:     
+            data = tejapi.get('TWN/' + table.upper(), paginate=True)
+            file_path = '/' + table + '/' + table + '.csv'            
+
+
+        if len(data) == 0:
+            continue
+
+        
+        if 'mdate' in data.columns:     
+            # ProgrammingError: Failed processing format-parameters; 
+            # Python 'timestamp' cannot be converted to a MySQL type
+            data['mdate'] = data['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            ar.db_upload(data=data, table_name=table)
+        except Exception as e:
+            print(e)
+            data.to_csv(path_export + file_path, index=False)        
+
+        # Reset Object
+        data = []
+
+
+
+
+
+def update_20211010(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False, 
            upload=True):
     '''
     證券交易資料表
@@ -147,9 +243,10 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
     
     # Delete Data ......
     if delete:
-        for i in range(len(tables)):
         
-            table = tables[i]        
+        for i in range(len(tables)):
+            table = tables[i]
+            
             # Delete incomplete data.
             sql = (" delete from " + table + " "
                    " where date_format(mdate, '%Y%m%d') >= " + str(begin))
@@ -198,166 +295,14 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
             
                 ar.db_upload(data=file, table_name=table)
 
-     
-
-
-
-def query_ewtinst1c():
-
-    '''
-    三大法人持股成本
-    '''    
-
-    # 不要太早抓資料，因為TEJ的資料可能會變
-
-    
-    # 建議每個月分開抓，如果抓到的資料是一萬筆，但額度只剩一千，剩下的一千好像會被浪費掉
-    begin = 20180101
-    end = 20180531
-    
-    
-    # Now
-    # 0722刪掉重上傳
-    begin = 20210818
-    end = 20210818
-        
-    
-    begin_str = cbyz.ymd(begin)
-    begin_str = begin_str.strftime('%Y-%m-%d')
-
-
-    end_str = cbyz.ymd(end)
-    end_str = end_str.strftime('%Y-%m-%d')    
-
-    
-    # 1個月約38000筆
-    # 20210715 - 每日1775筆才是對的；21:35只有抓到1772筆資料
-    data = tejapi.get('TWN/EWTINST1C', 
-                      mdate={'gte':begin_str, 'lte':end_str},
-                      paginate=True)
-    
-    data.to_csv(path_export + '/ewtinst1c/ewtinst1c_data_' + begin_str + '_' + end_str + '.csv', 
-                index=False)
-    
-    
-    # Delete incomplete data.
-    sql = (" delete from ewtinst1c "
-           " where date_format(mdate, '%Y%m%d') >= " + str(begin))
-    
-    ar.db_execute(sql, commit=True)
- 
-
-# ...............
-    
-
-def query_ewprcd():
-    '''
-    證券交易資料表
-    - 一個月51034筆
-    '''
-    
-    table_name = 'ewprcd' # 證券交易資料表
-
-    begin = 20210601
-    end = 20210630
-    
-    
-    begin_str = cbyz.ymd(begin)
-    begin_str = begin_str.strftime('%Y-%m-%d')
-
-
-    end_str = cbyz.ymd(end)
-    end_str = end_str.strftime('%Y-%m-%d')    
-    
-    # 2崇4541筆
-    # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
-    # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
-    data = tejapi.get('TWN/EWPRCD',
-                      mdate={'gte':begin_str, 'lte':end_str},
-                      paginate=True)
-
-
-    data.to_csv(path_export + '/' + table_name + '/' + table_name +'_' \
-                + begin_str + '_' + end_str + '.csv', 
-                index=False)
-
-
-
-
-
-
-
-def query_ewifinq():
-    '''
-    財務報表，一年7779筆
-    '''
-    
-    table_name = 'ewifinq'
-
-    begin = 20190101
-    end = 20191231
-    
-    
-    begin_str = cbyz.ymd(begin)
-    begin_str = begin_str.strftime('%Y-%m-%d')
-
-
-    end_str = cbyz.ymd(end)
-    end_str = end_str.strftime('%Y-%m-%d')    
-    
-    
-    data = tejapi.get('TWN/EWIFINQ',
-                      mdate={'gte':begin_str, 'lte':end_str},
-                      paginate=True)
-
-
-    data.to_csv(path_export + '/ewifinq/ewifinq_data_' \
-                + begin_str + '_' + end_str + '.csv', 
-                index=False)
-
-
-
-
-def query_ewsale():
-    '''
-    月營收資料表，一個月2112筆資料。
-    '''
-    
-    table_name = 'ewsale'
-
-    begin = 20180101
-    end = 20190531
-    
-    
-    begin_str = cbyz.ymd(begin)
-    begin_str = begin_str.strftime('%Y-%m-%d')
-
-
-    end_str = cbyz.ymd(end)
-    end_str = end_str.strftime('%Y-%m-%d')    
-    
-    
-    data = tejapi.get('TWN/EWSALE',
-                      mdate={'gte':begin_str, 'lte':end_str},
-                      paginate=True)
-
-
-    data.to_csv(path_export + '/ewsale/ewsale_data_' \
-                + begin_str + '_' + end_str + '.csv', 
-                index=False)
-
-
-
-
-
-
-
-
 
 
 
 def check():
-    
+    '''
+    Check historical data impocomlete
+    '''
+        
     file = pd.read_csv(path_export + '/ewiprcd/ewiprcd_data_2019-01-01_2020-12-31.csv')
     file2 = pd.read_csv(path_export + '/ewiprcd/ewiprcd_data_2021-01-01_2021-07-13.csv')
     
