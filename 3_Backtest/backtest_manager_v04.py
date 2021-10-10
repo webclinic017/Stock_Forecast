@@ -640,14 +640,14 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 23. 在Excel中排除交易量低的
     # 24. 把股性分群
     # 25. Do actions by change
+    # 26. Buggggg，price change ratio有沒有改成0-1
 
     
     # Parameters
-    _bt_last_begin = 20210930
-    # _bt_last_begin = 20210707
+    _bt_last_begin = 20211007
     predict_period = 5
     _interval = 4
-    _bt_times = 1
+    _bt_times = 2
     data_period = int(365 * 3.5)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2

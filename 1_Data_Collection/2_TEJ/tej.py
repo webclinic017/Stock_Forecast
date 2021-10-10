@@ -128,8 +128,13 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
         tables.append('ewprcd2') # 報酬率資訊表
 
 
-    begin = 20210929
-    end = 20210929
+    begin = 20211006
+    end = 20211006
+    
+    # 每一天要分開query，但假日的時候不需要
+    today = cbyz.date_get_today()
+    # today = 20211003
+    
 
 
     begin_str = cbyz.ymd(begin)
