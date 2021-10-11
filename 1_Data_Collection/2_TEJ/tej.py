@@ -114,6 +114,7 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
     if ewtinst1c:
         # 三大法人持股成本
         tables.append(['ewtinst1c', 'd']) 
+        
     elif ewprcd:
         # 證券交易資料表，一個月51034筆
         tables.append(['ewprcd', 'd'])  
@@ -138,9 +139,10 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
     end = cbyz.date_get_today()
     begin = cbyz.date_cal(end, -5, 'd')
     
+    
     # Manual Settings
-    # begin = 20160101
-    # end = 20161231
+    begin = 20180701
+    end = 20181231
     
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')
@@ -294,6 +296,69 @@ def update_20211010(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False,
                 file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
             
                 ar.db_upload(data=file, table_name=table)
+
+
+
+
+def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True, 
+           ewifinq=True, ewnprcstd=True,
+           delete=False, upload=True):
+    
+    '''
+    Dev, 先拼拼貼貼，還沒寫完
+    
+    '''
+    
+    
+    tables = []
+    
+    if ewtinst1c:
+        # 三大法人持股成本
+        tables.append(['ewtinst1c', 'd']) 
+    elif ewprcd:
+        # 證券交易資料表，一個月51034筆
+        tables.append(['ewprcd', 'd'])  
+        
+    elif ewprcd2:
+        # 報酬率資訊表，兩個月約100000筆        
+        tables.append(['ewprcd2', 'd']) 
+        
+    elif ewsale:
+        # 月營收資料表，一個月約2000筆，等同於股票檔數
+        tables.append(['ewsale', 'd']) 
+        
+    elif ewifinq:
+        # 單季財務資料表，資料量等同於股票檔數
+        tables.append(['ewifinq', 'd'])         
+
+    elif ewnprcstd:
+        # 證券屬性表，3125筆，資料量等同於股票檔數
+        tables.append(['ewnprcstd', None]) 
+    
+
+        
+    for i in range(len(tables)):
+        
+        table = tables[i]
+        
+        # Get file list
+        file_path = path_export + '/' + table
+        files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
+                                 remove_temp=True)
+
+        files = files['FILES']
+    
+    
+        for j in range(len(files)):
+            
+            name = files.loc[j, 'FILE_NAME']
+            file = pd.read_csv(file_path + '/' + name)
+    
+            file['mdate'] = pd.to_datetime(file.mdate)
+            file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+            ar.db_upload(data=file, table_name=table)
+
 
 
 
