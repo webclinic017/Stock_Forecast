@@ -140,9 +140,9 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
     begin = cbyz.date_cal(end, -5, 'd')
     
     
-    # Manual Settings
-    begin = 20180701
-    end = 20181231
+    # # Manual Settings
+    begin = 20211012
+    end = 20211012
     
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')
@@ -206,7 +206,7 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
         data = []
 
 
-
+# .............
 
 
 def update_20211010(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False, 

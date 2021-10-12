@@ -45,6 +45,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 r'/home/jupyter/Codebase_YZ',
+                 r'/home/jupyter/Arsenal',                 
                  path + '/Function']
 
 
@@ -757,9 +759,7 @@ def get_google_treneds(begin_date=None, end_date=None,
 # %% Process ------
 
 
-
 def get_model_data(industry=True, trade_value=True):
-    
     
     
     global shift_begin, shift_end, data_begin, data_end, ma_values
@@ -1223,76 +1223,76 @@ def get_model(y_index, cv=2, dev=False,
 # ..............
 
 
-def predict(load_model=False, cv=5, dev=False):
+# def predict(load_model=False, cv=2, dev=False):
     
-    global shift_begin, shift_end, data_begin, data_end
-    global predict_begin, predict_end    
-    global model_data, predict_date, model_x, model_y, norm_orig
+#     global shift_begin, shift_end, data_begin, data_end
+#     global predict_begin, predict_end    
+#     global model_data, predict_date, model_x, model_y, norm_orig
     
-    split_data()
+#     split_data()
     
    
-    # Model ......
-    results = pd.DataFrame()
-    rmse = pd.DataFrame()    
-    features = pd.DataFrame()    
+#     # Model ......
+#     results = pd.DataFrame()
+#     rmse = pd.DataFrame()    
+#     features = pd.DataFrame()    
 
     
-    for i in range(0, len(model_y)):
+#     for i in range(0, len(model_y)):
 
-        model = get_model(y_index=i, cv=cv, load_model=load_model, 
-                          export_model=True, path=path_export, dev=dev)
+#         model = get_model(y_index=i, cv=cv, load_model=load_model, 
+#                           export_model=True, path=path_export, dev=dev)
 
 
-        # Feature Importance ......
-        features_new = {'FEATURES':list(X_train_lite.columns),
-                        'IMPORTANCE':model.best_estimator_.feature_importances_}
+#         # Feature Importance ......
+#         features_new = {'FEATURES':list(X_train_lite.columns),
+#                         'IMPORTANCE':model.best_estimator_.feature_importances_}
         
-        features_new = pd.DataFrame(features_new)            
-        features_new['Y'] = model_y[i]
-        features = features.append(features_new)        
+#         features_new = pd.DataFrame(features_new)            
+#         features_new['Y'] = model_y[i]
+#         features = features.append(features_new)        
 
     
-        # RMSE ......
-        preds_test = model.predict(X_test_lite)
-        rmse_new = np.sqrt(mean_squared_error(y_test_lite[i], preds_test))
-        rmse_new = pd.DataFrame(data=[rmse_new], columns=['RMSE'])
-        rmse_new['Y'] = model_y[i]
-        rmse = rmse.append(rmse_new)
+#         # RMSE ......
+#         preds_test = model.predict(X_test_lite)
+#         rmse_new = np.sqrt(mean_squared_error(y_test_lite[i], preds_test))
+#         rmse_new = pd.DataFrame(data=[rmse_new], columns=['RMSE'])
+#         rmse_new['Y'] = model_y[i]
+#         rmse = rmse.append(rmse_new)
 
     
-        # Results ......
-        preds = model.predict(X_predict_lite)
-        results_new = X_predict[model_addt_vars].reset_index(drop=True)
-        results_new['VALUES'] = preds
-        results_new['Y'] = model_y[i]
-        results = results.append(results_new)        
+#         # Results ......
+#         preds = model.predict(X_predict_lite)
+#         results_new = X_predict[model_addt_vars].reset_index(drop=True)
+#         results_new['VALUES'] = preds
+#         results_new['Y'] = model_y[i]
+#         results = results.append(results_new)        
     
     
-    # Organize ......
-    rmse = rmse.reset_index(drop=True)
+#     # Organize ......
+#     rmse = rmse.reset_index(drop=True)
     
-    # 
-    features = features \
-                .sort_values(by='IMPORTANCE', ascending=False) \
-                .reset_index(drop=True)
+#     # 
+#     features = features \
+#                 .sort_values(by='IMPORTANCE', ascending=False) \
+#                 .reset_index(drop=True)
                 
-    features.to_csv(path_export + '/features_' + exe_serial + '.csv',
-                    index=False)           
+#     features.to_csv(path_export + '/features_' + exe_serial + '.csv',
+#                     index=False)           
                 
     
-    # results
-    results_pivot = results \
-                    .pivot_table(index=['STOCK_SYMBOL', 'WORK_DATE'],
-                                 columns='Y',
-                                 values='VALUES') \
-                    .reset_index()
+#     # results
+#     results_pivot = results \
+#                     .pivot_table(index=['STOCK_SYMBOL', 'WORK_DATE'],
+#                                  columns='Y',
+#                                  values='VALUES') \
+#                     .reset_index()
     
-    results = cbyz.df_normalize_restore(df=results_pivot, 
-                                        original=norm_orig)
+#     results = cbyz.df_normalize_restore(df=results_pivot, 
+#                                         original=norm_orig)
     
     
-    return results, rmse, features
+#     return results, rmse, features
 
 
 
@@ -1532,11 +1532,11 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
 # %% Master ------
 
 def master(_predict_begin, _predict_end=None, 
-           _predict_period=15, _data_period=180, 
-           _stock_symbol=[], _stock_type='tw', _ma_values=[3,5,20,60],
+           _predict_period=5, _data_period=180, 
+           _stock_symbol=[], _stock_type='tw', _ma_values=[5,20,60],
            _model_y=['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
                      'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO'],
-           _volume_thld=1000, load_model=False, cv=2, fast=False):
+           _volume_thld=500, export_model=True, load_model=False, cv=2, fast=False):
     '''
     主工作區
     '''
@@ -1697,8 +1697,9 @@ def master(_predict_begin, _predict_end=None,
     # predict_results = predict(load_model=load_model, cv=cv, dev=False)
     # predict_results
     predict_result, precision = \
-        predict_and_tuning(cv=cv, load_model=load_model, export_model=True, 
-                           path=path_temp, fast=fast)    
+        predict_and_tuning(cv=cv, load_model=load_model, 
+                           export_model=export_model, path=path_temp, 
+                           fast=fast)    
     
     # Export Log ......
     params_df = {key:str(value) for key, value in params.items()}
@@ -1716,10 +1717,7 @@ def master(_predict_begin, _predict_end=None,
 
 
 
-# if __name__ == '__main__':
-    
-    # master()
-
+# %% Check ------
 
 
 def check():
@@ -1843,3 +1841,20 @@ def tw_fix_symbol_error():
         file['SYMBOL'] = '0' + file['SYMBOL'] 
     
     
+
+
+if __name__ == '__main__':
+    
+    symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    
+    predict_result, precision = \
+        master(_predict_begin=20211001, _predict_end=None, 
+               _predict_period=5, _data_period=180, 
+               _stock_symbol=symbols, _stock_type='tw', _ma_values=[5,20,60],
+               _model_y=['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+                         'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO'],
+               _volume_thld=1000, export_model=True, load_model=False, cv=2, 
+               fast=True)
+        
+        
+        

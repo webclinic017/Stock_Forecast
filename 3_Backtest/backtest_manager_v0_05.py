@@ -588,8 +588,6 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     '''
     
 
-
-
     # v0.0 - First Version
     # v0.1
     # - 拿掉5MA之後的精準度有提升
@@ -640,10 +638,10 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
 
     
     # Parameters
-    _bt_last_begin = 20211012
+    _bt_last_begin = 20211013
     predict_period = 5
     _interval = 4
-    _bt_times = 1
+    _bt_times = 2
     data_period = int(365 * 3.5)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
@@ -711,7 +709,7 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [8105, 2606, 2610, 3051]
+    hold = [8105, 2610, 3051, 4934]
     
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
