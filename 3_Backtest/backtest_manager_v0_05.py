@@ -51,9 +51,13 @@ elif host == 2:
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
+                 r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 r'/home/jupyter/Codebase_YZ',
+                 r'/home/jupyter/Arsenal',                 
                  path + '/Function',
                  path_sam]
+
 
 
 for i in path_codebase:    
@@ -87,11 +91,10 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
-def set_calendar(_bt_last_begin, predict_period):
+def set_calendar():
 
-    global calendar, bt_last_begin, bt_last_end    
-    bt_last_begin = _bt_last_begin
-    calendar_end = cbyz.date_cal(bt_last_begin, predict_period + 20, 'd')
+    global calendar, _bt_last_begin, _bt_last_end, _predict_period   
+    calendar_end = cbyz.date_cal(_bt_last_begin, _predict_period + 20, 'd')
     
     calendar = stk.get_market_calendar(begin_date=20140101, 
                                        end_date=calendar_end, 
@@ -101,12 +104,12 @@ def set_calendar(_bt_last_begin, predict_period):
     
     
     calendar, _ = cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
-                                    shift=predict_period - 1, 
+                                    shift=_predict_period - 1, 
                                     group_by=['TRADE'], 
                                     suffix='_LAST', remove_na=False)
     
-    bt_last_end = calendar[calendar['WORK_DATE_LAST']==bt_last_begin]
-    bt_last_end = int(bt_last_end['WORK_DATE'])    
+    _bt_last_end = calendar[calendar['WORK_DATE_LAST']==_bt_last_begin]
+    _bt_last_end = int(_bt_last_end['WORK_DATE'])    
 
 
 
@@ -114,16 +117,16 @@ def set_calendar(_bt_last_begin, predict_period):
     
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
-                     bt_times, data_period, load_model=False, cv=2,
+                     data_period, load_model=False, cv=2,
                      fast=False):
     
     
-    global stock_symbol, stock_type, bt_info
+    global _stock_symbol, _stock_type, bt_info, _bt_times, _ma_values
     
     # Prepare For Backtest Records ......
     print('backtest_predict - 這裡有bug，應該用global calendar')
     bt_info_raw = cbyz.date_get_seq(begin_date=bt_last_begin,
-                                    seq_length=bt_times,
+                                    seq_length=_bt_times,
                                     unit='d', interval=-interval,
                                     simplify_date=True)
     
@@ -140,7 +143,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Work area ----------
-    global bt_results, precision, features, model_y, volume_thld
+    global bt_results, precision, features, model_y, _volume_thld
     
     bt_results_raw = pd.DataFrame()
     precision = pd.DataFrame()
@@ -155,9 +158,9 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                                  _predict_end=None, 
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
-                                 _stock_symbol=stock_symbol,
-                                 _ma_values=ma_values,
-                                 _volume_thld=volume_thld,
+                                 _stock_symbol=_stock_symbol,
+                                 _ma_values=_ma_values,
+                                 _volume_thld=_volume_thld,
                                  load_model=load_model,
                                  cv=cv, fast=fast)
 
@@ -194,11 +197,11 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     應用場景有可能全部作回測，而不做任何預測，因為data_end直接設為bt_last_begin
     '''
     
-    global predict_period
-    global interval, bt_times 
+    global _predict_period
+    global _interval, _bt_times 
     global bt_results, rmse, bt_main, actions, model_y
-    global stock_symbol, stock_type
-    global bt_last_begin, bt_last_end    
+    global _stock_symbol, _stock_type
+    global _bt_last_begin, _bt_last_end    
     global calendar
 
 
@@ -224,12 +227,12 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
     # Period ......
     # predict_period * 2是為了保險起見
-    bt_first_begin = cbyz.date_cal(bt_last_begin, 
-                                    -interval * bt_times - predict_period * 2, 
+    bt_first_begin = cbyz.date_cal(_bt_last_begin, 
+                                   -_interval * _bt_times - _predict_period * 2, 
                                     'd')
     
-    forecast_calendar = ar.get_calendar(begin_date=bt_last_begin, 
-                                        end_date=bt_last_end,
+    forecast_calendar = ar.get_calendar(begin_date=_bt_last_begin, 
+                                        end_date=_bt_last_end,
                                         simplify=True)    
     
     forecast_calendar = forecast_calendar[['WORK_DATE']]
@@ -238,9 +241,9 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
     # Hist Data ......
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
-                                 data_end=bt_last_end, 
+                                 data_end=_bt_last_end, 
                                  stock_type=stock_type, 
-                                 stock_symbol=stock_symbol, 
+                                 stock_symbol=_stock_symbol, 
                                  price_change=True,
                                  tej=True)
     
@@ -261,8 +264,8 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                                       to='int')
     
     # ......
-    if len(stock_symbol) > 0:
-        symbol_df = pd.DataFrame({'STOCK_SYMBOL':stock_symbol})
+    if len(_stock_symbol) > 0:
+        symbol_df = pd.DataFrame({'STOCK_SYMBOL':_stock_symbol})
     else:
         temp_symbol = hist_data_raw['STOCK_SYMBOL'].unique().tolist()
         symbol_df = pd.DataFrame({'STOCK_SYMBOL':temp_symbol})        
@@ -293,7 +296,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     # 把LAST全部補上最後一個交易日的資料
     # 因為回測的時間有可能是假日，所以這裡的LAST可能會有NA
     main_data = cbyz.df_shift_fill_na(df=main_data, 
-                                      loop_times=predict_period+1, 
+                                      loop_times=_predict_period+1, 
                                       cols=ohlc_last, 
                                       group_by=['STOCK_SYMBOL', 'BACKTEST_ID'])
 
@@ -426,12 +429,12 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     # 是不是可以移到gen_predict_action
     
     # Decrease On First Day ...
-    cond1 = actions[(actions['WORK_DATE']==bt_last_begin) \
+    cond1 = actions[(actions['WORK_DATE']==_bt_last_begin) \
                    & (actions[close + '_PROFIT_RATIO_PREDICT']<0)]
     cond1 = cond1['STOCK_SYMBOL'].unique().tolist()
     
     # Estimated Profit ...
-    cond2 = actions[(actions['WORK_DATE']>bt_last_begin) \
+    cond2 = actions[(actions['WORK_DATE']>_bt_last_begin) \
                    & (actions[close + '_PROFIT_RATIO_PREDICT']>=y_thld)]
     cond2 = cond2['STOCK_SYMBOL'].unique().tolist()    
     
@@ -579,8 +582,8 @@ def eval_metrics(export_file=False, upload=False):
 # ..........
 
 
-def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5, 
-           data_period=5, _stock_symbol=None, _stock_type='tw',
+def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
+           data_period=5, stock_symbol=None, stock_type='tw',
            signal=None, budget=None, split_budget=False):
     '''
     主工作區
@@ -637,53 +640,61 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     # 26. Add Auto-Competing Model    
 
     
+
+    global _interval, _bt_times, _volume_thld, _ma_values
+
+
     # Parameters
-    _bt_last_begin = 20211013
+    bt_last_begin = 20211014
     predict_period = 5
-    _interval = 4
-    _bt_times = 2
+    interval = 4
+    bt_times = 1
     data_period = int(365 * 3.5)
     # data_period = int(365 * 0.86) # Shareholding    
     # data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
-    _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    _stock_symbol = []
-    _stock_type = 'tw'
+    stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    # stock_symbol = []
+    stock_type = 'tw'
     # _ma_values = [5,10,20]
     # _ma_values = [5,10,20,40]
-    _ma_values = [5,10,20,60]
-    _volume_thld = 500
+    ma_values = [5,10,20,60]
+    volume_thld = 500
 
 
-    global interval, bt_times, volume_thld
-    interval = _interval
-    bt_times = _bt_times
-    volume_thld = _volume_thld
-    ma_values = _ma_values
+    _interval = interval
+    _bt_times = bt_times
+    _volume_thld = volume_thld
+    _ma_values = ma_values
         
 
     # Rename predict period as forecast preiod
     # ......    
-    global stock_symbol, stock_type, ma_values
-    global bt_last_begin, bt_last_end
+    global _stock_symbol, _stock_type
+    global _bt_last_begin, _bt_last_end
     
-    stock_type = _stock_type    
-    stock_symbol = _stock_symbol
-    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
+    _stock_type = stock_type    
+    _stock_symbol = stock_symbol
+    _stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
 
 
     # Set Date ......
-    global calendar, bt_last_begin, bt_last_end
-    set_calendar(_bt_last_begin, predict_period)
+    global calendar, _bt_last_begin, _bt_last_end, _predict_period
+    _predict_period = predict_period
+    _bt_last_begin = bt_last_begin
+    
+    set_calendar()
 
     
     # Predict ------
     global bt_results, precision, features
+    
+
+    
     backtest_predict(bt_last_begin=bt_last_begin, 
-                     predict_period=predict_period, 
+                     predict_period=_predict_period, 
                      interval=interval,
-                     bt_times=bt_times,
                      data_period=data_period,
                      load_model=True, cv=2, fast=False)
 
@@ -709,12 +720,12 @@ def master(_bt_last_begin, predict_period=14, interval=360, bt_times=5,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [8105, 2610, 3051, 4934]
+    hold = [8105, 2610, 3051, 1904, 2611]
     
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
     print('評估是否可以把buy_signal移到gen_predict_action')
-    cal_profit(y_thld=0.05, time_thld=predict_period, prec_thld=0.05,
+    cal_profit(y_thld=0.05, time_thld=_predict_period, prec_thld=0.05,
                execute_begin=2108110000, 
                export_file=True, load_file=True, path=path_temp,
                file_name=None, upload_metrics=True)
@@ -801,8 +812,6 @@ def check_price():
     chk
 
 
-if __name__ == '__main__':
-    results = master(begin_date=20180401)
 
 
 
@@ -873,4 +882,9 @@ def get_stock_fee():
 
 
 
-# %% Archive ------
+# %% Execute ------
+
+
+if __name__ == '__main__':
+    
+    results = master(bt_last_begin=20211004)

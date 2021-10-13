@@ -135,6 +135,7 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
         # 證券屬性表，3125筆，資料量等同於股票檔數
         tables.append(['ewnprcstd', None]) 
 
+
     # 每一天要分開query，但假日的時候不需要
     end = cbyz.date_get_today()
     begin = cbyz.date_cal(end, -5, 'd')
@@ -142,7 +143,7 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
     
     # # Manual Settings
     begin = 20211012
-    end = 20211012
+    end = 20211013
     
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')
