@@ -14,21 +14,24 @@ import sys, time, os, gc
 
 
 
-local = False
-local = True
+host = 2
+host = 0
+stock_type = 'tw'
 
 
 # Path .....
-if local == True:
+if host == 0:
     path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection/2_TEJ'
-else:
-    path = '/home/aronhack/stock_forecast/dashboard/'
+elif host == 2:
+    path = '/home/jupyter/1_Data_Collection/2_TEJ'
 
 
 # Codebase ......
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 r'/home/jupyter/Codebase_YZ',
+                 r'/home/jupyter/Arsenal',    
                  path + '/Function']
 
 
@@ -41,7 +44,7 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 
-
+ar.host = host
 
 
 # 自動設定區 -------
@@ -83,31 +86,20 @@ def master():
     主工作區
     '''
     
-    # Put all query in a funciton
+    print('master')
     
-    return ''
-
-
-
-
-
-# if __name__ == '__main__':
-#     master()
-
-
-    
-
-
 
 # %% Query ------
 
 
-def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True, 
-           ewifinq=True, ewnprcstd=True,
+def update(begin=None, end=None, ewprcd2=True, ewtinst1c=True, 
+           ewprcd=True, ewsale=True, ewifinq=True, ewnprcstd=True,
            delete=False, upload=True):
     '''
     以月或季為單位的資料，篩選的時候還是用日期下條件，所以當成是d
     '''
+    
+    print('update - param中的upload目前沒有用')
     
     tables = []
     
@@ -115,35 +107,36 @@ def update(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
         # 三大法人持股成本
         tables.append(['ewtinst1c', 'd']) 
         
-    elif ewprcd:
+    if ewprcd:
         # 證券交易資料表，一個月51034筆
         tables.append(['ewprcd', 'd'])  
         
-    elif ewprcd2:
+    if ewprcd2:
         # 報酬率資訊表，兩個月約100000筆        
         tables.append(['ewprcd2', 'd']) 
         
-    elif ewsale:
+    if ewsale:
         # 月營收資料表，一個月約2000筆，等同於股票檔數
         tables.append(['ewsale', 'd']) 
         
-    elif ewifinq:
+    if ewifinq:
         # 單季財務資料表，資料量等同於股票檔數
         tables.append(['ewifinq', 'd'])         
 
-    elif ewnprcstd:
+    if ewnprcstd:
         # 證券屬性表，3125筆，資料量等同於股票檔數
         tables.append(['ewnprcstd', None]) 
 
 
     # 每一天要分開query，但假日的時候不需要
-    end = cbyz.date_get_today()
-    begin = cbyz.date_cal(end, -5, 'd')
+    if begin == None and end == None:
+        end = cbyz.date_get_today()
+        begin = cbyz.date_cal(end, -5, 'd')
     
     
-    # # Manual Settings
-    begin = 20211012
-    end = 20211013
+    # Manual Settings
+    # begin = 20211012
+    # end = 20211013
     
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')
@@ -362,8 +355,6 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
 
 
 
-
-
 def check():
     '''
     Check historical data impocomlete
@@ -376,3 +367,70 @@ def check():
     final.to_csv(path_export + '/ewiprcd/ewiprcd_data_2019-01-01_2021-07-13.csv', index=False)
     
     
+    
+# %% Check ------    
+    
+
+def chk_last_date(ewprcd2=True, ewtinst1c=True, 
+           ewprcd=True, ewsale=True, ewifinq=True, ewnprcstd=True,
+           delete=False, upload=True):
+    
+    tables = []
+    
+    if ewtinst1c:
+        # 三大法人持股成本
+        tables.append(['ewtinst1c', 'd']) 
+        
+    if ewprcd:
+        # 證券交易資料表，一個月51034筆
+        tables.append(['ewprcd', 'd'])  
+        
+    if ewprcd2:
+        # 報酬率資訊表，兩個月約100000筆        
+        tables.append(['ewprcd2', 'd']) 
+        
+    if ewsale:
+        # 月營收資料表，一個月約2000筆，等同於股票檔數
+        tables.append(['ewsale', 'd']) 
+        
+    if ewifinq:
+        # 單季財務資料表，資料量等同於股票檔數
+        tables.append(['ewifinq', 'd'])         
+
+    if ewnprcstd:
+        # 證券屬性表，3125筆，資料量等同於股票檔數
+        tables.append(['ewnprcstd', None]) 
+
+
+    # Query ......    
+    li = []    
+    for i in range(len(tables)):
+        
+        table = tables[i][0]
+        sql = (" select max(date_format(mdate, '%Y%m%d')) last_date "
+               " from " + table + " ")
+        
+        try:
+            query = ar.db_query(sql)
+            last_date = query.values[0][0]
+            error = ''
+            
+        except Exception as e:
+            last_date = np.nan
+            error = e
+    
+        li.append([table, last_date, error])
+    
+    result = pd.DataFrame(li, columns=['TABEL', 'LAST_DATE', 'ERROR'])
+    print(result)
+    return result
+    
+
+if __name__ == '__main__':
+    
+    # Check
+    chk = chk_last_date()
+
+    update(begin=20211012, end=20211014, ewprcd2=False, ewtinst1c=True, 
+            ewprcd=True, ewsale=False, ewifinq=False, ewnprcstd=False,
+            delete=True, upload=True) 

@@ -583,8 +583,7 @@ def eval_metrics(export_file=False, upload=False):
 
 
 def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
-           data_period=5, stock_symbol=None, stock_type='tw',
-           signal=None, budget=None, split_budget=False):
+           data_period=5, stock_symbol=None, stock_type='tw', dev=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -645,7 +644,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
 
     # Parameters
-    bt_last_begin = 20211014
+    bt_last_begin = 20211015
     predict_period = 5
     interval = 4
     bt_times = 1
@@ -654,13 +653,18 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # data_period = 365 * 2
     # data_period = 365 * 5
     # data_period = 365 * 7
-    stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    # stock_symbol = []
     stock_type = 'tw'
     # _ma_values = [5,10,20]
     # _ma_values = [5,10,20,40]
     ma_values = [5,10,20,60]
     volume_thld = 500
+
+    
+    if dev:
+        stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    else:
+        stock_symbol = []
+
 
 
     _interval = interval
