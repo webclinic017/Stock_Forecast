@@ -66,13 +66,15 @@ for i in path_codebase:
 
 
 import codebase_yz as cbyz
+import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
 # import stock_analysis_manager_v1_02 as sam
 # import stock_analysis_manager_v1_03 as sam
 # import stock_analysis_manager_v1_04 as sam
 # import stock_analysis_manager_v1_05 as sam
-import stock_analysis_manager_v1_06 as sam
+# import stock_analysis_manager_v1_06 as sam
+import stock_analysis_manager_v1_07 as sam
 
 
 
@@ -118,7 +120,7 @@ def set_calendar():
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
                      data_period, load_model=False, cv=2,
-                     fast=False):
+                     fast=False, dev=False):
     
     
     global _stock_symbol, _stock_type, bt_info, _bt_times, _ma_values
@@ -162,7 +164,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                                  _ma_values=_ma_values,
                                  _volume_thld=_volume_thld,
                                  load_model=load_model,
-                                 cv=cv, fast=fast)
+                                 cv=cv, fast=fast, dev=dev)
 
 
         new_result = results_raw[0]
@@ -379,12 +381,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 
     # Rearrange Columns ......            
-    # if 'CLOSE' in model_y:
-    #     profit_cols = ['CLOSE_PROFIT_PREDICT', 
-    #                    'CLOSE_PROFIT_RATIO_PREDICT']
-    # else:
-    #     profit_cols = []
-        
     profit_cols = [close + '_PROFIT_PREDICT', 
                    close + '_PROFIT_RATIO_PREDICT']
         
@@ -464,10 +460,8 @@ def eval_metrics(export_file=False, upload=False):
     
     model_y_hist = [y + '_HIST' for y in model_y]
     mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
-        
+    assert len(mape_main) > 0, 'eval_metrics - mape_main is empty.'
     
-    if len(mape_main) == 0:
-        return ''
     
     # ......
     mape = pd.DataFrame()
@@ -498,13 +492,13 @@ def eval_metrics(export_file=False, upload=False):
                  
         
         # MAPE Overview
-        new_mape = cbyz.df_summary(df=mape_main_abs, group_by=[], cols=['MAPE'])
+        new_mape, _ = cbyz.df_summary(df=mape_main_abs, group_by=[], cols=['MAPE'])
         new_mape.loc[:, 'Y'] = y
         mape = mape.append(new_mape)
         
         
         # Group MAPE ......
-        new_mape = cbyz.df_summary(df=mape_main_abs, group_by=['OVERESTIMATE'], 
+        new_mape, _ = cbyz.df_summary(df=mape_main_abs, group_by=['OVERESTIMATE'], 
                                  cols=['MAPE'])
         new_mape.loc[:, 'Y'] = y
         mape_group = mape_group.append(new_mape)
@@ -512,7 +506,7 @@ def eval_metrics(export_file=False, upload=False):
         
         # Extreme MAPE ......
         new_mape = mape_main_abs[mape_main_abs['MAPE'] > 0.1]
-        new_mape = cbyz.df_summary(df=new_mape, 
+        new_mape, _ = cbyz.df_summary(df=new_mape, 
                                 group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
                                 cols=['MAPE'])
         
@@ -604,18 +598,16 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     # Backtest也可以用parameter做A/B    
     
-    # data_period用2年的精準度會比3年高
     
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
-    # add hold columns
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
+
 
 
     # Worklist
     # 0. Call notification function in backtest manager, and add stop loss 
     #    in excel
-    # 2. Price change of OHLC
     # 1. Add date index to indentify feature of time series
     #    > Add this to sam v7 and v8
     # 2. Add DIFF_MAPE_MEDIAN
@@ -639,14 +631,19 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 24. 把股性分群
     # 25. Do actions by change
     # 26. Add Auto-Competing Model    
-
+    # 27. Signal A and B，A是反彈的，B是low和close差距N%
+    # 交易資料先在dcm中算好ma
+    # 交易量低的資料表先保留，最後再merge回excel，在sam中處理完
+    # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
+    
     
 
     global _interval, _bt_times, _volume_thld, _ma_values
 
 
     # Parameters
-    bt_last_begin = 20211015
+    # Parameters
+    bt_last_begin = 20211006
     predict_period = 5
     interval = 4
     bt_times = 1
@@ -660,6 +657,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # _ma_values = [5,10,20,40]
     ma_values = [5,10,20,60]
     volume_thld = 500
+    dev = True
 
     
     if dev:
@@ -702,13 +700,10 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
                      predict_period=_predict_period, 
                      interval=interval,
                      data_period=data_period,
-                     load_model=True, cv=2, fast=False)
+                     load_model=False, cv=2, fast=True, dev=dev)
 
     
     # Profit ------    
-    # Update, 需把Y為close和Y為price_change的情況分開處理
-    # Update, stock_info每日比對檔案自動匯
-    
     # y_thld=0.05
     # time_thld=predict_period
     # prec_thld=0.03
@@ -730,11 +725,10 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
-    print('評估是否可以把buy_signal移到gen_predict_action')
     cal_profit(y_thld=0.05, time_thld=_predict_period, prec_thld=0.05,
                execute_begin=2108110000, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=True)
+               file_name=None, upload_metrics=False)
     
     
     # Export ......
@@ -776,24 +770,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
 
 
-# %% View ------
-def view_today_limit_up():
-    
-    data = stk.get_data(data_begin=20210706, data_end=20210707, price_change=True)
-    
-    data = data[data['PRICE_CHANGE_RATIO']>0.08]
-    # chk = data[data['VOLUME']>1000000]
-    # 
-    
-    
-    stock_info = stk.tw_get_stock_info(path=path_temp)
-    stock_main = data.merge(stock_info, how='left', on='STOCK_SYMBOL')
-    stock_main
-    
-    
-
-
-
 # %% Check ------
 
 def check():
@@ -806,18 +782,6 @@ def check():
     chk
     
     return ''
-
-
-def check_price():
-    
-    
-    chk = bt_results[bt_results['STOCK_SYMBOL']=='5521']
-    chk
-
-    chk = bt_results[bt_results['STOCK_SYMBOL']=='2702']
-    chk
-
-
 
 
 
@@ -873,24 +837,18 @@ def verify_prediction_results():
     
     main_data = data.merge(file, how='left', on='STOCK_SYMBOL')
     
-    
-    
 
     
 
 # %% Dev -----
 
-def get_stock_fee():
-    
-    
-    return ''
-
-
 
 
 # %% Execute ------
 
-
 if __name__ == '__main__':
     
-    results = master(bt_last_begin=20211004)
+    results = master(bt_last_begin=20211006, dev=True)
+
+
+
