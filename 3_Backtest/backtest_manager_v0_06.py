@@ -345,18 +345,25 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
             .rename(columns={'FORECAST_PRECISION_MEDIAN':'RECORD_PRECISION_MEDIAN',
                              'FORECAST_PRECISION_STD':'RECORD_PRECISION_STD'})
             
+    # Add Low Volume Symbols    
+    if len(sam.low_volume_symbols) > 0:
+        low_volume_df = pd.DataFrame({'STOCK_SYMBOL':sam.low_volume_symbols})
+        actions = actions.merge(low_volume_df, how='outer', on='STOCK_SYMBOL')
+        
+        
     # Add name ......
     stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
     stock_info = stock_info[['STOCK_SYMBOL', 'STOCK_NAME', 'INDUSTRY']]
-    actions = actions.merge(stock_info, how='left', on='STOCK_SYMBOL')      
-
-
-    # Hold 
-    global hold
-    hold = [str(i) for i in hold]
-    actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(hold), 1, 0)
+    actions = actions.merge(stock_info, how='left', on='STOCK_SYMBOL')
     
-    actions.loc[actions.index, 'BUY_SIGNAL'] = np.nan 
+    
+    # Hold Symbols
+    global hold
+    hold = [str(i) for i in hold]    
+    actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(hold), 1, 0)
+
+    print('Check BUY_SIGNAL')
+    actions['BUY_SIGNAL'] = np.nan 
     
     
     
@@ -594,6 +601,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
     # v0.06
     # - Update for cbyz and cbml
+    # - Include low volume symbols in the excel
     
     
     # Backtest也可以用parameter做A/B    
@@ -661,7 +669,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
     
     if dev:
-        stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+        stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603, 2611, 3051]
     else:
         stock_symbol = []
 
@@ -693,9 +701,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     # Predict ------
     global bt_results, precision, features
-    
-
-    
     backtest_predict(bt_last_begin=bt_last_begin, 
                      predict_period=_predict_period, 
                      interval=interval,
@@ -740,10 +745,8 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     workbook = writer.book
     workbook.add_worksheet('stock') 
     sht = workbook.get_worksheet_by_name("stock")
+    cbyz.excel_add_df(actions, sht, startrow=0, startcol=0, header=True)
 
-
-    cbyz.excel_add_df(actions, sht, 
-                      startrow=0, startcol=0, header=True)
 
     # Add Format
     digi_format = workbook.add_format({'num_format':'0.0'})

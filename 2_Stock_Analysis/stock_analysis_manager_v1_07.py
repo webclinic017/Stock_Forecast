@@ -477,30 +477,28 @@ def select_stock_symbols():
     # Exclude Low Value ......
     global volume_thld
     global data_end
-    loc_begin = cbyz.date_cal(data_end, -30, 'd')
+    loc_begin = cbyz.date_cal(data_end, -7, 'd')
     
-    low_volume = df[(df['WORK_DATE']>=loc_begin) \
-                    & (df['WORK_DATE']<=data_end)]
-    
+    low_volume = df[(df['WORK_DATE']>=loc_begin) & (df['WORK_DATE']<=data_end)]
     low_volume = low_volume \
-        .groupby(['STOCK_SYMBOL']) \
-        .agg({'VOLUME':'min'}) \
-        .reset_index()
+                .groupby(['STOCK_SYMBOL']) \
+                .agg({'VOLUME':'min'}) \
+                .reset_index()
         
         
     low_volume = low_volume[low_volume['VOLUME']<=volume_thld * 1000]
     low_volume = low_volume[['STOCK_SYMBOL']].drop_duplicates()
     
+    global low_volume_symbols
+    low_volume_symbols = low_volume['STOCK_SYMBOL'].tolist()
+    
+    # 為了避免low_volume_symbols的數量過多，因此採用df做anti_merge，而不是直接用list
     df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
     
-    # if volume_thld > 0 and len(low_volume) > 0:
-    #     low_volume = low_volume[['STOCK_SYMBOL']]
-    #     df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
-
-
     return df
 
 
+# ........
 
 
 def select_stock_symbols_manually(data_begin, data_end):
@@ -776,11 +774,9 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # Check ......
-    if predict_period > min(ma_values):
-        # Update, raise error here
-        print('get_model_data - predict_period is longer than ma values, ' \
-              + 'and it will cause na.')
-        del main_data    
+    msg = 'get_model_data - predict_period is longer than ma values, ' \
+            + 'and it will cause na.'
+    assert predict_period <= min(ma_values), msg
 
 
     # Stock Info .......
@@ -1600,7 +1596,7 @@ def master(_predict_begin, _predict_end=None,
     # dev = True
     
     if dev:
-        _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+        _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603, 3051]
     else:
         _stock_symbol = []
 
