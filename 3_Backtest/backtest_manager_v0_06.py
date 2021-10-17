@@ -74,7 +74,8 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v1_04 as sam
 # import stock_analysis_manager_v1_05 as sam
 # import stock_analysis_manager_v1_06 as sam
-import stock_analysis_manager_v1_07 as sam
+# import stock_analysis_manager_v1_07 as sam
+import stock_analysis_manager_v1_08 as sam
 
 
 
@@ -467,6 +468,8 @@ def eval_metrics(export_file=False, upload=False):
     
     model_y_hist = [y + '_HIST' for y in model_y]
     mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
+    
+    print('eval_metrics - Bug，dev為True時，如果剛好都沒有forecast_records會出錯')
     assert len(mape_main) > 0, 'eval_metrics - mape_main is empty.'
     
     
@@ -610,6 +613,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
+    # 2. Features現在是空的
 
 
 
@@ -650,8 +654,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
 
     # Parameters
-    # Parameters
-    bt_last_begin = 20211006
     predict_period = 5
     interval = 4
     bt_times = 1
@@ -665,11 +667,14 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # _ma_values = [5,10,20,40]
     ma_values = [5,10,20,60]
     volume_thld = 500
-    dev = True
+    
+    # bt_last_begin = 20211018    
+    # dev = True    
 
     
     if dev:
-        stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603, 2611, 3051]
+        stock_symbol = [2520, 2605, 6116, 6191, 3481, 
+                        2409, 2603, 2611, 3051, 3562]
     else:
         stock_symbol = []
 
@@ -844,6 +849,25 @@ def verify_prediction_results():
     
 
 # %% Dev -----
+
+
+def dev():
+    
+    ewsale = stk.tej_get_ewsale(begin_date=20180101, end_date=None, 
+                                stock_symbol=[], trade=True)    
+    
+    
+    cbyz.df_chk_col_na(df=data)
+    
+    cbyz.df_fillna(df=data, cols=['D0001', 'D0002', 'D0003'], 
+                   group_by=['STOCK_SYMBOL'], method='mean')
+
+
+
+    data['D0001'] = np.where(data['D0001'].isna(), np.nan, data['D0001'])
+    data['D0002'] = np.where(data['D0002'].isna(), np.nan, data['D0002'])
+    data['D0003'] = np.where(data['D0003'].isna(), np.nan, data['D0003'])
+    chk = data[data['D0001'].isna()]
 
 
 

@@ -99,6 +99,8 @@ def update(begin=None, end=None, ewprcd2=True, ewtinst1c=True,
     以月或季為單位的資料，篩選的時候還是用日期下條件，所以當成是d
     '''
     
+    
+    print('update - 增加防呆機制，當begin和end的位數低於8時用assert報錯')
     print('update - param中的upload目前沒有用')
     
     tables = []
@@ -135,8 +137,8 @@ def update(begin=None, end=None, ewprcd2=True, ewtinst1c=True,
     
     
     # Manual Settings
-    begin = 20170101
-    end = 20171231
+    # begin = 20170101
+    # end = 20171231
     
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')

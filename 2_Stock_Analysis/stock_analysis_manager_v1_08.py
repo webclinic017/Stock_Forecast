@@ -150,20 +150,6 @@ def get_market_data_raw(industry=True, trade_value=True):
     #                                prominence=4, days=False)
 
 
-    # # Add Data Index ......
-    # DATE_INDEX 已經在calendar中
-    # date_index = market_data_raw[['WORK_DATE']] \
-    #             .drop_duplicates() \
-    #             .sort_values(by='WORK_DATE') \
-    #             .reset_index(drop=True) \
-    #             .reset_index() \
-    #             .rename(columns={'index':'DATE_INDEX'})
-  
-    # market_data_raw = market_data_raw \
-    #                     .merge(date_index, how='left', on='WORK_DATE')  
-    
-
-
     # Predict Symbols ......
     # 1. Prevent some symbols excluded by select_stock_symbols(), but still
     #    exists.
@@ -219,6 +205,7 @@ def sam_load_data(industry=True, trade_value=True):
         
     # Process Market Data
     loc_main = market_data_raw.drop('TOTAL_TRADE_VALUE', axis=1)
+    except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
     
     loc_main, _, norm_orig = \
         cbml.ml_data_process(df=loc_main, ma=True, normalize=True, lag=True, 
@@ -226,11 +213,11 @@ def sam_load_data(industry=True, trade_value=True):
                             norm_group_by=['STOCK_SYMBOL'], 
                             lag_group_by=['STOCK_SYMBOL'], 
                             ma_cols_contains=[], 
-                            ma_except_contains=['WORK_DATE'],
+                            ma_except_contains=except_cols,
                             norm_cols_contains=[], 
-                            norm_except_contains=['WORK_DATE'],
+                            norm_except_contains=except_cols,
                             lag_cols_contains=[], 
-                            lag_except_contains=['WORK_DATE'], 
+                            lag_except_contains=except_cols, 
                             drop_except_contains=model_y,
                             ma_values=ma_values, 
                             lag_period=predict_period)
@@ -751,10 +738,6 @@ def get_google_treneds(begin_date=None, end_date=None,
 
 
 
-
-
-
-
 # %% Process ------
 
 
@@ -936,6 +919,64 @@ def get_model_data(industry=True, trade_value=True):
     main_data = cbyz.df_conv_na(df=main_data, cols=cols)
 
 
+    # 月營收資料表 ......
+    # 1. 主要邏輯就是顯示最新的營收資料
+    print('Update - 增加date index')
+    ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
+                                stock_symbol=stock_symbol, trade=True)
+    
+    ewsale, cols, _ = \
+        cbml.ml_data_process(df=ewsale, 
+                             ma=False, normalize=True, lag=False, 
+                             ma_group_by=['STOCK_SYMBOL'],
+                             norm_group_by=['STOCK_SYMBOL'], 
+                             lag_group_by=['STOCK_SYMBOL'],
+                             ma_cols_contains=[], 
+                             ma_except_contains=[],
+                             norm_cols_contains=['D000'], 
+                             norm_except_contains=[],
+                             lag_cols_contains=[], 
+                             lag_except_contains=[], 
+                             drop_except_contains=[],
+                             ma_values=ma_values, 
+                             lag_period=predict_period)    
+    
+    cur_cols = [s + '_CUR' for s in cols]
+    ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
+                                         cols=['D0001', 'D0002', 'D0003'], 
+                                         shift=-1, group_by=['STOCK_SYMBOL'],
+                                         suffix='_PRE', remove_na=False)
+    
+    # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
+    year_month = main_data[['WORK_DATE', 'YEAR', 'MONTH']] \
+                .drop_duplicates()
+                
+    ewsale = ewsale.merge(year_month, how='left', on=['WORK_DATE'])
+    ewsale = ewsale.rename(columns={'WORK_DATE':'EWSALE_WORK_DATE',
+                                    'D0001':'D0001_CUR',
+                                    'D0002':'D0002_CUR',
+                                    'D0003':'D0003_CUR'})
+    
+    main_data = main_data \
+            .merge(ewsale, how='left', on=['STOCK_SYMBOL', 'YEAR', 'MONTH'])  
+
+    cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
+    main_data['D0001'] = np.where(cond, 
+                                  main_data['D0001_CUR'], 
+                                  main_data['D0001_PRE'])
+    
+    main_data['D0002'] = np.where(cond, 
+                                  main_data['D0002_CUR'], 
+                                  main_data['D0002_PRE'])
+
+    main_data['D0003'] = np.where(cond, 
+                                  main_data['D0003_CUR'], 
+                                  main_data['D0003_PRE'])
+    
+    main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
+                               axis=1)
+    
+    
     # 指數日成本 ......
     # - Increase prediction time a lot, but not increase mape obviously.
     # ewiprcd = stk.tej_get_ewiprcd()
