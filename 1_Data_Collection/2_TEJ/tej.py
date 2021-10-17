@@ -89,7 +89,7 @@ def master():
     print('master')
     
 
-# %% Query ------
+# %% Update ------
 
 
 def update(begin=None, end=None, ewprcd2=True, ewtinst1c=True, 
@@ -135,8 +135,8 @@ def update(begin=None, end=None, ewprcd2=True, ewtinst1c=True,
     
     
     # Manual Settings
-    # begin = 20211012
-    # end = 20211013
+    begin = 20170101
+    end = 20171231
     
     begin_str = cbyz.ymd(begin)
     begin_str = begin_str.strftime('%Y-%m-%d')
@@ -333,12 +333,12 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
         
     for i in range(len(tables)):
         
-        table = tables[i]
+        table = tables[i][0]
         
         # Get file list
         file_path = path_export + '/' + table
         files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
-                                 remove_temp=True)
+                                     remove_temp=True)
 
         files = files['FILES']
     
@@ -351,8 +351,22 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
             file['mdate'] = pd.to_datetime(file.mdate)
             file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
         
+            # ewsale
+            # file['annd_s'] = pd.to_datetime(file.annd_s)
+            # file['annd_s'] = file['annd_s'].dt.strftime('%Y-%m-%d %H:%M:%S')        
+        
             ar.db_upload(data=file, table_name=table)
 
+
+
+def create_table():
+    
+    file_path = r'/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection/2_TEJ/Export/ewsale/ewsale_2021-07-01_2021-09-30.csv'
+    
+    file = pd.read_csv(file_path)
+    file = file.loc[0:100]
+    file.to_csv(path_export + '/ewsale.csv', index=False)
+    
 
 
 def check():

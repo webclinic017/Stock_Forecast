@@ -1548,11 +1548,13 @@ def master(_predict_begin, _predict_end=None,
     # - Add check for min max
     # v1.06
     # - Change local variable as host
-    
-    
     # v1.07
     # - Update for cbyz and cbml
     # - Add low_volume_symbols
+    
+    
+    # v1.08
+    # - Add data    
     
     
     # - 寫出全部的model log
