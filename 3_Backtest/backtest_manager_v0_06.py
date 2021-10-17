@@ -460,7 +460,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 def eval_metrics(export_file=False, upload=False):
 
-
+    
     # MAPE ......
     global bt_main, bt_info, rmse
     global mape, mape_group, mape_extreme
@@ -469,8 +469,11 @@ def eval_metrics(export_file=False, upload=False):
     model_y_hist = [y + '_HIST' for y in model_y]
     mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
     
-    print('eval_metrics - Bug，dev為True時，如果剛好都沒有forecast_records會出錯')
-    assert len(mape_main) > 0, 'eval_metrics - mape_main is empty.'
+    print('eval_metrics - Bug，不做回測時，mape_main的length一定會等於0')
+    # assert len(mape_main) > 0, 'eval_metrics - mape_main is empty.'
+
+    if len(mape_main) == 0:
+        return ''
     
     
     # ......

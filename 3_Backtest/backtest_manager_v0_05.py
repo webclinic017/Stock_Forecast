@@ -581,9 +581,10 @@ def eval_metrics(export_file=False, upload=False):
 
 # ..........
 
-
-def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
-           data_period=5, stock_symbol=None, stock_type='tw', dev=False):
+    
+def master(bt_last_begin, predict_period=5, interval=4, bt_times=1, 
+           data_period=int(365 * 3.5), ma_values = [5,10,20,60],
+           volume_thld = 500, stock_symbol=[], stock_type='tw', dev=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -887,8 +888,11 @@ def get_stock_fee():
 
 
 # %% Execute ------
-
-
 if __name__ == '__main__':
     
-    results = master(bt_last_begin=20211004)
+    results = master(bt_last_begin=20211018, predict_period=5, 
+                     interval=4, bt_times=1, 
+                     data_period=int(365 * 3.5), 
+                     ma_values = [5,10,20,60],
+                     volume_thld = 500, stock_symbol=[], 
+                     stock_type='tw', dev=False)
