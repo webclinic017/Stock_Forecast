@@ -1647,7 +1647,7 @@ def master(_predict_begin, _predict_end=None,
 
 
     global version, exe_serial
-    version = 1.08
+    version = 1.09
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
     global params, error_msg
@@ -1851,22 +1851,6 @@ def check_price_limit():
 
 
 # %% Dev ------
-
-
-
-
-# # Params Collector
-# class Struct:
-#     def __init__(self, **entries):
-#         self.__dict__.update(entries)
-
-
-# args = {'a': 1, 'b': 2}
-# s = Struct(**args)
-
-# s.a
-# s.b
-
 
 
 

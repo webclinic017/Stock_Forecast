@@ -92,8 +92,8 @@ def master():
 # %% Update ------
 
 
-def update(begin=None, end=None, ewprcd2=True, ewtinst1c=True, 
-           ewprcd=True, ewsale=True, ewifinq=True, ewnprcstd=True,
+def update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
+           ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
            delete=False, upload=True):
     '''
     以月或季為單位的資料，篩選的時候還是用日期下條件，所以當成是d
@@ -447,6 +447,6 @@ if __name__ == '__main__':
     # Check
     chk = chk_last_date()
 
-    update(begin=20211012, end=20211014, ewprcd2=False, ewtinst1c=True, 
-            ewprcd=True, ewsale=False, ewifinq=False, ewnprcstd=False,
+    update(begin=20211012, end=20211014, ewprcd=True, ewtinst1c=True, 
+           ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
             delete=True, upload=True) 
