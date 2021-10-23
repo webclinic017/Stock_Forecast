@@ -447,6 +447,8 @@ if __name__ == '__main__':
     # Check
     chk = chk_last_date()
 
-    update(begin=20211012, end=20211014, ewprcd=True, ewtinst1c=True, 
+    update(begin=20211018, end=20211021, ewprcd=True, ewtinst1c=True, 
            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-            delete=True, upload=True) 
+           delete=True, upload=True) 
+
+    chk2 = chk_last_date() 

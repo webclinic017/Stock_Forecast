@@ -93,38 +93,6 @@ def get_dismiss_symbol():
 
 
 
-
-def get_ledger():
-    
-    ledger = ar.google_get_sheet_data(url, worksheet='Ledger')
-    ledger = cbyz.df_conv_col_type(df=ledger, cols=['VOLUME', 'COST'],
-                                   to='float')
-
-    ledger = ledger \
-                .groupby(['MARKET', 'SYMBOL']) \
-                .agg({'COST':'sum',
-                      'VOLUME':'sum',
-                      'DATE':'min'}) \
-                .reset_index() \
-                .rename(columns={'DATE':'FIRST_PURCHASE'})
-                
-    ledger = ledger[(ledger['VOLUME']>0) & (ledger['COST']>10)] \
-                .reset_index(drop=True)
-                
-    ledger['PRICE'] = ledger['COST'] / ledger['VOLUME']
-    
-    
-    # Hold Days ......
-    ledger = cbyz.df_ymd(df=ledger, cols='FIRST_PURCHASE')
-    ledger['TODAY'] = cbyz.date_get_today(simplify=True)
-    ledger = cbyz.df_date_diff(df=ledger, col1='TODAY', col2='FIRST_PURCHASE')
-    
-    ledger = ledger.rename(columns={'DAYS':'HOLD_DAYS'})
-    ledger = ledger.drop(['FIRST_PURCHASE', 'TODAY'], axis=1)
-    
-    return ledger
-
-
 # %% Operation ------
 
 
@@ -132,7 +100,7 @@ def update_hist_data():
     
     # Update, write a load_data(), then set ledger as a global vars,
     # preventing from call API repeatedly.
-    ledger = get_ledger()
+    ledger = stk.get_ledger()
     ledger = ledger[['MARKET', 'SYMBOL', 'PRICE']] \
                 .rename(columns={'PRICE':'BUY_PRICE'})
     
@@ -212,13 +180,13 @@ def update_hist_data():
                            'PRICE', 'CURRENCY', 'NOTE']]
     
     # Upload ......
-    ar.google_sheet_write(obj=main_data, url=url, worksheet='Hist_Data',
+    ar.gsheets_sheet_write(obj=main_data, url=url, worksheet='Hist_Data',
                           append=True)
     
     # Log ......
     log_time = cbyz.get_time_serial(with_time=True)
     
-    ar.google_sheet_write(obj=[[log_time]], url=url, 
+    ar.gsheets_sheet_write(obj=[[log_time]], url=url, 
                           worksheet='Hist_Data_Log', append=True)    
     
     print('update_hist_data finished.')
@@ -241,7 +209,7 @@ def notif_stop_loss_backup_20210523():
     # record in the google sheet
     
     # ADD STOCK NAME
-    ledger = get_ledger()
+    ledger = stk.get_ledger()
     
     
     # Current Price
@@ -332,7 +300,7 @@ def notif_stop_loss():
     # record in the google sheet
     
     # ADD STOCK NAME
-    ledger = get_ledger()
+    ledger = stk.get_ledger()
     ledger = ledger.rename(columns={'PRICE':'MEAN_COST'})
     
     # Current Price

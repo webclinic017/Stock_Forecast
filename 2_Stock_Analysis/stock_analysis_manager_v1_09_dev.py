@@ -27,6 +27,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV    
 from sklearn.ensemble import RandomForestRegressor
 import pickle
+import xgboost as xgb
 
 
 
@@ -59,6 +60,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
+import ultra_tuner as ut
 
 ar.host = host
 
@@ -81,7 +83,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 # %% Inner Function ------
 
 
-def get_market_data_raw(industry=True, trade_value=True):
+def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
     global stock_symbol
@@ -115,8 +117,6 @@ def get_market_data_raw(industry=True, trade_value=True):
                                        trade_value=trade_value,
                                        tej=True)
         
-        # backup = market_data_raw.copy()
-        # market_data_raw = backup.copy()
 
     # Exclude New Symbols ......
     # Exclude the symbols that listing date shorter than data_period
@@ -125,8 +125,14 @@ def get_market_data_raw(industry=True, trade_value=True):
                         .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
                         .transform('min')
 
+    global new_symbols
+    new_symbols = market_data_raw[market_data_raw['MIN_DATE']>date_min]
+    new_symbols = new_symbols['STOCK_SYMBOL'].unique().tolist()
+
+    # Market data without new symbols
     market_data_raw = market_data_raw[market_data_raw['MIN_DATE']==date_min] \
                         .drop('MIN_DATE', axis=1)
+
 
 
     # Exclude Low Volume Symbols ......
@@ -142,12 +148,16 @@ def get_market_data_raw(industry=True, trade_value=True):
                                           cols=['K_LINE_COLOR', 'K_LINE_TYPE'])
     
     # Add Support Resistance ......
-    # print('add_support_resistance - days == True時有bug，全部數值一樣，導致沒辦法標準化？')
-    # global data_period
-    # market_data_raw, _ = \
-    #     stk.add_support_resistance(df=market_data_raw, cols='CLOSE',
-    #                                rank_thld=int(data_period * 2 / 360),
-    #                                prominence=4, days=False)
+    
+    if support_resist:
+        # Check，確認寫法是否正確
+        # print('add_support_resistance - days == True時有bug，全部數值一樣，導致
+        # 沒辦法標準化？')
+        global data_period
+        market_data_raw, _ = \
+            stk.add_support_resistance(df=market_data_raw, cols='CLOSE',
+                                       rank_thld=int(data_period * 2 / 360),
+                                       prominence=4, days=False)
 
 
     # Predict Symbols ......
@@ -156,6 +166,7 @@ def get_market_data_raw(industry=True, trade_value=True):
     global stock_symbol_df    
     all_symbols = market_data_raw['STOCK_SYMBOL'].unique().tolist()
     stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':all_symbols})
+    
     
     # Calendar
     calendar_proc = calendar \
@@ -203,8 +214,37 @@ def sam_load_data(industry=True, trade_value=True):
     global stock_info_raw
     
         
-    # Process Market Data
+    # Process Market Data ......
     loc_main = market_data_raw.drop('TOTAL_TRADE_VALUE', axis=1)
+    
+    
+    # Normalize By Day
+    if 'OPEN_CHANGE_RATIO' in loc_main.columns:
+        
+        cols = []
+        for i in range(len(model_y)):
+            col = model_y[i]
+            cols.append(col)
+            loc_main[col + '_GLOB_NORM'] = loc_main[col]
+    
+
+        loc_main, _, norm_orig = \
+            cbml.ml_data_process(df=loc_main, ma=True, 
+                                 normalize=True, lag=True, 
+                                 ma_group_by=['STOCK_SYMBOL'],   
+                                 norm_group_by=['WORK_DATE'], 
+                                 lag_group_by=['STOCK_SYMBOL'], 
+                                 ma_cols_contains=cols, 
+                                 ma_except_contains=[],
+                                 norm_cols_contains=cols, 
+                                 norm_except_contains=[],
+                                 lag_cols_contains=cols, 
+                                 lag_except_contains=[], 
+                                 drop_except_contains=model_y,
+                                 ma_values=ma_values, 
+                                 lag_period=predict_period)
+        
+    # Normalize By Stock
     except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
     
     loc_main, _, norm_orig = \
@@ -255,8 +295,6 @@ def sam_load_data(industry=True, trade_value=True):
 
 
     # Stock Info ...
-    
-    
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
     
     stock_info, _, _ = \
@@ -480,7 +518,8 @@ def select_stock_symbols():
     low_volume_symbols = low_volume['STOCK_SYMBOL'].tolist()
     
     # 為了避免low_volume_symbols的數量過多，因此採用df做anti_merge，而不是直接用list
-    df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
+    if len(low_volume_symbols) > 0:
+        df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
     
     return df
 
@@ -763,14 +802,12 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # Stock Info .......
-    # stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)  
     identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
 
 
     # Symbols ......
     stock_symbol = cbyz.conv_to_list(stock_symbol)
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, 'str')
-
 
     get_market_data_raw(industry=industry, trade_value=trade_value)
     
@@ -1326,6 +1363,327 @@ def get_model(y_index, cv=2, dev=False,
 
 
 
+
+
+# %% Master ------
+
+def master(_predict_begin, _predict_end=None, 
+           _predict_period=5, _data_period=180, 
+           _stock_symbol=[], _stock_type='tw', _ma_values=[5,20,60],
+           _volume_thld=500, export_model=True, load_model=False, cv=2, 
+           fast=False):
+    '''
+    主工作區
+    '''
+    
+    # date_period為10年的時候會出錯
+    
+
+    # v1.0
+    # - Add ml_data_process
+    # v1.0.1
+    # - Add Auto Model Tuning
+    # v1.03
+    # - Merge predict and tuning function from uber eats order forecast
+    # - Add small capitall back
+    # - Add TEJ market data function, multiply 1000
+    # v1.04
+    # - Add price change for OHLC
+    # - Fix industry bug
+    # v1.05
+    # - Update for new df_normalize
+    # - Test price_change_ratio as y
+    # - Add check for min max
+    # v1.06
+    # - Change local variable as host
+    # v1.07
+    # - Update for cbyz and cbml
+    # - Add low_volume_symbols
+    # v1.08
+    # - Add 每月投報率 data
+    
+    
+    
+    
+    # v1.09
+    # - Add Ultra_Tuner
+    
+    
+    # - 寫出全部的model log
+    # - Update predict_and_tunning
+    # - Add test serial and detail
+    # -NA issues, replace OHLC na in market data function, and add replace 
+    # na with interpolation. And why 0101 not excluded?
+    # Bug, 預測天數是5天，但結果可能只有3天
+
+
+    # Optimization .....
+    # - Add week
+    # 建長期投資的基本面模型
+    # 5. print('add_support_resistance - days == True時有bug，全部數值一樣，導致沒辦法標準化？')
+    # 6. 加上PRICE_CHANGE_ABS / PRICE_CHANGE加上STD
+    # 6. 技術分析型態學
+    # 8. Update CBYZ and auto-competing model
+    # 9. 上櫃的也要放
+    # 10. buy_signal to int
+
+    
+
+    # industry=True
+    # trade_value=True      
+    # _data_period = int(365 * 3.5)
+    # _predict_begin = 20211006
+    # _predict_end = None
+    # _stock_type = 'tw'
+    # _ma_values = [5,10,20]
+    # _predict_period = 5
+    # _model_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+    #             'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+    # _volume_thld = 700
+    # load_model = False
+    # cv = 2
+    # fast = True
+    # export_model = False
+    # dev = True
+    # _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+
+
+
+    global version, exe_serial
+    version = 1.09
+    exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
+
+    global params, error_msg
+    params = {}
+    error_msg = []    
+
+    
+    global volume_thld
+    volume_thld = _volume_thld
+    params['volume_thld'] = volume_thld
+    
+    global ma_values
+    ma_values = _ma_values
+    params['ma_values'] = ma_values
+
+
+    global shift_begin, shift_end, data_begin, data_end, data_period
+    global predict_date, predict_period, calendar
+    
+    
+    predict_period = _predict_period
+    data_shift = -(max(ma_values) * 2)
+    data_period = _data_period
+    
+    shift_begin, shift_end, \
+            data_begin, data_end, predict_date, calendar = \
+                stk.get_period(data_begin=None,
+                               data_end=None, 
+                               data_period=data_period,
+                               predict_begin=_predict_begin,
+                               predict_period=predict_period,
+                               shift=data_shift)  
+    
+    params['data_period'] = data_period
+    params['predict_period'] = predict_period
+    
+    
+    # .......
+    global stock_symbol, stock_type
+    stock_type = _stock_type
+    stock_symbol = _stock_symbol
+    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
+
+
+    # ......
+    global model_data
+    global model_x, model_y, model_addt_vars
+    global norm_orig
+        
+    
+    model_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+               'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+    model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']    
+    
+    
+    # 0707 - industry可以提高提精準，trade_value會下降
+    data_raw = get_model_data(industry=True, 
+                              trade_value=True)
+    
+    
+    model_data = data_raw['MODEL_DATA']
+    model_x = data_raw['MODEL_X']
+    norm_orig = data_raw['NORM_ORIG']
+    
+
+
+
+    tuner = ut.Ultra_Tuner()
+    model_params = [{'model': xgb.XGBRegressor(),
+                     'params': {
+                         'n_estimators': [200],
+                         'gamma':[0],
+                         'max_depth':[4],
+                         'objective':['reg:squarederror']
+                         }
+                     }
+                    ]  
+                    
+    return_result, return_scores, return_params, return_features, \
+        log_scores, log_params, log_features = \
+            tuner.fit(df=model_data, model_params=model_params, 
+                      model_type='reg', id_keys=model_addt_vars, var_x=model_x, 
+                      var_y=model_y, cv=2, threshold=30000,
+                      norm_orig=[], mode=0, fast=True, 
+                      export_model=True, export_log=True, 
+                      path=path_temp)     
+
+
+    # Predict ......
+    # global predict_results
+    # predict_results = predict(load_model=load_model, cv=cv, dev=False)
+    
+    
+    # predict_results
+    # predict_result, precision = \
+    #     predict_and_tuning(cv=cv, load_model=load_model, 
+    #                        export_model=export_model, path=path_temp, 
+    #                        fast=fast)    
+    
+    
+    # Export Log ......
+    params_df = {key:str(value) for key, value in params.items()}
+    params_df = pd.DataFrame.from_dict(params_df, orient='index', 
+                                       columns=['VALUE'])
+    
+    params_df['EXECUTE_SERIAL'] = exe_serial
+    
+    params_df = params_df.reset_index().rename(columns={'index':'PARAM'})         
+    params_df.to_csv(path_temp + '/sam_params_' + exe_serial + '.csv',
+                     index=False)
+    
+    
+    return return_result, return_scores
+
+
+def update_history():
+    
+    # v0.0 - Mess version
+    # v0.1 - Fix mess version
+    # v0.2 - 1. Add calendar    
+    # - Support Days True
+    # v0.3 
+    # - Fix induxtry
+    # - Add daily backup for stock info
+    # - Update resistance and support function in stk
+    # v0.4
+    # - Fix trade value
+    # - Add TEJ data
+    # - Precision stable version
+    # v0.5
+    # - Add symbol vars
+    # v0.6
+    # - Add TODC shareholding spread data, but temporaily commented
+    # - Add TEJ 指數日行情
+    # v0.7
+    # - Add Google Trends
+    # - Disable Pytrends and ewiprcd
+    # v0.8
+    # - Optimize data processing
+    # v0.9
+    # - Add industry in Excel
+    
+    pass
+
+
+
+
+# %% Check ------
+
+
+def check():
+    
+    chk = cbyz.df_chk_col_na(df=model_data_raw)    
+    chk = cbyz.df_chk_col_na(df=model_data)
+
+    # Err01
+    chk = main_data[model_x]
+    chk_na = cbyz.df_chk_col_na(df=chk, positive_only=True, return_obj=True,
+                                alert=True, alert_obj='main_data')
+    
+    chk = main_data[main_data['OPEN_MA_20_LAG'].isna()]
+    
+    
+    # Check Columns Not Normalized .......
+    cols = list(data.columns)
+    debug = pd.DataFrame()
+    
+    for c in cols:
+        new_df = pd.DataFrame({'COL':[c],
+                               'MIN':[data[c].min()],
+                               'MAX':[data[c].max()]})
+        
+        debug = debug.append(new_df)
+    
+    debug = cbyz.df_conv_col_type(df=debug, cols=['MAX'], to='float')
+    chk = debug[debug['MAX']>1]
+
+
+    # Check NA ......
+    chk_na = cbyz.df_chk_col_na(df=na_df, positive_only=True, return_obj=True,
+                                alert=True, alert_obj='main_data')
+    
+
+
+# %% Manually Analyze ------
+
+
+def check_price_limit():
+    
+    loc_stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
+    loc_stock_info = loc_stock_info[['STOCK_SYMBOL', 'CAPITAL_LEVEL']]
+    
+    
+    loc_market = stk.get_data(data_begin=20190101, 
+                        data_end=20210829, 
+                        stock_type='tw', stock_symbol=[], 
+                        price_change=True, price_limit=True, 
+                        trade_value=True)
+    
+    loc_main = loc_market.merge(loc_stock_info, how='left', 
+                                on=['STOCK_SYMBOL'])
+
+    # Check Limit Up ......
+    chk_limit = loc_main[~loc_main['CAPITAL_LEVEL'].isna()]
+    chk_limit = chk_limit[chk_limit['LIMIT_UP']==1]
+
+    chk_limit_summary = chk_limit \
+            .groupby(['CAPITAL_LEVEL']) \
+            .size() \
+            .reset_index(name='COUNT')
+
+
+    # Check Volume ......
+    #    OVER_1000  COUNT
+    # 0          0    115
+    # 1          1    131    
+    chk_volum = loc_main[loc_main['CAPITAL_LEVEL']==1]
+    chk_volum = chk_volum \
+                .groupby(['STOCK_SYMBOL']) \
+                .agg({'VOLUME':'min'}) \
+                .reset_index()
+                
+    chk_volum['OVER_1000'] = np.where(chk_volum['VOLUME']>=1000, 1, 0)
+    chk_volum_summary = chk_volum \
+                        .groupby(['OVER_1000']) \
+                        .size() \
+                        .reset_index(name='COUNT')
+
+
+# %% Archive ------
+
+
+
 def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None, 
                        fast=False):
     '''
@@ -1556,300 +1914,6 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
 
 
 
-# %% Master ------
-
-def master(_predict_begin, _predict_end=None, 
-           _predict_period=5, _data_period=180, 
-           _stock_symbol=[], _stock_type='tw', _ma_values=[5,20,60],
-           _model_y=['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-                     'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO'],
-           _volume_thld=500, export_model=True, load_model=False, cv=2, 
-           fast=False, dev=False):
-    '''
-    主工作區
-    '''
-    
-    # date_period為10年的時候會出錯
-    
-
-    # v1.0
-    # - Add ml_data_process
-    # v1.0.1
-    # - Add Auto Model Tuning
-    # v1.03
-    # - Merge predict and tuning function from uber eats order forecast
-    # - Add small capitall back
-    # - Add TEJ market data function, multiply 1000
-    # v1.04
-    # - Add price change for OHLC
-    # - Fix industry bug
-    # v1.05
-    # - Update for new df_normalize
-    # - Test price_change_ratio as y
-    # - Add check for min max
-    # v1.06
-    # - Change local variable as host
-    # v1.07
-    # - Update for cbyz and cbml
-    # - Add low_volume_symbols
-    
-    
-    # v1.08
-    # - Add data    
-    
-    
-    # - 寫出全部的model log
-    # - Update predict_and_tunning
-    # - Add test serial and detail
-    # -NA issues, replace OHLC na in market data function, and add replace 
-    # na with interpolation. And why 0101 not excluded?
-    # Bug, 預測天數是5天，但結果可能只有3天
-
-
-    # Bug
-    # 資料筆數低於N的時候，不要export model
-
-    
-    
-    # Worklist .....
-    # - Add week
-    # 建長期投資的基本面模型
-    # 5. print('add_support_resistance - days == True時有bug，全部數值一樣，導致沒辦法標準化？')
-    # 6. 加上PRICE_CHANGE_ABS / PRICE_CHANGE加上STD
-    # 6. 技術分析型態學
-    # 8. Update CBYZ and auto-competing model
-    # 9. 上櫃的也要放
-
-    
-
-    # industry=True
-    # trade_value=True      
-    # _data_period = int(365 * 3.5)
-    # _predict_begin = 20211006
-    # _predict_end = None
-    # _stock_type = 'tw'
-    # _ma_values = [5,10,20]
-    # _predict_period = 5
-    # _model_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-    #             'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
-    # _volume_thld = 700
-    # load_model = False
-    # cv = 2
-    # fast = True
-    # export_model = False
-    # dev = True
-    
-    if dev:
-        _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603, 3051]
-    else:
-        _stock_symbol = []
-
-
-
-    global version, exe_serial
-    version = 1.09
-    exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
-
-    global params, error_msg
-    params = {}
-    error_msg = []    
-
-    
-    global volume_thld
-    volume_thld = _volume_thld
-    params['volume_thld'] = volume_thld
-    
-    global ma_values
-    ma_values = _ma_values
-    params['ma_values'] = ma_values
-
-
-    global shift_begin, shift_end, data_begin, data_end, data_period
-    global predict_date, predict_period, calendar
-    
-    
-    predict_period = _predict_period
-    data_shift = -(max(ma_values) * 2)
-    data_period = _data_period
-    
-    shift_begin, shift_end, \
-            data_begin, data_end, predict_date, calendar = \
-                stk.get_period(data_begin=None,
-                               data_end=None, 
-                               data_period=data_period,
-                               predict_begin=_predict_begin,
-                               predict_period=predict_period,
-                               shift=data_shift)  
-    
-    params['data_period'] = data_period
-    params['predict_period'] = predict_period
-    
-    
-    # .......
-    global stock_symbol, stock_type
-    stock_type = _stock_type
-    stock_symbol = _stock_symbol
-    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
-
-
-    # ......
-    global model_data
-    global model_x, model_y, model_addt_vars
-    global norm_orig
-        
-    model_y = _model_y
-    model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']    
-    
-    
-    # 0707 - industry可以提高提精準，trade_value會下降
-    data_raw = get_model_data(industry=True, 
-                              trade_value=True)
-    
-    
-    model_data = data_raw['MODEL_DATA']
-    model_x = data_raw['MODEL_X']
-    norm_orig = data_raw['NORM_ORIG']
-    
-
-    # Predict ......
-    # global predict_results
-    # predict_results = predict(load_model=load_model, cv=cv, dev=False)
-    # predict_results
-    predict_result, precision = \
-        predict_and_tuning(cv=cv, load_model=load_model, 
-                           export_model=export_model, path=path_temp, 
-                           fast=fast)    
-    
-    # Export Log ......
-    params_df = {key:str(value) for key, value in params.items()}
-    params_df = pd.DataFrame.from_dict(params_df, orient='index', 
-                                       columns=['VALUE'])
-    
-    params_df['EXECUTE_SERIAL'] = exe_serial
-    
-    params_df = params_df.reset_index().rename(columns={'index':'PARAM'})         
-    params_df.to_csv(path_temp + '/sam_params_' + exe_serial + '.csv',
-                     index=False)
-    
-    
-    return predict_result, precision
-
-
-def update_history():
-    
-    # v0.0 - Mess version
-    # v0.1 - Fix mess version
-    # v0.2 - 1. Add calendar    
-    # - Support Days True
-    # v0.3 
-    # - Fix induxtry
-    # - Add daily backup for stock info
-    # - Update resistance and support function in stk
-    # v0.4
-    # - Fix trade value
-    # - Add TEJ data
-    # - Precision stable version
-    # v0.5
-    # - Add symbol vars
-    # v0.6
-    # - Add TODC shareholding spread data, but temporaily commented
-    # - Add TEJ 指數日行情
-    # v0.7
-    # - Add Google Trends
-    # - Disable Pytrends and ewiprcd
-    # v0.8
-    # - Optimize data processing
-    # v0.9
-    # - Add industry in Excel
-    
-    pass
-
-
-
-
-# %% Check ------
-
-
-def check():
-    
-    chk = cbyz.df_chk_col_na(df=model_data_raw)    
-    chk = cbyz.df_chk_col_na(df=model_data)
-
-    # Err01
-    chk = main_data[model_x]
-    chk_na = cbyz.df_chk_col_na(df=chk, positive_only=True, return_obj=True,
-                                alert=True, alert_obj='main_data')
-    
-    chk = main_data[main_data['OPEN_MA_20_LAG'].isna()]
-    
-    
-    # Check Columns Not Normalized .......
-    cols = list(data.columns)
-    debug = pd.DataFrame()
-    
-    for c in cols:
-        new_df = pd.DataFrame({'COL':[c],
-                               'MIN':[data[c].min()],
-                               'MAX':[data[c].max()]})
-        
-        debug = debug.append(new_df)
-    
-    debug = cbyz.df_conv_col_type(df=debug, cols=['MAX'], to='float')
-    chk = debug[debug['MAX']>1]
-
-
-    # Check NA ......
-    chk_na = cbyz.df_chk_col_na(df=na_df, positive_only=True, return_obj=True,
-                                alert=True, alert_obj='main_data')
-    
-
-
-# %% Manually Analyze ------
-
-
-def check_price_limit():
-    
-    loc_stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
-    loc_stock_info = loc_stock_info[['STOCK_SYMBOL', 'CAPITAL_LEVEL']]
-    
-    
-    loc_market = stk.get_data(data_begin=20190101, 
-                        data_end=20210829, 
-                        stock_type='tw', stock_symbol=[], 
-                        price_change=True, price_limit=True, 
-                        trade_value=True)
-    
-    loc_main = loc_market.merge(loc_stock_info, how='left', 
-                                on=['STOCK_SYMBOL'])
-
-    # Check Limit Up ......
-    chk_limit = loc_main[~loc_main['CAPITAL_LEVEL'].isna()]
-    chk_limit = chk_limit[chk_limit['LIMIT_UP']==1]
-
-    chk_limit_summary = chk_limit \
-            .groupby(['CAPITAL_LEVEL']) \
-            .size() \
-            .reset_index(name='COUNT')
-
-
-    # Check Volume ......
-    #    OVER_1000  COUNT
-    # 0          0    115
-    # 1          1    131    
-    chk_volum = loc_main[loc_main['CAPITAL_LEVEL']==1]
-    chk_volum = chk_volum \
-                .groupby(['STOCK_SYMBOL']) \
-                .agg({'VOLUME':'min'}) \
-                .reset_index()
-                
-    chk_volum['OVER_1000'] = np.where(chk_volum['VOLUME']>=1000, 1, 0)
-    chk_volum_summary = chk_volum \
-                        .groupby(['OVER_1000']) \
-                        .size() \
-                        .reset_index(name='COUNT')
-
-
-
 # %% Dev ------
 
 
@@ -1865,26 +1929,20 @@ def tw_fix_symbol_error():
     
     for i in range(3):
         file['SYMBOL'] = '0' + file['SYMBOL'] 
-    
-    
-    
+
+
+# %% Execution ------
 
 
 if __name__ == '__main__':
     
     symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     
-    # predict_result, precision = \
-    #     master(_predict_begin=20211001, _predict_end=None, 
-    #            _predict_period=5, _data_period=180, 
-    #            _stock_symbol=symbols, _stock_type='tw', _ma_values=[5,20,60],
-    #            _model_y=['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-    #                      'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO'],
-    #            _volume_thld=1000, export_model=True, load_model=False, cv=2, 
-    #            fast=True)
+    predict_result, precision = \
+        master(_predict_begin=20211001, _predict_end=None, 
+                _predict_period=5, _data_period=180, 
+                _stock_symbol=symbols, _stock_type='tw', _ma_values=[5,20,60],
+                _volume_thld=1000, export_model=True, load_model=False, cv=2, 
+                fast=True)
         
 
-
-
-
-        

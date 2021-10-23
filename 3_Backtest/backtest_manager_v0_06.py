@@ -778,6 +778,9 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     writer.save()
 
+
+    # Write Google Sheets
+    stk.write_actions(actions)
     
 
 

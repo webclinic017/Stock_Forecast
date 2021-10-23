@@ -72,7 +72,7 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v1_06 as sam
 # import stock_analysis_manager_v1_07 as sam
 # import stock_analysis_manager_v1_08 as sam
-import stock_analysis_manager_v1_09 as sam
+import stock_analysis_manager_v1_09_dev as sam
 
 
 
@@ -366,9 +366,8 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     
     # Hold Symbols
-    global hold
-    hold = [str(i) for i in hold]    
-    actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(hold), 1, 0)
+    global _hold
+    actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(_hold), 1, 0)
 
     print('Check BUY_SIGNAL')
     actions['BUY_SIGNAL'] = np.nan 
@@ -593,11 +592,12 @@ def eval_metrics(export_file=False, upload=False):
         ar.db_upload(data=stock_metrics, table_name='forecast_records')
 
 
-# ..........
+# %% Master ------
 
 
 def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
-           data_period=5, stock_symbol=None, stock_type='tw', dev=False):
+           data_period=5, stock_symbol=None, stock_type='tw', hold=[],
+           dev=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -625,6 +625,13 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
     # 2. Features現在是空的
     # 3.低交易量的symbol可能會完全消失在excel中，如預測20211019時的3051力特
+    
+    
+    # Optimization
+    # 1. Add hold variable as parameters of master
+    # 3. 把stock_type改成market，stock_symbol改成symbol
+    # 4. Calculate IRR, remove outliers
+    # 5. Google Sheet Add Manual Tick
 
 
 
@@ -656,6 +663,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 27. Signal A and B，A是反彈的，B是low和close差距N%
     # 交易資料先在dcm中算好ma
     # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
+    # 把stock_type改成market
     
     
 
@@ -671,7 +679,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # dev = True    
     
     # Collected Parameters
-    # bt_last_begin = 20211018    
+    bt_last_begin = 20211018    
     predict_period = 5
     data_period = int(365 * 3.5)
     ma_values = [5,10,20,60]
@@ -679,20 +687,36 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
 
     # Dev
-    args = {'bt_last_begin':bt_last_begin,
-            'predict_period': predict_period, 
-            'data_period':data_period,
-            'ma_values':ma_values,
-            'volume_thld':volume_thld,
+    args = {'bt_last_begin':[bt_last_begin],
+            'predict_period': [predict_period], 
+            'data_period':[data_period],
+            'ma_values':[ma_values],
+            'volume_thld':[volume_thld],
             'industry':[True, False],
             'trade_value':[True, False]}
     
     param_holder = Param_Holder(**args)
-    param_holder.params
-
-
-    cross_join
     
+    params = param_holder.params
+    keys = list(params.keys())
+    values = list(params.values())
+
+    param_df = pd.DataFrame()
+    for i in range(0, len(params)):
+        
+        values_li = values[i]
+        values_li = cbyz.conv_to_list(values_li)
+        new_df = pd.DataFrame({keys[i]:values_li})
+        
+        if i == 0:
+            param_df = param_df.append(new_df)
+        else:
+            param_df = cbyz.df_cross_join(param_df, new_df)
+
+    
+
+
+
     if dev:
         stock_symbol = [2520, 2605, 6116, 6191, 3481, 
                         2409, 2603, 2611, 3051, 3562]
@@ -750,8 +774,9 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
     
-    global hold
-    hold = [8105, 2610, 3051, 1904, 2611]
+    global _hold
+    # _hold = [8105, 2610, 3051, 1904, 2611]
+    _hold = [str(i) for i in hold]
     
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
@@ -795,6 +820,9 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     writer.save()
 
+
+    # Write Google Sheets
+    stk.write_actions(actions)
     
 
 
@@ -873,24 +901,21 @@ def verify_prediction_results():
 
 
 
-
-
-
-
-
 def dev():
-    args = {'a': 1, 'b': 2}
-    s = Param_Holder(**args)
-    
-    s.a
-    s.b
+
+    ledger = stk.get_ledger()
 
 
 # %% Execute ------
 
 if __name__ == '__main__':
     
-    results = master(bt_last_begin=20211006, dev=True)
+    results = master(bt_last_begin=20211021, predict_period=5, 
+                     interval=4, bt_times=2, 
+                     data_period=int(365 * 3.5), 
+                     ma_values = [5,10,20,60], volume_thld = 400,
+                     stock_symbol=[], stock_type='tw', hold=[],
+                     dev=False)
 
 
 
