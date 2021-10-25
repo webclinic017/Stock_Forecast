@@ -32,12 +32,11 @@ import xgboost as xgb
 
 
 host = 0
-stock_type = 'tw'
 
 
 # Path .....
 if host == 0:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
 elif host == 2:
     path = '/home/jupyter//2_Stock_Analysis'
 
@@ -86,7 +85,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
-    global stock_symbol
+    global _symbols, _market
     global market_data_raw
     global predict_period
     global stock_info_raw
@@ -101,18 +100,18 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
     loc_begin = cbyz.date_cal(shift_begin, -1, 'd')    
     
-    if len(stock_symbol) == 0:
+    if len(_symbols) == 0:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
                             data_end=data_end, 
-                            stock_type=stock_type, stock_symbol=[], 
+                            stock_type=_market, _symbols=[], 
                             price_change=True, price_limit=True, 
                             trade_value=trade_value,
                             tej=True)
     else:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
                                        data_end=data_end, 
-                                       stock_type=stock_type, 
-                                       stock_symbol=stock_symbol, 
+                                       stock_type=_market, 
+                                       stock_symbol=_symbols, 
                                        price_change=True, price_limit=True,
                                        trade_value=trade_value,
                                        tej=True)
@@ -207,7 +206,7 @@ def sam_load_data(industry=True, trade_value=True):
     讀取資料及重新整理
     '''
     
-    global stock_symbol
+    global _symbols
     global market_data_raw
     global predict_period
     global stock_symbol_df
@@ -534,7 +533,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     # 1. 先找百元以下的，才有資金可以買一整張
     # 2. 不要找疫情後才爆漲到歷史新高的
 
-
+    global _market
     data_end = cbyz.date_get_today()
     data_begin = cbyz.date_cal(data_end, -1, 'm')
 
@@ -552,7 +551,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
                             stock_symbol=level3_symbol, 
                             price_change=True,
-                            shift=0, stock_type='tw')
+                            shift=0, stock_type=_market)
     
     data = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbol)]
     
@@ -561,7 +560,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     data = stk.get_data(data_begin=data_begin, data_end=data_end, 
                             stock_symbol=[], 
                             price_change=True,
-                            shift=0, stock_type='tw')
+                            shift=0, stock_type=_market)
     
     
     # Section 2. 依價格篩選 ......
@@ -651,8 +650,9 @@ def select_stock_symbols_manually(data_begin, data_end):
 
 
 def get_google_treneds(begin_date=None, end_date=None, 
-                       normalize=True, stock_type='tw'):
+                       normalize=True):
     
+    global _market
     print('get_google_treneds - 增加和get_stock_info一樣的daily backup')
 
     # begin_date = 20210101
@@ -669,13 +669,13 @@ def get_google_treneds(begin_date=None, end_date=None,
     
     calendar = stk.get_market_calendar(begin_date=temp_begin, 
                                        end_date=temp_end, 
-                                       stock_type=stock_type)
+                                       stock_type=_market)
 
     # Word List ......
     file_path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Resource/google_trends_industry.xlsx'
     file = pd.read_excel(file_path, sheet_name='words')
     
-    file = file[(file['STOCK_TYPE'].str.contains(stock_type)) \
+    file = file[(file['STOCK_TYPE'].str.contains(_market)) \
                 & (~file['WORD'].isna()) \
                 & (file['REMOVE'].isna())]
     
@@ -785,7 +785,7 @@ def get_model_data(industry=True, trade_value=True):
     
     global shift_begin, shift_end, data_begin, data_end, ma_values
     global predict_date, predict_period, calendar    
-    global stock_symbol
+    global _symbols
     global model_y
     global market_data_raw  
     global params, error_msg
@@ -806,8 +806,8 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # Symbols ......
-    stock_symbol = cbyz.conv_to_list(stock_symbol)
-    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, 'str')
+    _symbols = cbyz.conv_to_list(_symbols)
+    _symbols = cbyz.li_conv_ele_type(_symbols, 'str')
 
     get_market_data_raw(industry=industry, trade_value=trade_value)
     
@@ -960,7 +960,7 @@ def get_model_data(industry=True, trade_value=True):
     # 1. 主要邏輯就是顯示最新的營收資料
     print('Update - 增加date index')
     ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
-                                stock_symbol=stock_symbol, trade=True)
+                                stock_symbol=_symbols, trade=True)
     
     ewsale, cols, _ = \
         cbml.ml_data_process(df=ewsale, 
@@ -1097,7 +1097,7 @@ def get_model_data(industry=True, trade_value=True):
     
     # Check min max ......
     chk = cbyz.df_chk_col_min_max(df=main_data_final)
-    chk = chk[~chk['COLUMN'].isin(model_addt_vars)]
+    chk = chk[~chk['COLUMN'].isin(id_vars)]
     
     col_min = chk['MIN_VALUE'].min()
     col_max = chk['MAX_VALUE'].max()
@@ -1122,8 +1122,8 @@ def get_model_data(industry=True, trade_value=True):
 
 def split_data():
     
-    global model_data, model_x, model_y, model_addt_vars, predict_date    
-    global stock_symbol
+    global model_data, model_x, model_y, id_vars, predict_date    
+    global _symbols
     
     # Model Data ......
     cur_model_data = model_data[model_data['WORK_DATE']<predict_date[0]] \
@@ -1155,19 +1155,19 @@ def split_data():
 
             
     # Predict            
-    X_predict = cur_predict_data[model_x + model_addt_vars]
+    X_predict = cur_predict_data[model_x + id_vars]
     # X_predict = X_predict[X_predict['STOCK_SYMBOL'].isin(stock_symbol)]
  
     
     # Traning And Test
-    X = cur_model_data[model_x + model_addt_vars]
-    y = cur_model_data[model_y + model_addt_vars]      
+    X = cur_model_data[model_x + id_vars]
+    y = cur_model_data[model_y + id_vars]      
     X_train, X_test, y_train, y_test = train_test_split(X, y)
     
     
-    X_train_lite = X_train.drop(model_addt_vars, axis=1)   
-    X_test_lite = X_test.drop(model_addt_vars, axis=1)   
-    X_predict_lite = X_predict.drop(model_addt_vars, axis=1)   
+    X_train_lite = X_train.drop(id_vars, axis=1)   
+    X_test_lite = X_test.drop(id_vars, axis=1)   
+    X_predict_lite = X_predict.drop(id_vars, axis=1)   
     
     
     # y_train_lite = y_train[model_y[0]]
@@ -1327,7 +1327,7 @@ def get_model(y_index, cv=2, dev=False,
     
 #         # Results ......
 #         preds = model.predict(X_predict_lite)
-#         results_new = X_predict[model_addt_vars].reset_index(drop=True)
+#         results_new = X_predict[id_vars].reset_index(drop=True)
 #         results_new['VALUES'] = preds
 #         results_new['Y'] = model_y[i]
 #         results = results.append(results_new)        
@@ -1361,16 +1361,12 @@ def get_model(y_index, cv=2, dev=False,
 
 
 
-
-
-
-
 # %% Master ------
 
-def master(_predict_begin, _predict_end=None, 
-           _predict_period=5, _data_period=180, 
-           _stock_symbol=[], _stock_type='tw', _ma_values=[5,20,60],
-           _volume_thld=500, export_model=True, load_model=False, cv=2, 
+def master(predict_begin,
+           predict_period=5, _data_period=180, 
+           symbols=[], market='tw', ma_values=[5,20,60],
+           volume_thld=500, export_model=True, load_model=False, cv=2, 
            fast=False):
     '''
     主工作區
@@ -1409,6 +1405,11 @@ def master(_predict_begin, _predict_end=None,
     # - Add Ultra_Tuner
     
     
+    
+    
+    # Bug
+    # 1. Fill na with interpolate
+    
     # - 寫出全部的model log
     # - Update predict_and_tunning
     # - Add test serial and detail
@@ -1426,26 +1427,24 @@ def master(_predict_begin, _predict_end=None,
     # 8. Update CBYZ and auto-competing model
     # 9. 上櫃的也要放
     # 10. buy_signal to int
+    
 
     
 
-    # industry=True
-    # trade_value=True      
-    # _data_period = int(365 * 3.5)
-    # _predict_begin = 20211006
-    # _predict_end = None
-    # _stock_type = 'tw'
-    # _ma_values = [5,10,20]
-    # _predict_period = 5
-    # _model_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-    #             'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
-    # _volume_thld = 700
-    # load_model = False
-    # cv = 2
-    # fast = True
-    # export_model = False
-    # dev = True
-    # _stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    industry=True
+    trade_value=True      
+    data_period = int(365 * 3.5)
+    predict_begin = 20211006
+    market = 'tw'
+    ma_values = [5,10,20]
+    predict_period = 5
+    volume_thld = 700
+    load_model = False
+    cv = 2
+    fast = True
+    export_model = False
+    dev = True
+    symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
 
 
 
@@ -1458,52 +1457,52 @@ def master(_predict_begin, _predict_end=None,
     error_msg = []    
 
     
-    global volume_thld
-    volume_thld = _volume_thld
+    global _volume_thld
+    _volume_thld = volume_thld
     params['volume_thld'] = volume_thld
     
-    global ma_values
-    ma_values = _ma_values
-    params['ma_values'] = ma_values
+    global _ma_values
+    _ma_values = ma_values
+    params['ma_values'] = _ma_values
 
 
     global shift_begin, shift_end, data_begin, data_end, data_period
-    global predict_date, predict_period, calendar
+    global _predict_date, _predict_period, calendar
     
     
-    predict_period = _predict_period
-    data_shift = -(max(ma_values) * 2)
-    data_period = _data_period
+    _predict_period = predict_period
+    data_shift = -(max(_ma_values) * 2)
+    _data_period = data_period
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \
                 stk.get_period(data_begin=None,
-                               data_end=None, 
-                               data_period=data_period,
-                               predict_begin=_predict_begin,
-                               predict_period=predict_period,
-                               shift=data_shift)  
+                                data_end=None, 
+                                data_period=_data_period,
+                                predict_begin=predict_begin,
+                                predict_period=predict_period,
+                                shift=data_shift)  
     
-    params['data_period'] = data_period
-    params['predict_period'] = predict_period
+
+
     
+
     
     # .......
-    global stock_symbol, stock_type
-    stock_type = _stock_type
-    stock_symbol = _stock_symbol
-    stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
+    global _symbols, _market
+    _market = market
+    _symbols = symbols
 
 
     # ......
     global model_data
-    global model_x, model_y, model_addt_vars
+    global model_x, model_y, id_vars
     global norm_orig
         
     
     model_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
                'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
-    model_addt_vars = ['STOCK_SYMBOL', 'WORK_DATE']    
+    id_vars = ['STOCK_SYMBOL', 'WORK_DATE']    
     
     
     # 0707 - industry可以提高提精準，trade_value會下降
@@ -1515,7 +1514,6 @@ def master(_predict_begin, _predict_end=None,
     model_x = data_raw['MODEL_X']
     norm_orig = data_raw['NORM_ORIG']
     
-
 
 
     tuner = ut.Ultra_Tuner()
@@ -1532,7 +1530,7 @@ def master(_predict_begin, _predict_end=None,
     return_result, return_scores, return_params, return_features, \
         log_scores, log_params, log_features = \
             tuner.fit(df=model_data, model_params=model_params, 
-                      model_type='reg', id_keys=model_addt_vars, var_x=model_x, 
+                      model_type='reg', id_keys=id_vars, var_x=model_x, 
                       var_y=model_y, cv=2, threshold=30000,
                       norm_orig=[], mode=0, fast=True, 
                       export_model=True, export_log=True, 
@@ -1892,7 +1890,7 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
     
         # Results ......
         preds = model.predict(X_predict_lite)
-        new_result = X_predict[model_addt_vars].reset_index(drop=True)
+        new_result = X_predict[id_vars].reset_index(drop=True)
         new_result[cur_y] = preds
         new_result = cbml.df_normalize_restore(df=new_result, 
                                                original=norm_orig)
@@ -1900,7 +1898,7 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
         if len(result) == 0:
             result = new_result.copy()
         else:
-            result = result.merge(new_result, how='left', on=model_addt_vars)
+            result = result.merge(new_result, how='left', on=id_vars)
         
     
     result.to_csv(path + '/results_' + exe_serial + '.csv', index=False)
@@ -1939,7 +1937,7 @@ if __name__ == '__main__':
     symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     
     predict_result, precision = \
-        master(_predict_begin=20211001, _predict_end=None, 
+        master(predict_begin=20211001,
                 _predict_period=5, _data_period=180, 
                 _stock_symbol=symbols, _stock_type='tw', _ma_values=[5,20,60],
                 _volume_thld=1000, export_model=True, load_model=False, cv=2, 

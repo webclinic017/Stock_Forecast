@@ -632,6 +632,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 3. 把stock_type改成market，stock_symbol改成symbol
     # 4. Calculate IRR, remove outliers
     # 5. Google Sheet Add Manual Tick
+    # 6. Think how to optimize stop loss
 
 
 
@@ -684,6 +685,28 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     data_period = int(365 * 3.5)
     ma_values = [5,10,20,60]
     volume_thld = 500
+    
+
+    # Wait for update
+    # date_manager = cbyz.Date_Manager(predict_begin=predict_begin, 
+    #                                  predict_period=_predict_period,
+    #                                  data_period=_data_period,
+    #                                  data_period_unit='d',
+    #                                  data_period_agg_unit='d',
+    #                                  predict_period_unit='d',
+    #                                  predict_by_time=True,
+    #                                  merge_period=[], shift=data_shift, 
+    #                                  week_begin=0)
+    
+    # date_df = date_manager.table
+    # shift_begin = date_df.loc[0, 'SHIFT_BEGIN']
+    # shift_end = date_df.loc[0, 'SHIFT_END']
+    # data_begin = date_df.loc[0, 'DATA_BEGIN']
+    # data_end = date_df.loc[0, 'DATA_END']
+    # predict_begin = date_df.loc[0, 'PREDICT_BEGIN']
+    # predict_end = date_df.loc[0, 'PREDICT_END']  
+    # calendar = date_manager.calendar_lite    
+    
 
 
     # Dev
