@@ -783,17 +783,13 @@ def get_google_treneds(begin_date=None, end_date=None,
 def get_model_data(industry=True, trade_value=True):
     
     
-    global shift_begin, shift_end, data_begin, data_end, ma_values
+    global shift_begin, shift_end, data_begin, data_end, _ma_values
     global predict_date, predict_period, calendar    
     global _symbols
     global model_y
     global market_data_raw  
     global params, error_msg
     
-    
-    params['industry'] = industry
-    params['trade_value'] = trade_value
-
 
     # Check ......
     msg = 'get_model_data - predict_period is longer than ma values, ' \
@@ -1363,7 +1359,7 @@ def get_model(y_index, cv=2, dev=False,
 
 # %% Master ------
 
-def master(predict_begin,
+def master(param_holder, predict_begin,
            predict_period=5, _data_period=180, 
            symbols=[], market='tw', ma_values=[5,20,60],
            volume_thld=500, export_model=True, load_model=False, cv=2, 
@@ -1403,6 +1399,7 @@ def master(predict_begin,
     
     # v1.09
     # - Add Ultra_Tuner
+    # - Rename stock_type and stock_symbol
     
     
     
@@ -1429,41 +1426,51 @@ def master(predict_begin,
     # 10. buy_signal to int
     
 
+
+    holder = param_holder.params
+    industry = holder['industry'][0]
+    trade_value = holder['trade_value'][0]
+    data_period = holder['data_period'][0]
+    market = holder['market'][0]
+    ma_values = holder['ma_values'][0]   
+    volume_thld = holder['volume_thld'][0]   
+    compete_mode = holder['compete_mode'][0]   
+    train_mode = holder['train_mode'][0]       
+    dev = holder['dev'][0]   
+    symbols = holder['symbols'][0]   
+    predict_period = holder['predict_period'][0]        
     
-
-    industry=True
-    trade_value=True      
-    data_period = int(365 * 3.5)
+    
     predict_begin = 20211006
-    market = 'tw'
-    ma_values = [5,10,20]
-    predict_period = 5
-    volume_thld = 700
-    load_model = False
-    cv = 2
-    fast = True
-    export_model = False
-    dev = True
-    symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
 
-
-
+    # industry = True
+    # trade_value = True      
+    # data_period = int(365 * 3.5)
+    # predict_begin = 20211006
+    # market = 'tw'
+    # ma_values = [5,10,20]
+    # predict_period = 5
+    # volume_thld = 700
+    # load_model = False
+    # cv = 2
+    # fast = True
+    # export_model = False
+    # dev = True
+    # symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    
+    
     global version, exe_serial
     version = 1.09
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
-    global params, error_msg
-    params = {}
+    global error_msg
     error_msg = []    
-
     
     global _volume_thld
     _volume_thld = volume_thld
-    params['volume_thld'] = volume_thld
     
     global _ma_values
     _ma_values = ma_values
-    params['ma_values'] = _ma_values
 
 
     global shift_begin, shift_end, data_begin, data_end, data_period
@@ -1477,17 +1484,13 @@ def master(predict_begin,
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \
                 stk.get_period(data_begin=None,
-                                data_end=None, 
-                                data_period=_data_period,
-                                predict_begin=predict_begin,
-                                predict_period=predict_period,
-                                shift=data_shift)  
+                               data_end=None, 
+                               data_period=_data_period,
+                               predict_begin=predict_begin,
+                               predict_period=predict_period,
+                               shift=data_shift)  
     
 
-
-    
-
-    
     # .......
     global _symbols, _market
     _market = market
@@ -1506,8 +1509,8 @@ def master(predict_begin,
     
     
     # 0707 - industry可以提高提精準，trade_value會下降
-    data_raw = get_model_data(industry=True, 
-                              trade_value=True)
+    data_raw = get_model_data(industry=industry, 
+                              trade_value=trade_value)
     
     
     model_data = data_raw['MODEL_DATA']
@@ -1515,7 +1518,7 @@ def master(predict_begin,
     norm_orig = data_raw['NORM_ORIG']
     
 
-
+    # Training Model
     tuner = ut.Ultra_Tuner()
     model_params = [{'model': xgb.XGBRegressor(),
                      'params': {
@@ -1532,7 +1535,7 @@ def master(predict_begin,
             tuner.fit(df=model_data, model_params=model_params, 
                       model_type='reg', id_keys=id_vars, var_x=model_x, 
                       var_y=model_y, cv=2, threshold=30000,
-                      norm_orig=[], mode=0, fast=True, 
+                      norm_orig=[], compete_mode=1, train_mode=1,
                       export_model=True, export_log=True, 
                       path=path_temp)     
 
@@ -1562,6 +1565,8 @@ def master(predict_begin,
     
     
     return return_result, return_scores
+
+
 
 
 def update_history():

@@ -93,11 +93,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 # %% ------
 
-# Params Holder
-class Param_Holder:
-    def __init__(self, **entries):
-        # self.__dict__.update(entries)
-        self.params = entries
+
 
 
 
@@ -715,11 +711,21 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
             'data_period':[data_period],
             'ma_values':[ma_values],
             'volume_thld':[volume_thld],
-            'industry':[True, False],
-            'trade_value':[True, False]}
+            'industry':[True],
+            'trade_value':[True],
+            'market':['tw'],
+            'compete_mode':[True],
+            'train_mode':[True],            
+            'cv':[2],
+            'dev':[True],
+            'symbols':[[2520, 2605, 6116, 6191, 3481, 
+                        2409, 2603, 2611, 3051, 3562]],
+            }
     
-    param_holder = Param_Holder(**args)
+    param_holder = ar.Param_Holder(**args)
     
+    
+    # Select Parameters
     params = param_holder.params
     keys = list(params.keys())
     values = list(params.values())
