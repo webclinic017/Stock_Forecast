@@ -9,28 +9,6 @@ History
 """
 
 
-
-# Worklist
-# 1.Add price increse but model didn't catch
-# 2.Retrieve one symbol historical data to ensure calendar
-
-
-
-# 在台灣投資股票的交易成本包含手續費與交易稅，
-# 手續費公定價格是0.1425%，買進和賣出時各要收取一次，
-# 股票交易稅是0.3%，如果投資ETF交易稅是0.1%，僅在賣出時收取。
-
-
-# To do action
-# (1) 集成
-# (2) 用迴歸，看哪一支model的成效好
-# (3) 多數決
-# (4) RMSE > How many model agree > RMSE (Chosen)
-
-
-# rmse and profit regression
-
-
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -42,8 +20,8 @@ stock_type = 'tw'
 
 # Path .....
 if host == 0:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/3_Backtest'
-    path_sam = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Stock_Forecast/3_Backtest'
+    path_sam = '/Users/Aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
 
 elif host == 2:
     path = '/home/jupyter/3_Backtest'
@@ -92,8 +70,6 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 # %% ------
-
-
 
 
 
@@ -588,6 +564,7 @@ def eval_metrics(export_file=False, upload=False):
         ar.db_upload(data=stock_metrics, table_name='forecast_records')
 
 
+
 # %% Master ------
 
 
@@ -661,6 +638,26 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 交易資料先在dcm中算好ma
     # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
     # 把stock_type改成market
+
+
+
+    
+    # Worklist
+    # 1.Add price increse but model didn't catch
+    # 2.Retrieve one symbol historical data to ensure calendar
+    
+    
+    
+    # 在台灣投資股票的交易成本包含手續費與交易稅，
+    # 手續費公定價格是0.1425%，買進和賣出時各要收取一次，
+    # 股票交易稅是0.3%，如果投資ETF交易稅是0.1%，僅在賣出時收取。
+    
+    
+    # To do action
+    # (1) 集成
+    # (2) 用迴歸，看哪一支model的成效好
+    # (3) 多數決
+    # (4) RMSE > How many model agree > RMSE (Chosen)
     
     
 
@@ -806,6 +803,9 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     global _hold
     # _hold = [8105, 2610, 3051, 1904, 2611]
     _hold = [str(i) for i in hold]
+    
+    
+    # execute_begin = cbyz.
     
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
