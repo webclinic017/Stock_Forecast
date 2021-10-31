@@ -712,7 +712,7 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # 月營收資料表 ......
-    # 1. 這在dev mode時會造成每一個symbol都有na，先移除
+    # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
     # 1. 主要邏輯就是顯示最新的營收資料
     # print('Update - 增加date index')
     # ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
