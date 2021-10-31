@@ -86,7 +86,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
-    global _symbols, _market
+    global symbols, market
     global market_data_raw
     global predict_period
     global stock_info_raw
@@ -101,18 +101,18 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
     loc_begin = cbyz.date_cal(shift_begin, -1, 'd')    
     
-    if len(_symbols) == 0:
+    if len(symbols) == 0:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
                             data_end=data_end, 
-                            stock_type=_market, _symbols=[], 
+                            stock_type=market, stock_symbol=[], 
                             price_change=True, price_limit=True, 
                             trade_value=trade_value,
                             tej=True)
     else:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
                                        data_end=data_end, 
-                                       stock_type=_market, 
-                                       stock_symbol=_symbols, 
+                                       stock_type=market, 
+                                       stock_symbol=symbols, 
                                        price_change=True, price_limit=True,
                                        trade_value=trade_value,
                                        tej=True)
@@ -169,7 +169,9 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
     # Calendar
-    calendar_proc = calendar \
+    global calendar
+    calendar_proc = calendar[calendar['TRADE_DATE']>0] \
+                    .reset_index(drop=True) \
                     .reset_index() \
                     .rename(columns={'index':'DATE_INDEX'})
     
@@ -207,7 +209,7 @@ def sam_load_data(industry=True, trade_value=True):
     讀取資料及重新整理
     '''
     
-    global _symbols
+    global symbols
     global market_data_raw
     global predict_period
     global stock_symbol_df
@@ -537,9 +539,9 @@ def select_stock_symbols():
 def get_model_data(industry=True, trade_value=True):
     
     
-    global shift_begin, shift_end, data_begin, data_end, _ma_values
+    global shift_begin, shift_end, data_begin, data_end, ma_values
     global predict_date, predict_period, calendar    
-    global _symbols
+    global symbols
     global var_y
     global market_data_raw  
     global params, error_msg
@@ -552,19 +554,22 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # Stock Info .......
-    identify_cols = ['STOCK_SYMBOL', 'WORK_DATE']
+    id_keys = ['STOCK_SYMBOL', 'WORK_DATE']
 
 
     # Symbols ......
-    _symbols = cbyz.conv_to_list(_symbols)
-    _symbols = cbyz.li_conv_ele_type(_symbols, 'str')
+    symbols = cbyz.conv_to_list(symbols)
+    symbols = cbyz.li_conv_ele_type(symbols, 'str')
 
+
+    # Market Data ......
     get_market_data_raw(industry=industry, trade_value=trade_value)
     
 
     # Load Historical Data ......
     main_data, norm_orig = \
         sam_load_data(industry=industry, trade_value=trade_value) 
+    print('Bug - 執行到這裡時，main_data裡面會有NA')
         
     
     # TODC Shareholdings Spread ......
@@ -707,61 +712,62 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # 月營收資料表 ......
+    # 1. 這在dev mode時會造成每一個symbol都有na，先移除
     # 1. 主要邏輯就是顯示最新的營收資料
-    print('Update - 增加date index')
-    ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
-                                stock_symbol=_symbols, trade=True)
+    # print('Update - 增加date index')
+    # ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
+    #                             stock_symbol=symbols, trade=True)
     
-    ewsale, cols, _ = \
-        cbml.ml_data_process(df=ewsale, 
-                             ma=False, normalize=True, lag=False, 
-                             ma_group_by=['STOCK_SYMBOL'],
-                             norm_group_by=['STOCK_SYMBOL'], 
-                             lag_group_by=['STOCK_SYMBOL'],
-                             ma_cols_contains=[], 
-                             ma_except_contains=[],
-                             norm_cols_contains=['D000'], 
-                             norm_except_contains=[],
-                             lag_cols_contains=[], 
-                             lag_except_contains=[], 
-                             drop_except_contains=[],
-                             ma_values=ma_values, 
-                             lag_period=predict_period)    
+    # ewsale, cols, _ = \
+    #     cbml.ml_data_process(df=ewsale, 
+    #                          ma=False, normalize=True, lag=False, 
+    #                          ma_group_by=['STOCK_SYMBOL'],
+    #                          norm_group_by=['STOCK_SYMBOL'], 
+    #                          lag_group_by=['STOCK_SYMBOL'],
+    #                          ma_cols_contains=[], 
+    #                          ma_except_contains=[],
+    #                          norm_cols_contains=['D000'], 
+    #                          norm_except_contains=[],
+    #                          lag_cols_contains=[], 
+    #                          lag_except_contains=[], 
+    #                          drop_except_contains=[],
+    #                          ma_values=ma_values, 
+    #                          lag_period=predict_period)    
     
-    cur_cols = [s + '_CUR' for s in cols]
-    ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
-                                         cols=['D0001', 'D0002', 'D0003'], 
-                                         shift=-1, group_by=['STOCK_SYMBOL'],
-                                         suffix='_PRE', remove_na=False)
+    # ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
+    #                                      cols=['D0001', 'D0002', 'D0003'], 
+    #                                      shift=-1, group_by=['STOCK_SYMBOL'],
+    #                                      suffix='_PRE', remove_na=False)
     
-    # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
-    year_month = main_data[['WORK_DATE', 'YEAR', 'MONTH']] \
-                .drop_duplicates()
+    # # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
+    # # Bug，但是這裡的year沒有標準化，現在是在get_model_data最後面直接把YEAR刪除
+    # year_month = main_data[['WORK_DATE', 'YEAR', 'MONTH']] \
+    #             .drop_duplicates()
                 
-    ewsale = ewsale.merge(year_month, how='left', on=['WORK_DATE'])
-    ewsale = ewsale.rename(columns={'WORK_DATE':'EWSALE_WORK_DATE',
-                                    'D0001':'D0001_CUR',
-                                    'D0002':'D0002_CUR',
-                                    'D0003':'D0003_CUR'})
+    # ewsale = ewsale.merge(year_month, how='inner', on=['WORK_DATE'])
+    # ewsale = ewsale.rename(columns={'WORK_DATE':'EWSALE_WORK_DATE',
+    #                                 'D0001':'D0001_CUR',
+    #                                 'D0002':'D0002_CUR',
+    #                                 'D0003':'D0003_CUR'})
     
-    main_data = main_data \
-            .merge(ewsale, how='left', on=['STOCK_SYMBOL', 'YEAR', 'MONTH'])  
+    # main_data = main_data \
+    #         .merge(ewsale, how='left', on=['STOCK_SYMBOL', 'YEAR', 'MONTH'])  
 
-    cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
-    main_data['D0001'] = np.where(cond, 
-                                  main_data['D0001_CUR'], 
-                                  main_data['D0001_PRE'])
+    # cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
+    # main_data['D0001'] = np.where(cond, 
+    #                               main_data['D0001_CUR'], 
+    #                               main_data['D0001_PRE'])
     
-    main_data['D0002'] = np.where(cond, 
-                                  main_data['D0002_CUR'], 
-                                  main_data['D0002_PRE'])
+    # main_data['D0002'] = np.where(cond, 
+    #                               main_data['D0002_CUR'], 
+    #                               main_data['D0002_PRE'])
 
-    main_data['D0003'] = np.where(cond, 
-                                  main_data['D0003_CUR'], 
-                                  main_data['D0003_PRE'])
+    # main_data['D0003'] = np.where(cond, 
+    #                               main_data['D0003_CUR'], 
+    #                               main_data['D0003_PRE'])
     
-    main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
-                               axis=1)
+    # main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
+    #                            axis=1)
     
     
     # 指數日成本 ......
@@ -808,7 +814,7 @@ def get_model_data(industry=True, trade_value=True):
 
     # Variables ......
     model_x = cbyz.df_get_cols_except(df=main_data, 
-                                      except_cols=var_y + identify_cols)
+                                      except_cols=var_y + id_keys)
     
     
     # Model Data ......
@@ -831,7 +837,7 @@ def get_model_data(industry=True, trade_value=True):
 
     # Remove all data with na values ......
     # 1. Some symbols may have serveral rows with na values
-    # na_df = main_data_final[identify_cols+model_x]
+    # na_df = main_data_final[id_keys+model_x]
     # na_df = na_df[na_df['WORK_DATE']<predict_date[0]]
     # na_df = na_df[na_df.isna().any(axis=1)]
     # symbols_removed = na_df['STOCK_SYMBOL'].unique().tolist()
@@ -841,16 +847,25 @@ def get_model_data(industry=True, trade_value=True):
             
 
     # Check - X裡面不應該有na，但Y的預測區間會是na ......
+    global chk_na
     chk_na = cbyz.df_chk_col_na(df=main_data_final, positive_only=True, 
                                 return_obj=True, alert=True, 
                                 alert_obj='main_data')
     
-    # Check min max ......
-    chk = cbyz.df_chk_col_min_max(df=main_data_final)
-    chk = chk[~chk['COLUMN'].isin(id_keys)]
+    assert len(chk_na) == len(var_y), 'model_data中有na'
     
-    col_min = chk['MIN_VALUE'].min()
-    col_max = chk['MAX_VALUE'].max()
+    
+    # Bug, YEAR沒有被標準化，這邊先刪掉，之後再修改
+    if 'YEAR' in main_data_final.columns:
+        main_data_final = main_data_final.drop('YEAR', axis=1)
+    
+    # Check min max ......
+    global chk_min_max
+    chk_min_max = cbyz.df_chk_col_min_max(df=main_data_final)
+    chk_min_max = chk_min_max[~chk_min_max['COLUMN'].isin(id_keys)]
+    
+    col_min = chk_min_max['MIN_VALUE'].min()
+    col_max = chk_min_max['MAX_VALUE'].max()
     
     if col_min < 0 or col_max > 1:
         msg = 'df_chk_col_min_max error'
@@ -868,11 +883,11 @@ def get_model_data(industry=True, trade_value=True):
 
 # %% Master ------
 
-def master(param_holder, predict_begin,
-           predict_period=5, _data_period=180, 
-           symbols=[], market='tw', ma_values=[5,20,60], volume_thld=500, 
-           compete_mode=1, train_mode=1, cv=2, 
-           export_model=True, load_model=False):
+def master(param_holder, _predict_begin,
+           _predict_period=5, _data_period=180, 
+           _symbols=[], _market='tw', _ma_values=[5,20,60], _volume_thld=500, 
+           _compete_mode=1, _train_mode=1, _cv=2, threshold=30000, k=30,
+           _export_model=True, _load_model=False):
     '''
     主工作區
     '''
@@ -931,37 +946,41 @@ def master(param_holder, predict_begin,
     # 9. 上櫃的也要放
     # 10. buy_signal to int
     
+    
+    global shift_begin, shift_end, data_begin, data_end, data_period
+    global predict_date, predict_period, calendar    
 
 
-    holder = param_holder.params
-    industry = holder['industry'][0]
-    trade_value = holder['trade_value'][0]
-    data_period = holder['data_period'][0]
-    market = holder['market'][0]
-    ma_values = holder['ma_values'][0]   
-    volume_thld = holder['volume_thld'][0]   
-    compete_mode = holder['compete_mode'][0]   
-    train_mode = holder['train_mode'][0]       
-    dev = holder['dev'][0]   
-    symbols = holder['symbols'][0]   
-    predict_period = holder['predict_period'][0]        
+    # holder = param_holder.params
+    # industry = holder['industry'][0]
+    # trade_value = holder['trade_value'][0]
+    # data_period = holder['data_period'][0]
+    # market = holder['market'][0]
+    # ma_values = holder['ma_values'][0]   
+    # volume_thld = holder['volume_thld'][0]   
+    # compete_mode = holder['compete_mode'][0]   
+    # train_mode = holder['train_mode'][0]       
+    # dev = holder['dev'][0]   
+    # symbols = holder['symbols'][0]   
+    # predict_period = holder['predict_period'][0]        
     
     
-    # predict_begin = 20210917
-    # industry = True
-    # trade_value = True      
-    # data_period = int(365 * 1)
-    # predict_begin = 20211006
-    # market = 'tw'
-    # ma_values = [5,10,20]
-    # predict_period = 5
-    # volume_thld = 700
-    # load_model = False
-    # cv = 2
+    industry = True
+    trade_value = True      
+    # _predict_begin = 20211001
+    # _data_period = int(365 * 1)
+    # _market = 'tw'
+    # _ma_values = [5,10,20]
+    # _predict_period = 5
+    # _volume_thld = 700
+    # _load_model = False
+    # _cv = 2
     # fast = True
     # export_model = False
     # dev = True
-    # symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    # _symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    # k = 10
+    # threshold = 20000
     
     
     global version, exe_serial
@@ -971,35 +990,33 @@ def master(param_holder, predict_begin,
     global error_msg
     error_msg = []    
     
-    global _volume_thld
-    _volume_thld = volume_thld
+    global volume_thld
+    volume_thld = _volume_thld
     
-    global _ma_values
-    _ma_values = ma_values
+    global ma_values
+    ma_values = _ma_values
 
 
-    global shift_begin, shift_end, data_begin, data_end, data_period
-    global _predict_date, _predict_period, calendar
+    # _predict_begin = 20210927
+    # _predict_begin = 20210930
+    # _predict_begin = 20211101    
+
     
-    
-    _predict_period = predict_period
+    predict_period = _predict_period
     data_shift = -(max(_ma_values) * 2)
-    _data_period = data_period
+    data_period = _data_period
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \
-                stk.get_period(data_begin=None,
-                               data_end=None, 
+                stk.get_period(predict_begin=_predict_begin,
+                               predict_period=_predict_period,
                                data_period=_data_period,
-                               predict_begin=predict_begin,
-                               predict_period=predict_period,
                                shift=data_shift)  
-    
 
     # .......
-    global _symbols, _market
-    _market = market
-    _symbols = symbols
+    global symbols, market
+    market = _market
+    symbols = _symbols
 
 
     # ......
@@ -1025,18 +1042,25 @@ def master(param_holder, predict_begin,
 
     # Training Model ......
     
-    model_params = [{'model': LinearRegression(),
-                     'params': {
-                         'normalize': [True, False],
-                         }
-                     },
-                   {'model': xgb.XGBRegressor(),
-                    'params': {
-                       'n_estimators': [200],
-                       'gamma':[0],
-                       'max_depth':[4],                
-                       }
-                   }] 
+    if len(symbols) > 0 and len(symbols) < 10:
+        model_params = [{'model': LinearRegression(),
+                         'params': {
+                             'normalize': [True, False],
+                             }
+                         }]         
+    else:
+        model_params = [{'model': LinearRegression(),
+                         'params': {
+                             'normalize': [True, False],
+                             }
+                         },
+                       {'model': xgb.XGBRegressor(),
+                        'params': {
+                           'n_estimators': [200],
+                           'gamma':[0],
+                           'max_depth':[4],                
+                           }
+                       }] 
                    
     global pred_result, pred_scores, pred_params, pred_features
     
@@ -1044,13 +1068,19 @@ def master(param_holder, predict_begin,
         
         print('Bug - predict_best_params還沒修好，train_mode先設為2')
         cur_y = var_y[i]
+        remove_y = [var_y[j] for j in range(len(var_y)) if j != i]
+        
         tuner = ut.Ultra_Tuner(id_keys=id_keys, y=cur_y, model_type='reg',
-                               compete_mode=1, train_mode=2, path=path_temp)
+                               compete_mode=2, train_mode=2, path=path_temp)
+        
+        # 排除其他y，否則會出錯
+        cur_model_data = model_data.drop(remove_y, axis=1)
         
         return_result, return_scores, return_params, return_features, \
                 log_scores, log_params, log_features = \
-                    tuner.fit(data=model_data, model_params=model_params, k=10,
-                              cv=2, threshold=10, norm_orig=[],
+                    tuner.fit(data=cur_model_data, model_params=model_params,
+                              k=k, cv=_cv, threshold=threshold, 
+                              norm_orig=norm_orig,
                               export_model=True, export_log=True)
 
         if i == 0:
@@ -1119,7 +1149,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     # 1. 先找百元以下的，才有資金可以買一整張
     # 2. 不要找疫情後才爆漲到歷史新高的
 
-    global _market
+    global market
     data_end = cbyz.date_get_today()
     data_begin = cbyz.date_cal(data_end, -1, 'm')
 
@@ -1137,7 +1167,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
                             stock_symbol=level3_symbol, 
                             price_change=True,
-                            shift=0, stock_type=_market)
+                            shift=0, stock_type=market)
     
     data = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbol)]
     
@@ -1146,7 +1176,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     data = stk.get_data(data_begin=data_begin, data_end=data_end, 
                             stock_symbol=[], 
                             price_change=True,
-                            shift=0, stock_type=_market)
+                            shift=0, stock_type=market)
     
     
     # Section 2. 依價格篩選 ......
@@ -1282,7 +1312,7 @@ def check_price_limit():
 def get_google_treneds(begin_date=None, end_date=None, 
                        normalize=True):
     
-    global _market
+    global market
     print('get_google_treneds - 增加和get_stock_info一樣的daily backup')
 
     # begin_date = 20210101
@@ -1299,13 +1329,13 @@ def get_google_treneds(begin_date=None, end_date=None,
     
     calendar = stk.get_market_calendar(begin_date=temp_begin, 
                                        end_date=temp_end, 
-                                       stock_type=_market)
+                                       stock_type=market)
 
     # Word List ......
     file_path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis/Resource/google_trends_industry.xlsx'
     file = pd.read_excel(file_path, sheet_name='words')
     
-    file = file[(file['STOCK_TYPE'].str.contains(_market)) \
+    file = file[(file['STOCK_TYPE'].str.contains(market)) \
                 & (~file['WORD'].isna()) \
                 & (file['REMOVE'].isna())]
     

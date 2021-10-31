@@ -13,7 +13,6 @@ import numpy as np
 import sys, time, os, gc
 
 
-
 host = 2
 host = 0
 stock_type = 'tw'
@@ -21,7 +20,7 @@ stock_type = 'tw'
 
 # Path .....
 if host == 0:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection/2_TEJ'
+    path = '/Users/Aron/Documents/GitHub/Stock_Forecast/1_Data_Collection/2_TEJ'
 elif host == 2:
     path = '/home/jupyter/1_Data_Collection/2_TEJ'
 
@@ -447,7 +446,8 @@ if __name__ == '__main__':
     # Check
     chk = chk_last_date()
 
-    update(begin=20211018, end=20211021, ewprcd=True, ewtinst1c=True, 
+    # Update, add auto pick date
+    update(begin=20211021, end=20211101, ewprcd=True, ewtinst1c=True, 
            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
            delete=True, upload=True) 
 

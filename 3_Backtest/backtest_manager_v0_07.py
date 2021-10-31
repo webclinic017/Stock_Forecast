@@ -50,7 +50,7 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v1_06 as sam
 # import stock_analysis_manager_v1_07 as sam
 # import stock_analysis_manager_v1_08 as sam
-import stock_analysis_manager_v1_09_dev as sam
+import stock_analysis_manager_v1_09 as sam
 
 
 
@@ -136,17 +136,24 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         begin = bt_seq[i]
 
-        results_raw = sam.master(_predict_begin=begin,
-                                 _predict_end=None, 
+        print('Bug - 還沒處理好predict_date')
+        # results_raw = sam.master(param_holder)
+        
+        
+        # pred_result, pred_scores, pred_params, pred_features
+        results_raw = sam.master(param_holder=param_holder,
+                                 _predict_begin=begin,
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
-                                 _stock_symbol=_stock_symbol,
+                                 _symbols=_stock_symbol,
+                                 _market=stock_type,
                                  _ma_values=_ma_values,
                                  _volume_thld=_volume_thld,
-                                 load_model=load_model,
-                                 cv=cv, fast=fast, dev=dev)
+                                 _load_model=load_model,
+                                 threshold=30000, k=30,
+                                 _cv=cv)
 
-
+        print('Update - 還沒改')
         new_result = results_raw[0]
         new_result['BACKTEST_ID'] = i
         
@@ -167,6 +174,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     model_y = cbyz.df_get_cols_except(df=bt_results, 
                                       except_cols=['STOCK_SYMBOL', 'WORK_DATE', 
                                                    'BACKTEST_ID'])
+
 
 # ............
 
@@ -277,7 +285,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
     # 把LAST全部補上最後一個交易日的資料
     # 因為回測的時間有可能是假日，所以這裡的LAST可能會有NA
-    main_data = cbyz.df_shift_fill_na(df=main_data, 
+    main_data = cbyz.df_shift_fillna(df=main_data, 
                                       loop_times=_predict_period+1, 
                                       cols=ohlc_last, 
                                       group_by=['STOCK_SYMBOL', 'BACKTEST_ID'])
@@ -569,7 +577,8 @@ def eval_metrics(export_file=False, upload=False):
 
 
 def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
-           data_period=5, stock_symbol=None, stock_type='tw', hold=[],
+           data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
+           stock_symbol=[], stock_type='tw', hold=[],
            dev=False):
     '''
     主工作區
@@ -590,8 +599,12 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # - Include low volume symbols in the excel
     
     
-    # Backtest也可以用parameter做A/B    
     
+    # v0.07
+    # - Update for ultra_tuner
+    
+    
+    # Backtest也可以用parameter做A/B    
     
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
@@ -640,7 +653,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 把stock_type改成market
 
 
-
     
     # Worklist
     # 1.Add price increse but model didn't catch
@@ -659,25 +671,29 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # (3) 多數決
     # (4) RMSE > How many model agree > RMSE (Chosen)
     
-    
 
     global _interval, _bt_times, _volume_thld, _ma_values
+    
+    global _hold
+    # hold = [8105, 2610, 3051, 1904, 2611]
+    _hold = [str(i) for i in hold]
+        
 
 
     # Parameters
     
-    #　Not Collected Parameters
-    bt_times = 1
-    interval = 4
-    stock_type = 'tw'
+    # #　Not Collected Parameters
+    # bt_times = 1
+    # interval = 4
+    # stock_type = 'tw'
     # dev = True    
     
-    # Collected Parameters
-    bt_last_begin = 20211018    
-    predict_period = 5
-    data_period = int(365 * 3.5)
-    ma_values = [5,10,20,60]
-    volume_thld = 500
+    # # Collected Parameters
+    # # bt_last_begin = 20210913
+    # predict_period = 5
+    # data_period = int(365 * 3.5)
+    # ma_values = [5,10,20,60]
+    # volume_thld = 500
     
 
     # Wait for update
@@ -719,6 +735,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
                         2409, 2603, 2611, 3051, 3562]],
             }
     
+    global param_holder
     param_holder = ar.Param_Holder(**args)
     
     
@@ -739,15 +756,13 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
         else:
             param_df = cbyz.df_cross_join(param_df, new_df)
 
-    
-
 
 
     if dev:
-        stock_symbol = [2520, 2605, 6116, 6191, 3481, 
-                        2409, 2603, 2611, 3051, 3562]
+        symbols = [2520, 2605, 6116, 6191, 3481, 
+                   2409, 2603, 2611, 3051, 3562]
     else:
-        stock_symbol = []
+        symbols = []
 
 
     _interval = interval
@@ -762,12 +777,13 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     global _bt_last_begin, _bt_last_end
     
     _stock_type = stock_type    
-    _stock_symbol = stock_symbol
-    _stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
+    _stock_symbol = symbols
+    _stock_symbol = cbyz.li_conv_ele_type(_stock_symbol, to_type='str')
 
 
     # Set Date ......
-    global calendar, _bt_last_begin, _bt_last_end, _predict_period
+    global _bt_last_begin, _predict_period
+    global calendar, _bt_last_end
     _predict_period = predict_period
     _bt_last_begin = bt_last_begin
     
@@ -781,7 +797,8 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
                      interval=interval,
                      data_period=data_period,
                      load_model=False, cv=2, fast=True, dev=dev)
-
+    
+    
     
     # Profit ------    
     # y_thld=0.05
@@ -800,17 +817,14 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
     
-    global _hold
-    # _hold = [8105, 2610, 3051, 1904, 2611]
-    _hold = [str(i) for i in hold]
     
-    
-    # execute_begin = cbyz.
-    
+    execute_begin = cbyz.date_get_today()
+    execute_begin = cbyz.date_cal(execute_begin, -30, 'd')
+    execute_begin = int(str(execute_begin)[2:] + '0000')
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
     cal_profit(y_thld=0.05, time_thld=_predict_period, prec_thld=0.05,
-               execute_begin=2108110000, 
+               execute_begin=execute_begin, 
                export_file=True, load_file=True, path=path_temp,
                file_name=None, upload_metrics=False)
     
@@ -928,23 +942,32 @@ def verify_prediction_results():
 # %% Dev -----
 
 
-
-
 def dev():
 
     ledger = stk.get_ledger()
 
 
-# %% Execute ------
 
+# %% Execute ------
 if __name__ == '__main__':
     
-    results = master(bt_last_begin=20211021, predict_period=5, 
-                     interval=4, bt_times=2, 
-                     data_period=int(365 * 3.5), 
-                     ma_values = [5,10,20,60], volume_thld = 400,
-                     stock_symbol=[], stock_type='tw', hold=[],
-                     dev=False)
+    
+    hold =  [8105, 1609, 4414, 1904, 1440]
+    
+    master(bt_last_begin=20211101, predict_period=5, 
+           interval=4, bt_times=1, 
+           data_period=int(365 * 1), 
+           ma_values=[5,10,20], volume_thld=400,
+           stock_type='tw', hold=hold,
+           dev=True)
+
+    
+    # master(bt_last_begin=20211101, predict_period=5, 
+    #        interval=4, bt_times=1, 
+    #        data_period=int(365 * 3.5), 
+    #        ma_values=[5,10,20,60], volume_thld=400,
+    #        stock_type='tw', hold=hold,
+    #        dev=False)
 
 
 
