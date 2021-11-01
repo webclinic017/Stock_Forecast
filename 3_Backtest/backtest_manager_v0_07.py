@@ -232,10 +232,9 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     # Hist Data ......
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
                                  data_end=_bt_last_end, 
-                                 stock_type=stock_type, 
+                                 market=stock_type, 
                                  stock_symbol=_stock_symbol, 
-                                 price_change=True,
-                                 tej=True)
+                                 price_change=True)
     
     temp_cols = ['WORK_DATE', 'STOCK_SYMBOL'] + ohlc
     hist_data_raw = hist_data_raw[temp_cols]
@@ -923,10 +922,10 @@ def verify_prediction_results():
     
     # Market Data ......
     data_raw = stk.get_data(data_begin=begin, 
-                        data_end=end, 
-                        stock_type='tw', 
-                        stock_symbol=[], 
-                        price_change=True)
+                            data_end=end, 
+                            stock_type='tw', 
+                            stock_symbol=[], 
+                            price_change=True)
 
     data = data_raw[(data_raw['WORK_DATE']==20210625) \
                 & (data_raw['STOCK_SYMBOL'].isin(symbols))] \
@@ -952,7 +951,7 @@ def dev():
 if __name__ == '__main__':
     
     
-    hold =  [8105, 1609, 4414, 1904, 1440]
+    hold =  [8105, 4414, 1904, 1440]
     
     master(bt_last_begin=20211101, predict_period=5, 
            interval=4, bt_times=1, 

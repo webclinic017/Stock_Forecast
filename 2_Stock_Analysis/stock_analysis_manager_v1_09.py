@@ -103,21 +103,29 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     if len(symbols) == 0:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
-                            data_end=data_end, 
-                            stock_type=market, stock_symbol=[], 
-                            price_change=True, price_limit=True, 
-                            trade_value=trade_value,
-                            tej=True)
+                                       data_end=data_end, 
+                                       market=market, stock_symbol=[], 
+                                       price_change=True, price_limit=True, 
+                                       trade_value=trade_value)
     else:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
                                        data_end=data_end, 
-                                       stock_type=market, 
+                                       market=market, 
                                        stock_symbol=symbols, 
                                        price_change=True, price_limit=True,
-                                       trade_value=trade_value,
-                                       tej=True)
-        
+                                       trade_value=trade_value)
 
+    # Check        
+    ohlc = stk.get_ohlc()
+    for c in ohlc:
+        col = c + '_CHANGE_RATIO'
+        min_value = market_data_raw[col].min()
+        max_value = market_data_raw[col].max()
+        
+        # assert min_value >= -0.25, col + ' min_value is ' + str(min_value)
+        # assert max_value <= 0.25, col + ' max_value is ' + str(max_value)
+        
+    
     # Exclude New Symbols ......
     # Exclude the symbols that listing date shorter than data_period
     date_min = market_data_raw['WORK_DATE'].min()
@@ -132,7 +140,6 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Market data without new symbols
     market_data_raw = market_data_raw[market_data_raw['MIN_DATE']==date_min] \
                         .drop('MIN_DATE', axis=1)
-
 
 
     # Exclude Low Volume Symbols ......
@@ -230,11 +237,12 @@ def sam_load_data(industry=True, trade_value=True):
             loc_main[col + '_GLOB_NORM'] = loc_main[col]
     
 
-        loc_main, _, norm_orig = \
+        # 如果by WORK_DATE normalized的話，最後會沒辦法還原
+        loc_main, ohlc_cols, norm_orig = \
             cbml.ml_data_process(df=loc_main, ma=True, 
                                  normalize=True, lag=True, 
                                  ma_group_by=['STOCK_SYMBOL'],   
-                                 norm_group_by=['WORK_DATE'], 
+                                 norm_group_by=[], 
                                  lag_group_by=['STOCK_SYMBOL'], 
                                  ma_cols_contains=cols, 
                                  ma_except_contains=[],
@@ -245,11 +253,13 @@ def sam_load_data(industry=True, trade_value=True):
                                  drop_except_contains=var_y,
                                  ma_values=ma_values, 
                                  lag_period=predict_period)
+            
         
     # Normalize By Stock
-    except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM']
+    except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
+                    + ohlc_cols
     
-    loc_main, _, norm_orig = \
+    loc_main, _, _ = \
         cbml.ml_data_process(df=loc_main, ma=True, normalize=True, lag=True, 
                             ma_group_by=['STOCK_SYMBOL'],   
                             norm_group_by=['STOCK_SYMBOL'], 
@@ -263,7 +273,7 @@ def sam_load_data(industry=True, trade_value=True):
                             drop_except_contains=var_y,
                             ma_values=ma_values, 
                             lag_period=predict_period)
-        
+    
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
     drop_cols = cbyz.df_chk_col_na(df=loc_main, positive_only=True)
@@ -526,12 +536,6 @@ def select_stock_symbols():
     return df
 
 
-# ........
-
-
-
-
-
 
 # %% Process ------
 
@@ -569,7 +573,7 @@ def get_model_data(industry=True, trade_value=True):
     # Load Historical Data ......
     main_data, norm_orig = \
         sam_load_data(industry=industry, trade_value=trade_value) 
-    print('Bug - 執行到這裡時，main_data裡面會有NA')
+    print('Bug - 執行到這裡時，main_data裡面會有NA, 主要是INDUSTRY的問題')
         
     
     # TODC Shareholdings Spread ......
@@ -927,14 +931,15 @@ def master(param_holder, _predict_begin,
     # Bug
     # 2. Fix Date Issues
     # 1. Fill na with interpolate
+    # 3. 在get_market_data_raw中, OPEN_CHANGE_RATIO min_value 
+    #    is -0.8897097625329815，暫時移除assert
     
     # - 寫出全部的model log
     # - Update predict_and_tunning
     # - Add test serial and detail
     # -NA issues, replace OHLC na in market data function, and add replace 
     # na with interpolation. And why 0101 not excluded?
-    # Bug, 預測天數是5天，但結果可能只有3天
-
+    # print('Bug - 執行到這裡時，main_data裡面會有NA, 主要是INDUSTRY的問題')
 
     # Optimization .....
     # - Add week
@@ -951,18 +956,18 @@ def master(param_holder, _predict_begin,
     global predict_date, predict_period, calendar    
 
 
-    # holder = param_holder.params
-    # industry = holder['industry'][0]
-    # trade_value = holder['trade_value'][0]
-    # data_period = holder['data_period'][0]
-    # market = holder['market'][0]
-    # ma_values = holder['ma_values'][0]   
-    # volume_thld = holder['volume_thld'][0]   
-    # compete_mode = holder['compete_mode'][0]   
-    # train_mode = holder['train_mode'][0]       
-    # dev = holder['dev'][0]   
-    # symbols = holder['symbols'][0]   
-    # predict_period = holder['predict_period'][0]        
+    # # holder = param_holder.params
+    # # industry = holder['industry'][0]
+    # # trade_value = holder['trade_value'][0]
+    # # data_period = holder['data_period'][0]
+    # # market = holder['market'][0]
+    # # ma_values = holder['ma_values'][0]   
+    # # volume_thld = holder['volume_thld'][0]   
+    # # compete_mode = holder['compete_mode'][0]   
+    # # train_mode = holder['train_mode'][0]       
+    # # dev = holder['dev'][0]   
+    # # symbols = holder['symbols'][0]   
+    # # predict_period = holder['predict_period'][0]        
     
     
     industry = True
@@ -1049,24 +1054,25 @@ def master(param_holder, _predict_begin,
                              }
                          }]         
     else:
-        model_params = [{'model': LinearRegression(),
-                         'params': {
-                             'normalize': [True, False],
-                             }
-                         },
+        model_params = [
+                        # {'model': LinearRegression(),
+                        #  'params': {
+                        #      'normalize': [True, False],
+                        #      }
+                        #  },
                        {'model': xgb.XGBRegressor(),
                         'params': {
                            'n_estimators': [200],
                            'gamma':[0],
                            'max_depth':[4],                
                            }
-                       }] 
+                       }
+                       ] 
                    
     global pred_result, pred_scores, pred_params, pred_features
     
     for i in range(len(var_y)):
         
-        print('Bug - predict_best_params還沒修好，train_mode先設為2')
         cur_y = var_y[i]
         remove_y = [var_y[j] for j in range(len(var_y)) if j != i]
         
@@ -1082,6 +1088,10 @@ def master(param_holder, _predict_begin,
                               k=k, cv=_cv, threshold=threshold, 
                               norm_orig=norm_orig,
                               export_model=True, export_log=True)
+                    
+        # ut的norm_orig有bug，所以先獨立出來
+        # return_result = cbml.df_normalize_restore(df=return_result, 
+        #                                        original=norm_orig)
 
         if i == 0:
             pred_result = return_result.copy()
