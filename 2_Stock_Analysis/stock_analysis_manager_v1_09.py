@@ -890,7 +890,7 @@ def get_model_data(industry=True, trade_value=True):
 def master(param_holder, _predict_begin,
            _predict_period=5, _data_period=180, 
            _symbols=[], _market='tw', _ma_values=[5,20,60], _volume_thld=500, 
-           _compete_mode=1, _train_mode=1, _cv=2, threshold=30000, k=30,
+           _compete_mode=1, _train_mode=1, _cv=2, threshold=30000, k='all',
            _export_model=True, _load_model=False):
     '''
     主工作區
@@ -956,18 +956,18 @@ def master(param_holder, _predict_begin,
     global predict_date, predict_period, calendar    
 
 
-    # # holder = param_holder.params
-    # # industry = holder['industry'][0]
-    # # trade_value = holder['trade_value'][0]
-    # # data_period = holder['data_period'][0]
-    # # market = holder['market'][0]
-    # # ma_values = holder['ma_values'][0]   
-    # # volume_thld = holder['volume_thld'][0]   
-    # # compete_mode = holder['compete_mode'][0]   
-    # # train_mode = holder['train_mode'][0]       
-    # # dev = holder['dev'][0]   
-    # # symbols = holder['symbols'][0]   
-    # # predict_period = holder['predict_period'][0]        
+    # holder = param_holder.params
+    # industry = holder['industry'][0]
+    # trade_value = holder['trade_value'][0]
+    # data_period = holder['data_period'][0]
+    # market = holder['market'][0]
+    # ma_values = holder['ma_values'][0]   
+    # volume_thld = holder['volume_thld'][0]   
+    # compete_mode = holder['compete_mode'][0]   
+    # train_mode = holder['train_mode'][0]       
+    # dev = holder['dev'][0]   
+    # symbols = holder['symbols'][0]   
+    # predict_period = holder['predict_period'][0]        
     
     
     industry = True
@@ -984,6 +984,7 @@ def master(param_holder, _predict_begin,
     # export_model = False
     # dev = True
     # _symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    # k = 10
     # k = 10
     # threshold = 20000
     
@@ -1069,6 +1070,8 @@ def master(param_holder, _predict_begin,
                        }
                        ] 
                    
+    # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業的預測
+    #    值完全相同
     global pred_result, pred_scores, pred_params, pred_features
     
     for i in range(len(var_y)):

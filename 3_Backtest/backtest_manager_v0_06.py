@@ -245,10 +245,9 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     # Hist Data ......
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
                                  data_end=_bt_last_end, 
-                                 stock_type=stock_type, 
+                                 market=stock_type, 
                                  stock_symbol=_stock_symbol, 
-                                 price_change=True,
-                                 tej=True)
+                                 price_change=True)
     
     temp_cols = ['WORK_DATE', 'STOCK_SYMBOL'] + ohlc
     hist_data_raw = hist_data_raw[temp_cols]
@@ -298,7 +297,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
     # 把LAST全部補上最後一個交易日的資料
     # 因為回測的時間有可能是假日，所以這裡的LAST可能會有NA
-    main_data = cbyz.df_shift_fill_na(df=main_data, 
+    main_data = cbyz.df_shift_fillna(df=main_data, 
                                       loop_times=_predict_period+1, 
                                       cols=ohlc_last, 
                                       group_by=['STOCK_SYMBOL', 'BACKTEST_ID'])
@@ -451,16 +450,13 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     actions['BUY_SIGNAL'] = \
         np.where(actions['STOCK_SYMBOL'].isin(buy_signal_symbols), 1, 0)
 
-    
-
 
 # .................
 
 
-
 def eval_metrics(export_file=False, upload=False):
 
-    
+
     # MAPE ......
     global bt_main, bt_info, rmse
     global mape, mape_group, mape_extreme
@@ -468,13 +464,11 @@ def eval_metrics(export_file=False, upload=False):
     
     model_y_hist = [y + '_HIST' for y in model_y]
     mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
-    
-    print('eval_metrics - Bug，不做回測時，mape_main的length一定會等於0')
     # assert len(mape_main) > 0, 'eval_metrics - mape_main is empty.'
+    
 
     if len(mape_main) == 0:
-        return ''
-    
+        return ''    
     
     # ......
     mape = pd.DataFrame()
@@ -589,8 +583,10 @@ def eval_metrics(export_file=False, upload=False):
 # ..........
 
 
-def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
-           data_period=5, stock_symbol=None, stock_type='tw', dev=False):
+def master(bt_last_begin, predict_period=5, interval=4, bt_times=1, 
+           data_period=int(365 * 3.5), ma_values = [5,10,20,60],
+           volume_thld = 500, stock_symbol=[], stock_type='tw', dev=False, 
+           load_model=True, fast=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -616,7 +612,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
-    # 2. Features現在是空的
 
 
 
@@ -657,27 +652,26 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
 
     # Parameters
-    predict_period = 5
-    interval = 4
-    bt_times = 1
-    data_period = int(365 * 3.5)
-    # data_period = int(365 * 0.86) # Shareholding    
-    # data_period = 365 * 2
-    # data_period = 365 * 5
-    # data_period = 365 * 7
-    stock_type = 'tw'
-    # _ma_values = [5,10,20]
-    # _ma_values = [5,10,20,40]
-    ma_values = [5,10,20,60]
-    volume_thld = 500
+    # predict_period = 5
+    # interval = 4
+    # bt_times = 1
+    # data_period = int(365 * 3.5)
+    # # data_period = int(365 * 0.86) # Shareholding    
+    # # data_period = 365 * 2
+    # # data_period = 365 * 5
+    # # data_period = 365 * 7
+    # stock_type = 'tw'
+    # # _ma_values = [5,10,20]
+    # # _ma_values = [5,10,20,40]
+    # ma_values = [5,10,20,60]
+    # volume_thld = 500
     
     # bt_last_begin = 20211018    
-    # dev = True    
+    # dev = True
 
     
     if dev:
-        stock_symbol = [2520, 2605, 6116, 6191, 3481, 
-                        2409, 2603, 2611, 3051, 3562]
+        stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603, 2611, 3051, 3562]
     else:
         stock_symbol = []
 
@@ -713,7 +707,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
                      predict_period=_predict_period, 
                      interval=interval,
                      data_period=data_period,
-                     load_model=False, cv=2, fast=True, dev=dev)
+                     load_model=load_model, cv=2, fast=fast, dev=dev)
 
     
     # Profit ------    
@@ -734,14 +728,14 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     global stock_metrics_raw, stock_metrics    
     
     global hold
-    hold = [8105, 2610, 3051, 1904, 2611]
+    hold = [1609, 2399, 8105]
     
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
     cal_profit(y_thld=0.05, time_thld=_predict_period, prec_thld=0.05,
-               execute_begin=2108110000, 
+               execute_begin=2109110000, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False)
+               file_name=None, upload_metrics=True)
     
     
     # Export ......
@@ -778,9 +772,8 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     writer.save()
 
-
     # Write Google Sheets
-    stk.write_actions(actions)
+    stk.write_actions(actions)    
     
 
 
@@ -839,7 +832,7 @@ def verify_prediction_results():
     # Market Data ......
     data_raw = stk.get_data(data_begin=begin, 
                         data_end=end, 
-                        stock_type='tw', 
+                        market='tw', 
                         stock_symbol=[], 
                         price_change=True)
 
@@ -851,37 +844,28 @@ def verify_prediction_results():
     
     main_data = data.merge(file, how='left', on='STOCK_SYMBOL')
     
-
     
-
-# %% Dev -----
-
-
-def dev():
-    
-    ewsale = stk.tej_get_ewsale(begin_date=20180101, end_date=None, 
-                                stock_symbol=[], trade=True)    
-    
-    
-    cbyz.df_chk_col_na(df=data)
-    
-    cbyz.df_fillna(df=data, cols=['D0001', 'D0002', 'D0003'], 
-                   group_by=['STOCK_SYMBOL'], method='mean')
-
-
-
-    data['D0001'] = np.where(data['D0001'].isna(), np.nan, data['D0001'])
-    data['D0002'] = np.where(data['D0002'].isna(), np.nan, data['D0002'])
-    data['D0003'] = np.where(data['D0003'].isna(), np.nan, data['D0003'])
-    chk = data[data['D0001'].isna()]
-
-
 
 # %% Execute ------
-
 if __name__ == '__main__':
     
-    results = master(bt_last_begin=20211006, dev=True)
+    # Test
+    # results = master(bt_last_begin=20211102, predict_period=5, 
+    #                  interval=4, bt_times=1, 
+    #                  data_period=int(365 * 1), 
+    #                  ma_values = [5,10,20],
+    #                  volume_thld = 400,
+    #                  stock_symbol=[], stock_type='tw', dev=True,
+    #                  load_model=False, fast=True)
 
-
-
+    
+    results = master(bt_last_begin=20211102, predict_period=5, 
+                     interval=4, bt_times=1, 
+                     data_period=int(365 * 3.5), 
+                     ma_values = [5,10,20,60],
+                     volume_thld = 400,
+                     stock_symbol=[], stock_type='tw', dev=False,
+                     load_model=False, fast=True)    
+    
+    
+# %% Dev -----

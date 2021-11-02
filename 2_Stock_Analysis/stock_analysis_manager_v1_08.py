@@ -102,18 +102,16 @@ def get_market_data_raw(industry=True, trade_value=True):
     if len(stock_symbol) == 0:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
                             data_end=data_end, 
-                            stock_type=stock_type, stock_symbol=[], 
+                            market=stock_type, stock_symbol=[], 
                             price_change=True, price_limit=True, 
-                            trade_value=trade_value,
-                            tej=True)
+                            trade_value=trade_value)
     else:
         market_data_raw = stk.get_data(data_begin=loc_begin, 
                                        data_end=data_end, 
-                                       stock_type=stock_type, 
+                                       market=stock_type, 
                                        stock_symbol=stock_symbol, 
                                        price_change=True, price_limit=True,
-                                       trade_value=trade_value,
-                                       tej=True)
+                                       trade_value=trade_value)
         
         # backup = market_data_raw.copy()
         # market_data_raw = backup.copy()
@@ -673,7 +671,7 @@ def get_google_treneds(begin_date=None, end_date=None,
                                            main_data['WORK_DATE'],
                                            np.nan)
     
-    main_data = cbyz.df_shift_fill_na(df=main_data, loop_times=len(calendar), 
+    main_data = cbyz.df_shift_fillna(df=main_data, loop_times=len(calendar), 
                                      group_by='WORD_TREND',
                                      cols='NEXT_TRADE_DATE', forward=False)
     
@@ -921,60 +919,60 @@ def get_model_data(industry=True, trade_value=True):
 
     # 月營收資料表 ......
     # 1. 主要邏輯就是顯示最新的營收資料
-    print('Update - 增加date index')
-    ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
-                                stock_symbol=stock_symbol, trade=True)
+#     print('Update - 增加date index')
+#     ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
+#                                 stock_symbol=stock_symbol, trade=True)
     
-    ewsale, cols, _ = \
-        cbml.ml_data_process(df=ewsale, 
-                             ma=False, normalize=True, lag=False, 
-                             ma_group_by=['STOCK_SYMBOL'],
-                             norm_group_by=['STOCK_SYMBOL'], 
-                             lag_group_by=['STOCK_SYMBOL'],
-                             ma_cols_contains=[], 
-                             ma_except_contains=[],
-                             norm_cols_contains=['D000'], 
-                             norm_except_contains=[],
-                             lag_cols_contains=[], 
-                             lag_except_contains=[], 
-                             drop_except_contains=[],
-                             ma_values=ma_values, 
-                             lag_period=predict_period)    
+#     ewsale, cols, _ = \
+#         cbml.ml_data_process(df=ewsale, 
+#                              ma=False, normalize=True, lag=False, 
+#                              ma_group_by=['STOCK_SYMBOL'],
+#                              norm_group_by=['STOCK_SYMBOL'], 
+#                              lag_group_by=['STOCK_SYMBOL'],
+#                              ma_cols_contains=[], 
+#                              ma_except_contains=[],
+#                              norm_cols_contains=['D000'], 
+#                              norm_except_contains=[],
+#                              lag_cols_contains=[], 
+#                              lag_except_contains=[], 
+#                              drop_except_contains=[],
+#                              ma_values=ma_values, 
+#                              lag_period=predict_period)    
     
-    cur_cols = [s + '_CUR' for s in cols]
-    ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
-                                         cols=['D0001', 'D0002', 'D0003'], 
-                                         shift=-1, group_by=['STOCK_SYMBOL'],
-                                         suffix='_PRE', remove_na=False)
+#     cur_cols = [s + '_CUR' for s in cols]
+#     ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
+#                                          cols=['D0001', 'D0002', 'D0003'], 
+#                                          shift=-1, group_by=['STOCK_SYMBOL'],
+#                                          suffix='_PRE', remove_na=False)
     
-    # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
-    year_month = main_data[['WORK_DATE', 'YEAR', 'MONTH']] \
-                .drop_duplicates()
+#     # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
+#     year_month = main_data[['WORK_DATE', 'YEAR', 'MONTH']] \
+#                 .drop_duplicates()
                 
-    ewsale = ewsale.merge(year_month, how='left', on=['WORK_DATE'])
-    ewsale = ewsale.rename(columns={'WORK_DATE':'EWSALE_WORK_DATE',
-                                    'D0001':'D0001_CUR',
-                                    'D0002':'D0002_CUR',
-                                    'D0003':'D0003_CUR'})
+#     ewsale = ewsale.merge(year_month, how='left', on=['WORK_DATE'])
+#     ewsale = ewsale.rename(columns={'WORK_DATE':'EWSALE_WORK_DATE',
+#                                     'D0001':'D0001_CUR',
+#                                     'D0002':'D0002_CUR',
+#                                     'D0003':'D0003_CUR'})
     
-    main_data = main_data \
-            .merge(ewsale, how='left', on=['STOCK_SYMBOL', 'YEAR', 'MONTH'])  
+#     main_data = main_data \
+#             .merge(ewsale, how='left', on=['STOCK_SYMBOL', 'YEAR', 'MONTH'])  
 
-    cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
-    main_data['D0001'] = np.where(cond, 
-                                  main_data['D0001_CUR'], 
-                                  main_data['D0001_PRE'])
+#     cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
+#     main_data['D0001'] = np.where(cond, 
+#                                   main_data['D0001_CUR'], 
+#                                   main_data['D0001_PRE'])
     
-    main_data['D0002'] = np.where(cond, 
-                                  main_data['D0002_CUR'], 
-                                  main_data['D0002_PRE'])
+#     main_data['D0002'] = np.where(cond, 
+#                                   main_data['D0002_CUR'], 
+#                                   main_data['D0002_PRE'])
 
-    main_data['D0003'] = np.where(cond, 
-                                  main_data['D0003_CUR'], 
-                                  main_data['D0003_PRE'])
+#     main_data['D0003'] = np.where(cond, 
+#                                   main_data['D0003_CUR'], 
+#                                   main_data['D0003_PRE'])
     
-    main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
-                               axis=1)
+#     main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
+#                                axis=1)
     
     
     # 指數日成本 ......
@@ -1465,7 +1463,7 @@ def predict_and_tuning(cv=5, load_model=False, export_model=True, path=None,
             
             # 自動測試 ...
             scores_li = []
-            best_score = 0
+            best_score = -np.inf
             model = None
             
             for model_name, mp in model_params.items():
@@ -1647,7 +1645,7 @@ def master(_predict_begin, _predict_end=None,
 
 
     global version, exe_serial
-    version = 1.08
+    version = 1.07
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
     global params, error_msg
@@ -1674,9 +1672,7 @@ def master(_predict_begin, _predict_end=None,
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \
-                stk.get_period(data_begin=None,
-                               data_end=None, 
-                               data_period=data_period,
+                stk.get_period(data_period=data_period,
                                predict_begin=_predict_begin,
                                predict_period=predict_period,
                                shift=data_shift)  
