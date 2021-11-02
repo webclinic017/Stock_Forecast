@@ -9,6 +9,28 @@ History
 """
 
 
+
+# Worklist
+# 1.Add price increse but model didn't catch
+# 2.Retrieve one symbol historical data to ensure calendar
+
+
+
+# 在台灣投資股票的交易成本包含手續費與交易稅，
+# 手續費公定價格是0.1425%，買進和賣出時各要收取一次，
+# 股票交易稅是0.3%，如果投資ETF交易稅是0.1%，僅在賣出時收取。
+
+
+# To do action
+# (1) 集成
+# (2) 用迴歸，看哪一支model的成效好
+# (3) 多數決
+# (4) RMSE > How many model agree > RMSE (Chosen)
+
+
+# rmse and profit regression
+
+
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -47,10 +69,13 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
+# import stock_analysis_manager_v1_02 as sam
+# import stock_analysis_manager_v1_03 as sam
+# import stock_analysis_manager_v1_04 as sam
+# import stock_analysis_manager_v1_05 as sam
 # import stock_analysis_manager_v1_06 as sam
 # import stock_analysis_manager_v1_07 as sam
-# import stock_analysis_manager_v1_08 as sam
-import stock_analysis_manager_v1_09 as sam
+import stock_analysis_manager_v1_08 as sam
 
 
 
@@ -66,10 +91,6 @@ path_export = path + '/Export'
 
 cbyz.os_create_folder(path=[path_resource, path_function, 
                          path_temp, path_export])     
-
-
-
-# %% ------
 
 
 
@@ -136,24 +157,17 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         begin = bt_seq[i]
 
-        print('Bug - 還沒處理好predict_date')
-        # results_raw = sam.master(param_holder)
-        
-        
-        # pred_result, pred_scores, pred_params, pred_features
-        results_raw = sam.master(param_holder=param_holder,
-                                 _predict_begin=begin,
+        results_raw = sam.master(_predict_begin=begin,
+                                 _predict_end=None, 
                                  _predict_period=predict_period,
                                  _data_period=data_period, 
-                                 _symbols=_stock_symbol,
-                                 _market=stock_type,
+                                 _stock_symbol=_stock_symbol,
                                  _ma_values=_ma_values,
                                  _volume_thld=_volume_thld,
-                                 _load_model=load_model,
-                                 threshold=30000, k=30,
-                                 _cv=cv)
+                                 load_model=load_model,
+                                 cv=cv, fast=fast, dev=dev)
 
-        print('Update - 還沒改')
+
         new_result = results_raw[0]
         new_result['BACKTEST_ID'] = i
         
@@ -174,7 +188,6 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     model_y = cbyz.df_get_cols_except(df=bt_results, 
                                       except_cols=['STOCK_SYMBOL', 'WORK_DATE', 
                                                    'BACKTEST_ID'])
-
 
 # ............
 
@@ -345,8 +358,9 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     
     # Hold Symbols
-    global _hold
-    actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(_hold), 1, 0)
+    global hold
+    hold = [str(i) for i in hold]    
+    actions['HOLD'] = np.where(actions['STOCK_SYMBOL'].isin(hold), 1, 0)
 
     print('Check BUY_SIGNAL')
     actions['BUY_SIGNAL'] = np.nan 
@@ -430,22 +444,24 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     # Max Error ...
     cond3 = actions[actions['DIFF_MEDIAN']<prec_thld]
     cond3 = cond3['STOCK_SYMBOL'].unique().tolist()       
-    
-    
-    buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
-    actions['BUY_SIGNAL'] = \
-        np.where(actions['STOCK_SYMBOL'].isin(buy_signal_symbols), 1, 0)
 
+    buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
     
+    # Add Level
+    actions['PERCENTAGE'] = actions[close] * 100
+    actions['PERCENTAGE'] = actions['PERCENTAGE'].astype('int')
+    
+    actions['BUY_SIGNAL'] = \
+        np.where(actions['STOCK_SYMBOL'].isin(buy_signal_symbols), 
+                 99, actions['PERCENTAGE'])
 
 
 # .................
 
 
-
 def eval_metrics(export_file=False, upload=False):
 
-    
+
     # MAPE ......
     global bt_main, bt_info, rmse
     global mape, mape_group, mape_extreme
@@ -453,13 +469,11 @@ def eval_metrics(export_file=False, upload=False):
     
     model_y_hist = [y + '_HIST' for y in model_y]
     mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
-    
-    print('eval_metrics - Bug，不做回測時，mape_main的length一定會等於0')
     # assert len(mape_main) > 0, 'eval_metrics - mape_main is empty.'
+    
 
     if len(mape_main) == 0:
-        return ''
-    
+        return ''    
     
     # ......
     mape = pd.DataFrame()
@@ -571,14 +585,13 @@ def eval_metrics(export_file=False, upload=False):
         ar.db_upload(data=stock_metrics, table_name='forecast_records')
 
 
+# ..........
 
-# %% Master ------
 
-
-def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
-           data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
-           stock_symbol=[], stock_type='tw', hold=[],
-           dev=False):
+def master(bt_last_begin, predict_period=5, interval=4, bt_times=1, 
+           data_period=int(365 * 3.5), ma_values = [5,10,20,60],
+           volume_thld = 500, stock_symbol=[], stock_type='tw', dev=False, 
+           load_model=True, fast=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -592,32 +605,19 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # - Add buy_signal
     # v0.05
     # - Change local variable as host
-
     # v0.06
     # - Update for cbyz and cbml
     # - Include low volume symbols in the excel
-    
-    
-    
-    # v0.07
-    # - Update for ultra_tuner
-    
+    # v0.062
+    # - Add Close Level To BUY_SIGNAL column
+
     
     # Backtest也可以用parameter做A/B    
+    
     
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
-    # 2. Features現在是空的
-    # 3.低交易量的symbol可能會完全消失在excel中，如預測20211019時的3051力特
-    
-    
-    # Optimization
-    # 1. Add hold variable as parameters of master
-    # 3. 把stock_type改成market，stock_symbol改成symbol
-    # 4. Calculate IRR, remove outliers
-    # 5. Google Sheet Add Manual Tick
-    # 6. Think how to optimize stop loss
 
 
 
@@ -629,7 +629,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 2. Add DIFF_MAPE_MEDIAN
     # 3. 除權息會拉抬N天的服價，把N用weight的方式考慮進去
     # 4. data_process中的lag，應該是要針對vars處理，還是針對y處理？
-    # 5. 美股指數 https://iexcloud.io/pricing/#price-table-section
+    # 5. 美股指數
     # 7. Add machine learning error function
     # 8. 之前的code是不是沒有把股本正確normalize / Add EPS
     # 9. Add DIFF_MAPE_MIN
@@ -643,125 +643,45 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 20. Add Sell Signal
     # 21. 產業上中下游關係，SNA
     # 22. Update, load last version of model
+    # 23. 在Excel中排除交易量低的
     # 24. 把股性分群
     # 25. Do actions by change
     # 26. Add Auto-Competing Model    
     # 27. Signal A and B，A是反彈的，B是low和close差距N%
     # 交易資料先在dcm中算好ma
+    # 交易量低的資料表先保留，最後再merge回excel，在sam中處理完
     # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
-    # 把stock_type改成market
-
-
     
-    # Worklist
-    # 1.Add price increse but model didn't catch
-    # 2.Retrieve one symbol historical data to ensure calendar
-    
-    
-    
-    # 在台灣投資股票的交易成本包含手續費與交易稅，
-    # 手續費公定價格是0.1425%，買進和賣出時各要收取一次，
-    # 股票交易稅是0.3%，如果投資ETF交易稅是0.1%，僅在賣出時收取。
-    
-    
-    # To do action
-    # (1) 集成
-    # (2) 用迴歸，看哪一支model的成效好
-    # (3) 多數決
-    # (4) RMSE > How many model agree > RMSE (Chosen)
     
 
     global _interval, _bt_times, _volume_thld, _ma_values
-    
-    global _hold
-    # hold = [8105, 2610, 3051, 1904, 2611]
-    _hold = [str(i) for i in hold]
-        
 
 
     # Parameters
-    
-    # #　Not Collected Parameters
-    # bt_times = 1
-    # interval = 4
-    # stock_type = 'tw'
-    # dev = True    
-    
-    # # Collected Parameters
-    # # bt_last_begin = 20210913
     # predict_period = 5
+    # interval = 4
+    # bt_times = 1
     # data_period = int(365 * 3.5)
+    # # data_period = int(365 * 0.86) # Shareholding    
+    # # data_period = 365 * 2
+    # # data_period = 365 * 5
+    # # data_period = 365 * 7
+    # stock_type = 'tw'
+    # # _ma_values = [5,10,20]
+    # # _ma_values = [5,10,20,40]
     # ma_values = [5,10,20,60]
     # volume_thld = 500
     
+    # bt_last_begin = 20211018    
+    # dev = True
+    # hold = [1609, 2399, 8105]
 
-    # Wait for update
-    # date_manager = cbyz.Date_Manager(predict_begin=predict_begin, 
-    #                                  predict_period=_predict_period,
-    #                                  data_period=_data_period,
-    #                                  data_period_unit='d',
-    #                                  data_period_agg_unit='d',
-    #                                  predict_period_unit='d',
-    #                                  predict_by_time=True,
-    #                                  merge_period=[], shift=data_shift, 
-    #                                  week_begin=0)
     
-    # date_df = date_manager.table
-    # shift_begin = date_df.loc[0, 'SHIFT_BEGIN']
-    # shift_end = date_df.loc[0, 'SHIFT_END']
-    # data_begin = date_df.loc[0, 'DATA_BEGIN']
-    # data_end = date_df.loc[0, 'DATA_END']
-    # predict_begin = date_df.loc[0, 'PREDICT_BEGIN']
-    # predict_end = date_df.loc[0, 'PREDICT_END']  
-    # calendar = date_manager.calendar_lite    
-    
-
-
-    # Dev
-    args = {'bt_last_begin':[bt_last_begin],
-            'predict_period': [predict_period], 
-            'data_period':[data_period],
-            'ma_values':[ma_values],
-            'volume_thld':[volume_thld],
-            'industry':[True],
-            'trade_value':[True],
-            'market':['tw'],
-            'compete_mode':[True],
-            'train_mode':[True],            
-            'cv':[2],
-            'dev':[True],
-            'symbols':[[2520, 2605, 6116, 6191, 3481, 
-                        2409, 2603, 2611, 3051, 3562]],
-            }
-    
-    global param_holder
-    param_holder = ar.Param_Holder(**args)
-    
-    
-    # Select Parameters
-    params = param_holder.params
-    keys = list(params.keys())
-    values = list(params.values())
-
-    param_df = pd.DataFrame()
-    for i in range(0, len(params)):
-        
-        values_li = values[i]
-        values_li = cbyz.conv_to_list(values_li)
-        new_df = pd.DataFrame({keys[i]:values_li})
-        
-        if i == 0:
-            param_df = param_df.append(new_df)
-        else:
-            param_df = cbyz.df_cross_join(param_df, new_df)
-
-
-
     if dev:
-        symbols = [2520, 2605, 6116, 6191, 3481, 
-                   2409, 2603, 2611, 3051, 3562]
+        stock_symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603, 2611, 3051, 3562]
     else:
-        symbols = []
+        stock_symbol = []
+
 
 
     _interval = interval
@@ -776,13 +696,12 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     global _bt_last_begin, _bt_last_end
     
     _stock_type = stock_type    
-    _stock_symbol = symbols
-    _stock_symbol = cbyz.li_conv_ele_type(_stock_symbol, to_type='str')
+    _stock_symbol = stock_symbol
+    _stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
 
 
     # Set Date ......
-    global _bt_last_begin, _predict_period
-    global calendar, _bt_last_end
+    global calendar, _bt_last_begin, _bt_last_end, _predict_period
     _predict_period = predict_period
     _bt_last_begin = bt_last_begin
     
@@ -795,9 +714,8 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
                      predict_period=_predict_period, 
                      interval=interval,
                      data_period=data_period,
-                     load_model=False, cv=2, fast=True, dev=dev)
-    
-    
+                     load_model=load_model, cv=2, fast=fast, dev=dev)
+
     
     # Profit ------    
     # y_thld=0.05
@@ -818,14 +736,15 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     
     execute_begin = cbyz.date_get_today()
-    execute_begin = cbyz.date_cal(execute_begin, -30, 'd')
-    execute_begin = int(str(execute_begin)[2:] + '0000')
+    execute_begin = cbyz.date_cal(execute_begin, -14, 'd')
+    execute_begin = int(str(execute_begin)[2:] + '0000')    
+    
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
     cal_profit(y_thld=0.05, time_thld=_predict_period, prec_thld=0.05,
                execute_begin=execute_begin, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False)
+               file_name=None, upload_metrics=True)
     
     
     # Export ......
@@ -862,9 +781,8 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     writer.save()
 
-
     # Write Google Sheets
-    stk.write_actions(actions)
+    stk.write_actions(actions)    
     
 
 
@@ -922,10 +840,10 @@ def verify_prediction_results():
     
     # Market Data ......
     data_raw = stk.get_data(data_begin=begin, 
-                            data_end=end, 
-                            stock_type='tw', 
-                            stock_symbol=[], 
-                            price_change=True)
+                        data_end=end, 
+                        market='tw', 
+                        stock_symbol=[], 
+                        price_change=True)
 
     data = data_raw[(data_raw['WORK_DATE']==20210625) \
                 & (data_raw['STOCK_SYMBOL'].isin(symbols))] \
@@ -935,38 +853,32 @@ def verify_prediction_results():
     
     main_data = data.merge(file, how='left', on='STOCK_SYMBOL')
     
-
     
-
-# %% Dev -----
-
-
-def dev():
-
-    ledger = stk.get_ledger()
-
-
 
 # %% Execute ------
 if __name__ == '__main__':
     
     
-    hold =  [8105, 4414, 1904, 1440]
+    global hold
+    hold = [1609, 2399, 8105]    
     
-    master(bt_last_begin=20211101, predict_period=5, 
-           interval=4, bt_times=1, 
-           data_period=int(365 * 1), 
-           ma_values=[5,10,20], volume_thld=400,
-           stock_type='tw', hold=hold,
-           dev=True)
+    # Test
+    results = master(bt_last_begin=20211102, predict_period=5, 
+                      interval=4, bt_times=1, 
+                      data_period=int(365 * 1), 
+                      ma_values = [5,10,20],
+                      volume_thld = 400,
+                      stock_symbol=[], stock_type='tw', dev=True,
+                      load_model=False, fast=True)
 
     
-    # master(bt_last_begin=20211101, predict_period=5, 
-    #        interval=4, bt_times=1, 
-    #        data_period=int(365 * 3.5), 
-    #        ma_values=[5,10,20,60], volume_thld=400,
-    #        stock_type='tw', hold=hold,
-    #        dev=False)
-
-
-
+    # results = master(bt_last_begin=20211102, predict_period=5, 
+    #                  interval=4, bt_times=1, 
+    #                  data_period=int(365 * 3.5), 
+    #                  ma_values = [5,10,20,60],
+    #                  volume_thld = 400,
+    #                  stock_symbol=[], stock_type='tw', dev=False,
+    #                  load_model=False, fast=True)    
+    
+    
+# %% Dev -----

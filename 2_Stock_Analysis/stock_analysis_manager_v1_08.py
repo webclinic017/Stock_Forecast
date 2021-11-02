@@ -36,7 +36,7 @@ stock_type = 'tw'
 
 # Path .....
 if host == 0:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/2_Stock_Analysis'
+    path = '/Users/Aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
 elif host == 2:
     path = '/home/jupyter//2_Stock_Analysis'
 

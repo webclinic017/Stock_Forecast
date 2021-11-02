@@ -122,6 +122,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         min_value = market_data_raw[col].min()
         max_value = market_data_raw[col].max()
         
+        # 這裡可能會出現0.7，不確定是不是bug
         # assert min_value >= -0.25, col + ' min_value is ' + str(min_value)
         # assert max_value <= 0.25, col + ' max_value is ' + str(max_value)
         
@@ -130,8 +131,8 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Exclude the symbols that listing date shorter than data_period
     date_min = market_data_raw['WORK_DATE'].min()
     market_data_raw['MIN_DATE'] = market_data_raw \
-                        .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
-                        .transform('min')
+                                .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
+                                .transform('min')
 
     global new_symbols
     new_symbols = market_data_raw[market_data_raw['MIN_DATE']>date_min]
@@ -145,10 +146,11 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Exclude Low Volume Symbols ......
     market_data_raw = select_stock_symbols()
 
+
     # Add K line ......
     market_data_raw = market_data_raw \
-            .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
-            .reset_index(drop=True)
+                    .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+                    .reset_index(drop=True)
             
     market_data_raw = stk.add_k_line(market_data_raw)
     market_data_raw = cbml.df_get_dummies(df=market_data_raw, 
@@ -276,9 +278,16 @@ def sam_load_data(industry=True, trade_value=True):
     
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
+    ohlc = stk.get_ohlc()
+    ohlc = '|'.join(ohlc)
+    
     drop_cols = cbyz.df_chk_col_na(df=loc_main, positive_only=True)
-    drop_cols = drop_cols[~drop_cols['COLUMN'].isin(var_y)]
-    drop_cols = drop_cols[~drop_cols['COLUMN'].str.contains('MA')]
+    
+    # 20211102 - 增加drop_cols['COLUMN'].str.contains(ohlc)
+    drop_cols = drop_cols[(~drop_cols['COLUMN'].isin(var_y)) \
+                          & (~drop_cols['COLUMN'].str.contains('MA')) \
+                          & (drop_cols['COLUMN'].str.contains(ohlc))]
+    
     drop_cols = drop_cols['COLUMN'].tolist()
     loc_main = loc_main.drop(drop_cols, axis=1)
     
@@ -307,6 +316,8 @@ def sam_load_data(industry=True, trade_value=True):
 
 
     # Stock Info ...
+     # ['STOCK_SYMBOL', 'CAPITAL', 'CAPITAL_LEVEL', 
+     # 'ESTABLISH_DAYS', 'LISTING_DAYS']
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
     
     stock_info, _, _ = \
@@ -567,7 +578,9 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # Market Data ......
-    get_market_data_raw(industry=industry, trade_value=trade_value)
+    
+    # market_data
+    get_market_data_raw(trade_value=trade_value)
     
 
     # Load Historical Data ......
@@ -926,20 +939,21 @@ def master(param_holder, _predict_begin,
     # v1.09
     # - Add Ultra_Tuner
     # - Rename stock_type and stock_symbol
+    # - Set df_fillna with interpolate method in arsenal_stock
+    # - Fix Date Issues
         
     
     # Bug
-    # 2. Fix Date Issues
+    # 4. Fix industry issues，是不是要做PCA
     # 1. Fill na with interpolate
     # 3. 在get_market_data_raw中, OPEN_CHANGE_RATIO min_value 
     #    is -0.8897097625329815，暫時移除assert
+    # 5. 有些symbole會不見，像正隆
+    # 2. pred price和Last price都有錯置的問題，應該是stk有bug, df_fillna的interpolate
     
-    # - 寫出全部的model log
-    # - Update predict_and_tunning
-    # - Add test serial and detail
     # -NA issues, replace OHLC na in market data function, and add replace 
     # na with interpolation. And why 0101 not excluded?
-    # print('Bug - 執行到這裡時，main_data裡面會有NA, 主要是INDUSTRY的問題')
+    # print('Bug - 執行到這裡時，main_data裡面會有NA, 主要是INDUSTRY的問題')>這是lag的問題
 
     # Optimization .....
     # - Add week
@@ -1070,9 +1084,9 @@ def master(param_holder, _predict_begin,
                        }
                        ] 
                    
-    # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業的預測
-    #    值完全相同
     global pred_result, pred_scores, pred_params, pred_features
+    # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業
+    #    的預測值完全相同
     
     for i in range(len(var_y)):
         
@@ -1385,7 +1399,7 @@ def get_google_treneds(begin_date=None, end_date=None,
                                            main_data['WORK_DATE'],
                                            np.nan)
     
-    main_data = cbyz.df_shift_fill_na(df=main_data, loop_times=len(calendar), 
+    main_data = cbyz.df_shift_fillna(df=main_data, loop_times=len(calendar), 
                                      group_by='WORD_TREND',
                                      cols='NEXT_TRADE_DATE', forward=False)
     

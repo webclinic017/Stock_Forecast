@@ -132,7 +132,7 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
     # 每一天要分開query，但假日的時候不需要
     if begin == None and end == None:
         end = cbyz.date_get_today()
-        begin = cbyz.date_cal(end, -5, 'd')
+        begin = cbyz.date_cal(end, -7, 'd')
     
     
     # Manual Settings
@@ -446,8 +446,7 @@ if __name__ == '__main__':
     # Check
     chk = chk_last_date()
 
-    # Update, add auto pick date
-    update(begin=20211021, end=20211101, ewprcd=True, ewtinst1c=True, 
+    update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
            delete=True, upload=True) 
 
