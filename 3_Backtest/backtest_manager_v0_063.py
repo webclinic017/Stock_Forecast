@@ -416,8 +416,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
         np.where(actions['STOCK_SYMBOL'].isin(buy_signal_symbols), 
                  99, actions['PERCENTAGE'])        
             
-
-
     
     # Day Trading Signal ......
     # Update, 之後如果將ohlc重新排列，就不需要這一段的min和max
@@ -704,7 +702,6 @@ def master(bt_last_begin, predict_period=5, interval=4, bt_times=1,
                         2603, 2611, 3051, 3562]
     else:
         stock_symbol = []
-
 
 
     _interval = interval

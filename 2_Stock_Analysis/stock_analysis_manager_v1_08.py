@@ -1645,7 +1645,7 @@ def master(_predict_begin, _predict_end=None,
 
 
     global version, exe_serial
-    version = 1.07
+    version = 1.08
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
     global params, error_msg
@@ -1686,7 +1686,7 @@ def master(_predict_begin, _predict_end=None,
     stock_type = _stock_type
     stock_symbol = _stock_symbol
     stock_symbol = cbyz.li_conv_ele_type(stock_symbol, to_type='str')
-
+    
 
     # ......
     global model_data
