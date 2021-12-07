@@ -287,6 +287,13 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 
     # Organize ......
+    
+    print('Bug, bt_main的work_date會變成object')
+    # # ValueError: You are trying to merge on object and int64 columns. If you wish to proceed you should use pd.concat
+    bt_results = cbyz.df_conv_col_type(df=bt_results, cols='WORK_DATE', 
+                                        to='int')
+    
+    
     main_data = bt_results.merge(main_data_pre, how='left', 
                                  on=['WORK_DATE', 'STOCK_SYMBOL'])
 
@@ -404,7 +411,8 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
     buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
     
-    # Add Level
+    
+    # Add Level ......
     actions['PERCENTAGE'] = actions[close] * 100
     actions['PERCENTAGE'] = actions['PERCENTAGE'].astype('int')
     
@@ -637,6 +645,10 @@ def master(bt_last_begin, predict_period=5, interval=4, bt_times=1,
 
     # print predict date in sam to fix missing date issues    
     # Backtest也可以用parameter做A/B    
+    
+    
+    print('這個版本有bug，和v0_063 compare diff')
+    # KeyError: "['BACKTEST_ID', 'LAST_DATE', 'OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO', 'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO', 'OPEN_HIST', 'HIGH_HIST', 'LOW_HIST', 'CLOSE_HIST', 'OPEN_CHANGE_RATIO_HIST', 'HIGH_CHANGE_RATIO_HIST', 'LOW_CHANGE_RATIO_HIST', 'CLOSE_CHANGE_RATIO_HIST', 'OPEN_LAST', 'HIGH_LAST', 'LOW_LAST', 'CLOSE_LAST', 'OPEN_CHANGE_RATIO_LAST', 'HIGH_CHANGE_RATIO_LAST', 'LOW_CHANGE_RATIO_LAST', 'CLOSE_CHANGE_RATIO_LAST'] not in index"    
     
     
     # Bug

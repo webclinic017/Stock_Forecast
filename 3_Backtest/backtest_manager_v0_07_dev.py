@@ -274,6 +274,12 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 
     # Organize ......
+    
+    print('Bug, bt_main的work_date會變成object')
+    # ValueError: You are trying to merge on object and int64 columns. If you wish to proceed you should use pd.concat
+    bt_results = cbyz.df_conv_col_type(df=bt_results, cols='WORK_DATE', 
+                                        to='int')
+    
     main_data = bt_results.merge(main_data_pre, how='left', 
                                  on=['WORK_DATE', 'STOCK_SYMBOL'])
 
@@ -645,8 +651,10 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
 
     # Worklist
+    # 0. Remove Open
     # 0. Call notification function in backtest manager, and add stop loss 
     #    in excel
+    # 1. Dev為True時就不匯出模型，避免檔案亂掉
     # 1. Add date index to indentify feature of time series
     #    > Add this to sam v7 and v8
     # 2. Add DIFF_MAPE_MEDIAN
@@ -673,6 +681,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # 交易資料先在dcm中算好ma
     # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
     # 把stock_type改成market
+    # 28. 當bt_times為2，且load_file=false時，重新訓練一次模型就好
 
 
     
