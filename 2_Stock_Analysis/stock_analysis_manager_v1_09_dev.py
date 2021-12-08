@@ -560,6 +560,7 @@ def get_model_data(industry=True, trade_value=True):
     global var_y
     global market_data_raw  
     global params, error_msg
+    global id_keys
     
 
     # Check ......
@@ -567,9 +568,6 @@ def get_model_data(industry=True, trade_value=True):
             + 'and it will cause na.'
     assert predict_period <= min(ma_values), msg
 
-
-    # Stock Info .......
-    id_keys = ['STOCK_SYMBOL', 'WORK_DATE']
 
 
     # Symbols ......
@@ -900,11 +898,8 @@ def get_model_data(industry=True, trade_value=True):
 
 # %% Master ------
 
-def master(param_holder, _predict_begin,
-           _predict_period=5, _data_period=180, 
-           _symbols=[], _market='tw', _ma_values=[5,20,60], _volume_thld=500, 
-           _compete_mode=1, _train_mode=1, _cv=2, threshold=30000, k='all',
-           _export_model=True, _load_model=False):
+def master(param_holder, predict_begin, export_model=True, load_model=False, 
+           threshold=30000):
     '''
     主工作區
     '''
@@ -938,7 +933,7 @@ def master(param_holder, _predict_begin,
     
     # v1.09
     # - Add Ultra_Tuner
-    # - Rename stock_type and stock_symbol
+    # - Rename stock_type and stock_symbol >> Done
     # - Set df_fillna with interpolate method in arsenal_stock
     # - Fix Date Issues
         
@@ -966,41 +961,31 @@ def master(param_holder, _predict_begin,
     # 10. buy_signal to int
     
     
-    global shift_begin, shift_end, data_begin, data_end, data_period
-    global predict_date, predict_period, calendar    
+    
 
-
-    # holder = param_holder.params
-    # industry = holder['industry'][0]
-    # trade_value = holder['trade_value'][0]
-    # data_period = holder['data_period'][0]
-    # market = holder['market'][0]
-    # ma_values = holder['ma_values'][0]   
-    # volume_thld = holder['volume_thld'][0]   
-    # compete_mode = holder['compete_mode'][0]   
-    # train_mode = holder['train_mode'][0]       
-    # dev = holder['dev'][0]   
-    # symbols = holder['symbols'][0]   
-    # predict_period = holder['predict_period'][0]        
+    holder = param_holder.params
+    
+    bt_last_begin = holder['bt_last_begin'][0]
+    industry = holder['industry'][0]
+    trade_value = holder['trade_value'][0]
+    data_period = holder['data_period'][0]
+    market = holder['market'][0]
+    ma_values = holder['ma_values'][0]   
+    volume_thld = holder['volume_thld'][0]   
+    compete_mode = holder['compete_mode'][0]   
+    train_mode = holder['train_mode'][0]       
+    dev = holder['dev'][0]   
+    symbols = holder['symbols'][0]   
+    predict_period = holder['predict_period'][0]
+    kbest = holder['kbest'][0]
+    cv = holder['cv'][0]
     
     
-    industry = True
-    trade_value = True      
-    # _predict_begin = 20211001
-    # _data_period = int(365 * 1)
-    # _market = 'tw'
-    # _ma_values = [5,10,20]
-    # _predict_period = 5
-    # _volume_thld = 700
-    # _load_model = False
-    # _cv = 2
     # fast = True
     # export_model = False
     # dev = True
-    # _symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    # k = 10
-    # k = 10
     # threshold = 20000
+    predict_begin=20211209
     
     
     global version, exe_serial
@@ -1010,33 +995,25 @@ def master(param_holder, _predict_begin,
     global error_msg
     error_msg = []    
     
-    global volume_thld
-    volume_thld = _volume_thld
     
-    global ma_values
-    ma_values = _ma_values
-
-
-    # _predict_begin = 20210927
-    # _predict_begin = 20210930
-    # _predict_begin = 20211101    
-
+    # predict_period = _predict_period
+    # data_period = _data_period
+    data_shift = -(max(ma_values) * 2)
     
-    predict_period = _predict_period
-    data_shift = -(max(_ma_values) * 2)
-    data_period = _data_period
+    global shift_begin, shift_end, data_begin, data_end, data_period
+    global predict_date, predict_period, calendar        
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \
-                stk.get_period(predict_begin=_predict_begin,
-                               predict_period=_predict_period,
-                               data_period=_data_period,
+                stk.get_period(predict_begin=predict_begin,
+                               predict_period=predict_period,
+                               data_period=data_period,
                                shift=data_shift)  
 
     # .......
-    global symbols, market
-    market = _market
-    symbols = _symbols
+    # global symbols, market
+    # market = _market
+    # symbols = _symbols
 
 
     # ......
@@ -1083,10 +1060,13 @@ def master(param_holder, _predict_begin,
                            }
                        }
                        ] 
+
                    
-    global pred_result, pred_scores, pred_params, pred_features
     # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業
     #    的預測值完全相同
+    global pred_result, pred_scores, pred_params, pred_features
+    
+    
     
     for i in range(len(var_y)):
         
@@ -1102,7 +1082,7 @@ def master(param_holder, _predict_begin,
         return_result, return_scores, return_params, return_features, \
                 log_scores, log_params, log_features = \
                     tuner.fit(data=cur_model_data, model_params=model_params,
-                              k=k, cv=_cv, threshold=threshold, 
+                              k=kbest, cv=_cv, threshold=threshold, 
                               norm_orig=norm_orig,
                               export_model=True, export_log=True)
                     
@@ -1120,6 +1100,11 @@ def master(param_holder, _predict_begin,
             pred_scores = pred_scores.append(return_scores)
             pred_params = pred_scores.append(return_params)
             pred_features = pred_scores.append(return_features)            
+        
+        
+    # Upload to Google Sheet
+    if predict_period == bt_last_begin:
+        stk.write_sheet(data=pred_features, sheet='Features')
         
     
     return pred_result, pred_scores, pred_params, pred_features
@@ -1959,11 +1944,16 @@ if __name__ == '__main__':
     
     symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     
-    predict_result, precision = \
-        master(predict_begin=20211001,
-                _predict_period=5, _data_period=180, 
-                _stock_symbol=symbols, _stock_type='tw', _ma_values=[5,20,60],
-                _volume_thld=1000, export_model=True, load_model=False, cv=2, 
-                fast=True)
+    # predict_result, precision = \
+    #     master(param_holder=param_holder,
+    #            predict_begin=20211209,
+    #             _volume_thld=1000, export_model=True, load_model=False,
+    #             fast=True)
+        
+        
+    sam.master(param_holder=param_holder,
+               predict_begin=20211201,
+               load_model=False,
+               threshold=30000)        
         
 

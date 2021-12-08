@@ -142,16 +142,9 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         # pred_result, pred_scores, pred_params, pred_features
         results_raw = sam.master(param_holder=param_holder,
-                                 _predict_begin=begin,
-                                 _predict_period=predict_period,
-                                 _data_period=data_period, 
-                                 _symbols=_stock_symbol,
-                                 _market=stock_type,
-                                 _ma_values=_ma_values,
-                                 _volume_thld=_volume_thld,
-                                 _load_model=load_model,
-                                 threshold=30000, k=30,
-                                 _cv=cv)
+                                 predict_begin=begin,
+                                 load_model=load_model,
+                                 threshold=30000)
 
         print('Update - 還沒改')
         new_result = results_raw[0]
@@ -379,20 +372,9 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 
     # Day Trading Signal ......
-    # Update, 之後如果將ohlc重新排列，就不需要這一段的min和max
-    actions['DAY_TRADING_HIGH'] = \
-        actions[['OPEN', 'HIGH', 'LOW', 'CLOSE']].max(axis=1)
+    actions['DAY_TRADING_SIGNAL'] = actions['HIGH'] - actions['LOW']
+        
     
-    actions['DAY_TRADING_LOW'] = \
-        actions[['OPEN', 'HIGH', 'LOW', 'CLOSE']].min(axis=1)
-        
-    actions['DAY_TRADING_SIGNAL'] = \
-        actions['DAY_TRADING_HIGH'] - actions['DAY_TRADING_LOW']
-        
-    actions = actions.drop(['DAY_TRADING_HIGH', 'DAY_TRADING_LOW'], axis=1)
-
-
-
     # Rearrange Columns ......            
     profit_cols = [close + '_PROFIT_PREDICT', 
                    close + '_PROFIT_RATIO_PREDICT']
@@ -624,11 +606,17 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # - Include low volume symbols in the excel
     # v0.062
     # - Add Close Level To BUY_SIGNAL column  
-    
+
+
+    # v0.064
+    # Export to specific sheet
+    # 這個版本有Bug，不改了，直接跳v0_07    
     
     # v0.07
     # - Update for ultra_tuner
-    
+    # - Add write_sheet
+    # - 列出前一天大漲的產業
+    # - 增加一個欄位，標示第二天為負，為了和DAY_TRADING配合快速篩選
     
     # print predict date in sam to fix missing date issues
     # Backtest也可以用parameter做A/B    
@@ -721,11 +709,11 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # dev = True    
     
     # # Collected Parameters
-    # # bt_last_begin = 20210913
-    # predict_period = 5
-    # data_period = int(365 * 3.5)
-    # ma_values = [5,10,20,60]
-    # volume_thld = 500
+    bt_last_begin = 20210913
+    predict_period = 5
+    data_period = int(365 * 3.5)
+    ma_values = [5,10,20,60]
+    volume_thld = 500
     
 
     # Wait for update
@@ -762,6 +750,8 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
             'compete_mode':[True],
             'train_mode':[True],            
             'cv':[2],
+            'fast':[True],  # 之後用train_mode代替
+            'kbest':['all'],
             'dev':[True],
             'symbols':[[2520, 2605, 6116, 6191, 3481, 
                         2409, 2603, 2611, 3051, 3562]],
@@ -832,7 +822,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     
     # Debug for prices columns issues
-    stk.write_debug(bt_results)    
+    stk.write_sheet(data=bt_results, sheet='Debug')
     
     
     # Profit ------    
@@ -900,8 +890,12 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
 
 
     # Write Google Sheets
-    stk.write_actions(data=actions, predict_begin=_bt_last_begin)
+    stk.write_sheet(data=actions, sheet='TW',
+                    predict_begin=_bt_last_begin)
     
+    
+    # .....
+    view_yesterday()
 
 
 # %% Check ------
@@ -995,7 +989,7 @@ if __name__ == '__main__':
            ma_values=[5,10,20], volume_thld=400,
            stock_type='tw', hold=hold,
            dev=True)
-
+    
     
     # master(bt_last_begin=20211101, predict_period=5, 
     #        interval=4, bt_times=1, 
@@ -1006,3 +1000,36 @@ if __name__ == '__main__':
 
 
 
+
+def view_yesterday():
+
+    # Stock Info
+    stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
+    stock_info = stock_info[['STOCK_SYMBOL', 'INDUSTRY']]
+    
+    # Market Data
+    loc_data = stk.get_data(data_begin=20211207, 
+                          data_end=20211208, 
+                          market='tw', 
+                          stock_symbol=[], 
+                          price_change=True)    
+    
+    loc_data = loc_data[['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE_CHANGE_RATIO']]
+    
+    print('還沒處理除權息的問題，所以會有超過10，先手動排除')
+    loc_data = loc_data[abs(loc_data['CLOSE_CHANGE'])]
+    
+    
+    # Combine
+    loc_main = loc_data.merge(stock_info, how='inner', on='STOCK_SYMBOL')
+    summary, _ = cbyz.df_summary(df=loc_main, 
+                                 group_by=['INDUSTRY'], 
+                                 cols=['CLOSE_CHANGE_RATIO'])
+
+    summary = summary \
+            .sort_values(by='CLOSE_CHANGE_RATIO_MEAN', ascending=False) \
+            .reset_index(drop=True)
+            
+    # Write
+    stk.write_sheet(data=summary, sheet='Yesterday')            
+            

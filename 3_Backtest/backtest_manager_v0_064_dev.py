@@ -641,6 +641,7 @@ def master(bt_last_begin, predict_period=5, interval=4, bt_times=1,
 
     # v0.064
     # Export to specific sheet
+    # 這個版本有Bug，不改了，直接跳v0_07
 
 
     # print predict date in sam to fix missing date issues    
