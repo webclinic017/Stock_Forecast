@@ -53,8 +53,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ',
-                 r'/home/jupyter/Arsenal',                 
+                 r'/home/jupyter/Codebase_YZ/20211208',
+                 r'/home/jupyter/Arsenal/20211208',   
                  path + '/Function',
                  path_sam]
 

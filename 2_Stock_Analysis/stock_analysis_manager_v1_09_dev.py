@@ -46,8 +46,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ',
-                 r'/home/jupyter/Arsenal',                 
+                 r'/home/jupyter/Codebase_YZ/20211208',
+                 r'/home/jupyter/Arsenal/20211208',             
                  path + '/Function']
 
 
@@ -60,7 +60,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v0_1 as ut
+import ultra_tuner_v0_15 as ut
 
 ar.host = host
 
@@ -90,9 +90,13 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     global market_data_raw
     global predict_period
     global stock_info_raw
+    global log
     
 
-    stock_info_raw = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
+    stock_info_raw = \
+        stk.tw_get_stock_info(daily_backup=True, 
+                              path=path_temp)
+        
     stock_info_raw = stock_info_raw[['STOCK_SYMBOL', 'CAPITAL', 
                                      'CAPITAL_LEVEL', 'ESTABLISH_DAYS', 
                                      'LISTING_DAYS', 'INDUSTRY_ONE_HOT']]    
@@ -123,8 +127,18 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         max_value = market_data_raw[col].max()
         
         # 這裡可能會出現0.7，不確定是不是bug
-        # assert min_value >= -0.25, col + ' min_value is ' + str(min_value)
-        # assert max_value <= 0.25, col + ' max_value is ' + str(max_value)
+        # >> 應該是除權息的問題
+        msg_min = col + ' min_value is ' + str(min_value)
+        msg_max = col + ' max_value is ' + str(max_value)
+        
+        # assert min_value >= -0.25, msg_min
+        # assert max_value <= 0.25, msg_max
+        
+        if  min_value >= -0.25:
+            msg_min
+            
+        if  max_value <= 0.25:
+            msg_max            
         
     
     # Exclude New Symbols ......
@@ -137,10 +151,15 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     global new_symbols
     new_symbols = market_data_raw[market_data_raw['MIN_DATE']>date_min]
     new_symbols = new_symbols['STOCK_SYMBOL'].unique().tolist()
+    
+    # Add log
+    log_msg = 'new_symbols - ' + str(len(new_symbols))
+    log.append(log_msg)
 
-    # Market data without new symbols
-    market_data_raw = market_data_raw[market_data_raw['MIN_DATE']==date_min] \
-                        .drop('MIN_DATE', axis=1)
+    # Exclude new symbols
+    market_data_raw = \
+        market_data_raw[market_data_raw['MIN_DATE']==date_min] \
+            .drop('MIN_DATE', axis=1)
 
 
     # Exclude Low Volume Symbols ......
@@ -510,19 +529,13 @@ def select_stock_symbols():
     global market_data_raw
     global stock_info_raw
 
-    # global predict_date
-    # predict_begin = cbyz.date_cal(predict_date[0], -3, 'm')
-
-    # data_end = cbyz.date_get_today()
-    # data_begin = cbyz.date_cal(data_end, -1, 'm')
-
 
     # Exclude ETF ......
     all_symbols = stock_info_raw[['STOCK_SYMBOL']]
     df = all_symbols.merge(market_data_raw, on=['STOCK_SYMBOL']) 
 
 
-    # Exclude Low Value ......
+    # Exclude low volume in the past 7 days
     global volume_thld
     global data_end
     loc_begin = cbyz.date_cal(data_end, -7, 'd')
@@ -533,16 +546,20 @@ def select_stock_symbols():
                 .agg({'VOLUME':'min'}) \
                 .reset_index()
         
-        
     low_volume = low_volume[low_volume['VOLUME']<=volume_thld * 1000]
     low_volume = low_volume[['STOCK_SYMBOL']].drop_duplicates()
     
     global low_volume_symbols
     low_volume_symbols = low_volume['STOCK_SYMBOL'].tolist()
     
-    # 為了避免low_volume_symbols的數量過多，因此採用df做anti_merge，而不是直接用list
+    # 為了避免low_volume_symbols的數量過多，導致計算效率差，因此採用df做anti_merge，
+    # 而不是直接用list
     if len(low_volume_symbols) > 0:
         df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
+        
+    # Add log
+    log_msg = 'low_volume_symbols - ' + str(len(low_volume_symbols))
+    log.append(log_msg)        
     
     return df
 
@@ -938,7 +955,12 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     # - Fix Date Issues
         
     
+    # v1.10
+    # - Combine cbyz >> detect_cycle.py, including support_resistance and 
+    #    season_decompose
+    
     # Bug
+    # 1. 處理除權息的問題
     # 4. Fix industry issues，是不是要做PCA
     # 1. Fill na with interpolate
     # 3. 在get_market_data_raw中, OPEN_CHANGE_RATIO min_value 
@@ -961,7 +983,7 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     # 10. buy_signal to int
     
     
-    
+    global data_period, predict_period
 
     holder = param_holder.params
     
@@ -970,7 +992,6 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     trade_value = holder['trade_value'][0]
     data_period = holder['data_period'][0]
     market = holder['market'][0]
-    ma_values = holder['ma_values'][0]   
     volume_thld = holder['volume_thld'][0]   
     compete_mode = holder['compete_mode'][0]   
     train_mode = holder['train_mode'][0]       
@@ -980,6 +1001,8 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     kbest = holder['kbest'][0]
     cv = holder['cv'][0]
     
+    ma_values = holder['ma_values'][0]   
+    data_shift = -(max(ma_values) * 2)
     
     # fast = True
     # export_model = False
@@ -992,16 +1015,13 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     version = 1.09
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
-    global error_msg
+    global log, error_msg
+    log = []
     error_msg = []    
     
     
-    # predict_period = _predict_period
-    # data_period = _data_period
-    data_shift = -(max(ma_values) * 2)
-    
-    global shift_begin, shift_end, data_begin, data_end, data_period
-    global predict_date, predict_period, calendar        
+    global shift_begin, shift_end, data_begin, data_end
+    global predict_date, calendar        
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \

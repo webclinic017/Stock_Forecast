@@ -31,8 +31,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ',
-                 r'/home/jupyter/Arsenal',                 
+                 r'/home/jupyter/Codebase_YZ/20211208',
+                 r'/home/jupyter/Arsenal/20211208',                 
                  path + '/Function',
                  path_sam]
 
@@ -580,6 +580,41 @@ def eval_metrics(export_file=False, upload=False):
 
 
 
+def view_yesterday():
+
+    # Stock Info
+    stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
+    stock_info = stock_info[['STOCK_SYMBOL', 'INDUSTRY']]
+    
+    # Market Data
+    loc_data = stk.get_data(data_begin=20211207, 
+                          data_end=20211208, 
+                          market='tw', 
+                          stock_symbol=[], 
+                          price_change=True)    
+    
+    loc_data = loc_data[['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE_CHANGE_RATIO']]
+    
+    print('還沒處理除權息的問題，所以會有超過10，先手動排除')
+    loc_data = loc_data[abs(loc_data['CLOSE_CHANGE'])]
+    
+    
+    # Combine
+    loc_main = loc_data.merge(stock_info, how='inner', on='STOCK_SYMBOL')
+    summary, _ = cbyz.df_summary(df=loc_main, 
+                                 group_by=['INDUSTRY'], 
+                                 cols=['CLOSE_CHANGE_RATIO'])
+
+    summary = summary \
+            .sort_values(by='CLOSE_CHANGE_RATIO_MEAN', ascending=False) \
+            .reset_index(drop=True)
+            
+    # Write
+    stk.write_sheet(data=summary, sheet='Yesterday')            
+            
+
+
+
 # %% Master ------
 
 
@@ -617,6 +652,10 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # - Add write_sheet
     # - 列出前一天大漲的產業
     # - 增加一個欄位，標示第二天為負，為了和DAY_TRADING配合快速篩選
+    
+    
+    
+
     
     # print predict date in sam to fix missing date issues
     # Backtest也可以用parameter做A/B    
@@ -708,12 +747,12 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # stock_type = 'tw'
     # dev = True    
     
-    # # Collected Parameters
-    bt_last_begin = 20210913
-    predict_period = 5
-    data_period = int(365 * 3.5)
-    ma_values = [5,10,20,60]
-    volume_thld = 500
+    # Collected Parameters
+    # bt_last_begin = 20210913
+    # predict_period = 6
+    # data_period = int(365 * 3.5)
+    # ma_values = [6,10,20,60]
+    # volume_thld = 500
     
 
     # Wait for update
@@ -999,37 +1038,3 @@ if __name__ == '__main__':
     #        dev=False)
 
 
-
-
-def view_yesterday():
-
-    # Stock Info
-    stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
-    stock_info = stock_info[['STOCK_SYMBOL', 'INDUSTRY']]
-    
-    # Market Data
-    loc_data = stk.get_data(data_begin=20211207, 
-                          data_end=20211208, 
-                          market='tw', 
-                          stock_symbol=[], 
-                          price_change=True)    
-    
-    loc_data = loc_data[['STOCK_SYMBOL', 'WORK_DATE', 'CLOSE_CHANGE_RATIO']]
-    
-    print('還沒處理除權息的問題，所以會有超過10，先手動排除')
-    loc_data = loc_data[abs(loc_data['CLOSE_CHANGE'])]
-    
-    
-    # Combine
-    loc_main = loc_data.merge(stock_info, how='inner', on='STOCK_SYMBOL')
-    summary, _ = cbyz.df_summary(df=loc_main, 
-                                 group_by=['INDUSTRY'], 
-                                 cols=['CLOSE_CHANGE_RATIO'])
-
-    summary = summary \
-            .sort_values(by='CLOSE_CHANGE_RATIO_MEAN', ascending=False) \
-            .reset_index(drop=True)
-            
-    # Write
-    stk.write_sheet(data=summary, sheet='Yesterday')            
-            
