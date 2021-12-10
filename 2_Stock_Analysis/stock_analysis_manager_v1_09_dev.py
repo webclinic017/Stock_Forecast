@@ -97,27 +97,37 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         stk.tw_get_stock_info(daily_backup=True, 
                               path=path_temp)
         
-    stock_info_raw = stock_info_raw[['STOCK_SYMBOL', 'CAPITAL', 
-                                     'CAPITAL_LEVEL', 'ESTABLISH_DAYS', 
-                                     'LISTING_DAYS', 'INDUSTRY_ONE_HOT']]    
+    stock_info_raw = \
+        stock_info_raw[['SYMBOL', 'CAPITAL', 
+                        'CAPITAL_LEVEL', 'ESTABLISH_DAYS', 
+                        'LISTING_DAYS', 'INDUSTRY_ONE_HOT']]    
+
 
     # Market Data ...
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
     loc_begin = cbyz.date_cal(shift_begin, -1, 'd')    
     
+    
     if len(symbols) == 0:
-        market_data_raw = stk.get_data(data_begin=loc_begin, 
-                                       data_end=data_end, 
-                                       market=market, stock_symbol=[], 
-                                       price_change=True, price_limit=True, 
-                                       trade_value=trade_value)
+        market_data_raw = \
+            stk.get_data(
+                data_begin=loc_begin, 
+                data_end=data_end, 
+                market=market, 
+                symbol=[], 
+                price_change=True, 
+                price_limit=True, 
+                trade_value=trade_value)
     else:
-        market_data_raw = stk.get_data(data_begin=loc_begin, 
-                                       data_end=data_end, 
-                                       market=market, 
-                                       stock_symbol=symbols, 
-                                       price_change=True, price_limit=True,
-                                       trade_value=trade_value)
+        market_data_raw = \
+            stk.get_data(
+                data_begin=loc_begin,
+                data_end=data_end, 
+                market=market, 
+                symbol=symbols, 
+                price_change=True, 
+                price_limit=True,
+                trade_value=trade_value)
 
     # Check        
     ohlc = stk.get_ohlc()
@@ -133,47 +143,28 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         
         # assert min_value >= -0.25, msg_min
         # assert max_value <= 0.25, msg_max
-        
         if  min_value >= -0.25:
-            msg_min
+            print(msg_min)
             
         if  max_value <= 0.25:
-            msg_max            
+            print(msg_max)
         
-    
-    # Exclude New Symbols ......
-    # Exclude the symbols that listing date shorter than data_period
-    date_min = market_data_raw['WORK_DATE'].min()
-    market_data_raw['MIN_DATE'] = market_data_raw \
-                                .groupby(['STOCK_SYMBOL'])['WORK_DATE'] \
-                                .transform('min')
-
-    global new_symbols
-    new_symbols = market_data_raw[market_data_raw['MIN_DATE']>date_min]
-    new_symbols = new_symbols['STOCK_SYMBOL'].unique().tolist()
-    
-    # Add log
-    log_msg = 'new_symbols - ' + str(len(new_symbols))
-    log.append(log_msg)
-
-    # Exclude new symbols
-    market_data_raw = \
-        market_data_raw[market_data_raw['MIN_DATE']==date_min] \
-            .drop('MIN_DATE', axis=1)
-
 
     # Exclude Low Volume Symbols ......
-    market_data_raw = select_stock_symbols()
-
+    market_data_raw = select_symbols()
+    
 
     # Add K line ......
     market_data_raw = market_data_raw \
-                    .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+                    .sort_values(by=['SYMBOL', 'WORK_DATE']) \
                     .reset_index(drop=True)
             
     market_data_raw = stk.add_k_line(market_data_raw)
-    market_data_raw = cbml.df_get_dummies(df=market_data_raw, 
-                                          cols=['K_LINE_COLOR', 'K_LINE_TYPE'])
+    market_data_raw = \
+        cbml.df_get_dummies(
+            df=market_data_raw, 
+            cols=['K_LINE_COLOR', 'K_LINE_TYPE']
+        )
     
     # Add Support Resistance ......
     
@@ -187,13 +178,12 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                                        rank_thld=int(data_period * 2 / 360),
                                        prominence=4, days=False)
 
-
     # Predict Symbols ......
-    # 1. Prevent some symbols excluded by select_stock_symbols(), but still
+    # 1. Prevent some symbols excluded by select_symbols(), but still
     #    exists.
-    global stock_symbol_df    
-    all_symbols = market_data_raw['STOCK_SYMBOL'].unique().tolist()
-    stock_symbol_df = pd.DataFrame({'STOCK_SYMBOL':all_symbols})
+    global symbol_df    
+    all_symbols = market_data_raw['SYMBOL'].unique().tolist()
+    symbol_df = pd.DataFrame({'SYMBOL':all_symbols})
     
     
     # Calendar
@@ -204,29 +194,50 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                     .rename(columns={'index':'DATE_INDEX'})
     
     calendar_proc, _, _ = \
-        cbml.ml_data_process(df=calendar_proc, 
-                                  ma=False, normalize=True, lag=False, 
-                                  ma_group_by=[],
-                                  norm_group_by=[], 
-                                  lag_group_by=[],
-                                  ma_cols_contains=[], 
-                                  ma_except_contains=[],
-                                  norm_cols_contains=[], 
-                                  norm_except_contains=['WORK_DATE', 
-                                                        'TRADE_DATE'],
-                                  lag_cols_contains=[], lag_except_contains=[], 
-                                  drop_except_contains=[],
-                                  ma_values=ma_values, 
-                                  lag_period=predict_period)    
+        cbml.ml_data_process(
+            df=calendar_proc, 
+            ma=False, normalize=True, lag=False, 
+            ma_group_by=[],
+            norm_group_by=[], 
+            lag_group_by=[],
+            ma_cols_contains=[], 
+            ma_except_contains=[],
+            norm_cols_contains=[], 
+            norm_except_contains=['WORK_DATE', 'TRADE_DATE'],
+            lag_cols_contains=[], lag_except_contains=[], 
+            drop_except_contains=[],
+            ma_values=ma_values, 
+            lag_period=predict_period
+            )   
+        
     
     # Merge As Main Data
-    main_data_frame = cbyz.df_cross_join(stock_symbol_df, calendar_proc)
-    main_data_frame = main_data_frame[(main_data_frame['TRADE_DATE']>=1) \
-                        & (main_data_frame['WORK_DATE']<=predict_date[-1])] \
-                        .drop('TRADE_DATE', axis=1)
+    main_data_frame = cbyz.df_cross_join(symbol_df, calendar_proc)
+    main_data_frame = \
+        main_data_frame[
+            (main_data_frame['TRADE_DATE']>=1) \
+            & (main_data_frame['WORK_DATE']<=predict_date[-1])] \
+        .drop('TRADE_DATE', axis=1)
 
-    market_data_raw = main_data_frame.merge(market_data_raw, how='left',
-                                            on=['STOCK_SYMBOL', 'WORK_DATE'])
+    market_data_raw = main_data_frame \
+        .merge(market_data_raw, how='left', on=['SYMBOL', 'WORK_DATE'])
+    
+
+    # Check ......
+    
+    # 執行到這裡，因為加入了預測區間，所以會有NA，但所有NA的數量應該要一樣多
+    na_cols = cbyz.df_chk_col_na(df=market_data_raw)
+    na_min = na_cols['NA_COUNT'].min()
+    na_max = na_cols['NA_COUNT'].max()
+    
+    msg = 'Number of NA in each column should be the same.'
+    assert na_min == na_max, msg
+    
+    
+    # Check Predict Period
+    chk = market_data_raw[market_data_raw['WORK_DATE'].isin(predict_date)]
+    chk = chk[['WORK_DATE']].drop_duplicates()
+    assert len(chk) == len(predict_date), 'predict_date error'
     
 
 # ...........
@@ -240,7 +251,7 @@ def sam_load_data(industry=True, trade_value=True):
     global symbols
     global market_data_raw
     global predict_period
-    global stock_symbol_df
+    global symbol_df
     global stock_info_raw
     
         
@@ -249,7 +260,7 @@ def sam_load_data(industry=True, trade_value=True):
     
     
     # Normalize By Day
-    if 'OPEN_CHANGE_RATIO' in loc_main.columns:
+    if 'CLOSE_CHANGE_RATIO' in loc_main.columns:
         
         cols = []
         for i in range(len(var_y)):
@@ -257,14 +268,13 @@ def sam_load_data(industry=True, trade_value=True):
             cols.append(col)
             loc_main[col + '_GLOB_NORM'] = loc_main[col]
     
-
         # 如果by WORK_DATE normalized的話，最後會沒辦法還原
         loc_main, ohlc_cols, norm_orig = \
             cbml.ml_data_process(df=loc_main, ma=True, 
                                  normalize=True, lag=True, 
-                                 ma_group_by=['STOCK_SYMBOL'],   
+                                 ma_group_by=['SYMBOL'],   
                                  norm_group_by=[], 
-                                 lag_group_by=['STOCK_SYMBOL'], 
+                                 lag_group_by=['SYMBOL'], 
                                  ma_cols_contains=cols, 
                                  ma_except_contains=[],
                                  norm_cols_contains=cols, 
@@ -273,7 +283,8 @@ def sam_load_data(industry=True, trade_value=True):
                                  lag_except_contains=[], 
                                  drop_except_contains=var_y,
                                  ma_values=ma_values, 
-                                 lag_period=predict_period)
+                                 lag_period=predict_period
+                                 )
             
         
     # Normalize By Stock
@@ -281,19 +292,21 @@ def sam_load_data(industry=True, trade_value=True):
                     + ohlc_cols
     
     loc_main, _, _ = \
-        cbml.ml_data_process(df=loc_main, ma=True, normalize=True, lag=True, 
-                            ma_group_by=['STOCK_SYMBOL'],   
-                            norm_group_by=['STOCK_SYMBOL'], 
-                            lag_group_by=['STOCK_SYMBOL'], 
-                            ma_cols_contains=[], 
-                            ma_except_contains=except_cols,
-                            norm_cols_contains=[], 
-                            norm_except_contains=except_cols,
-                            lag_cols_contains=[], 
-                            lag_except_contains=except_cols, 
-                            drop_except_contains=var_y,
-                            ma_values=ma_values, 
-                            lag_period=predict_period)
+        cbml.ml_data_process(df=loc_main, ma=True, 
+                             normalize=True, lag=True, 
+                             ma_group_by=['SYMBOL'],   
+                             norm_group_by=['SYMBOL'], 
+                             lag_group_by=['SYMBOL'], 
+                             ma_cols_contains=[], 
+                             ma_except_contains=except_cols,
+                             norm_cols_contains=[], 
+                             norm_except_contains=except_cols,
+                             lag_cols_contains=[], 
+                             lag_except_contains=except_cols, 
+                             drop_except_contains=var_y,
+                             ma_values=ma_values, 
+                             lag_period=predict_period
+                             )
     
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
@@ -335,7 +348,7 @@ def sam_load_data(industry=True, trade_value=True):
 
 
     # Stock Info ...
-     # ['STOCK_SYMBOL', 'CAPITAL', 'CAPITAL_LEVEL', 
+     # ['SYMBOL', 'CAPITAL', 'CAPITAL_LEVEL', 
      # 'ESTABLISH_DAYS', 'LISTING_DAYS']
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
     
@@ -345,18 +358,18 @@ def sam_load_data(industry=True, trade_value=True):
                             norm_group_by=[], lag_group_by=[],
                             ma_cols_contains=[], ma_except_contains=[],
                             norm_cols_contains=[], 
-                            norm_except_contains=['STOCK_SYMBOL'],
+                            norm_except_contains=['SYMBOL'],
                             lag_cols_contains=[], lag_except_contains=[], 
                             drop_except_contains=[],
                             ma_values=ma_values, 
                             lag_period=predict_period)
     
-    loc_main = loc_main.merge(stock_info, how='left', on=['STOCK_SYMBOL'])      
+    loc_main = loc_main.merge(stock_info, how='left', on=['SYMBOL'])      
 
 
     # Merge Other Data ......        
     if industry:        
-        stock_industry = stock_info_raw[['STOCK_SYMBOL', 'INDUSTRY_ONE_HOT']]
+        stock_industry = stock_info_raw[['SYMBOL', 'INDUSTRY_ONE_HOT']]
         stock_info_dummy = cbml.df_get_dummies(df=stock_industry, 
                                                cols='INDUSTRY_ONE_HOT')
         
@@ -366,7 +379,7 @@ def sam_load_data(industry=True, trade_value=True):
         
         if trade_value:
             industry_data = \
-                market_data_raw[['STOCK_SYMBOL', 'WORK_DATE', 'VOLUME', 
+                market_data_raw[['SYMBOL', 'WORK_DATE', 'VOLUME', 
                                  'OPEN', 'OPEN_CHANGE', 
                                  'HIGH', 'HIGH_CHANGE',
                                  'LOW', 'LOW_CHANGE', 
@@ -375,14 +388,14 @@ def sam_load_data(industry=True, trade_value=True):
                                  'TOTAL_TRADE_VALUE']]
         else:
             industry_data = \
-                market_data_raw[['STOCK_SYMBOL', 'WORK_DATE', 'VOLUME', 
+                market_data_raw[['SYMBOL', 'WORK_DATE', 'VOLUME', 
                                  'OPEN', 'OPEN_CHANGE', 
                                  'HIGH', 'HIGH_CHANGE',
                                  'LOW', 'LOW_CHANGE', 
                                  'CLOSE', 'CLOSE_CHANGE']]
 
         # Merge        
-        industry_data = industry_data.merge(stock_industry, on='STOCK_SYMBOL')
+        industry_data = industry_data.merge(stock_industry, on='SYMBOL')
         
         
         if trade_value:
@@ -450,8 +463,8 @@ def sam_load_data(industry=True, trade_value=True):
         
         # Merge ...
         loc_main = loc_main \
-            .merge(stock_info_dummy, how='left', on='STOCK_SYMBOL') \
-            .merge(stock_industry, how='left', on='STOCK_SYMBOL') \
+            .merge(stock_info_dummy, how='left', on='SYMBOL') \
+            .merge(stock_industry, how='left', on='SYMBOL') \
             .merge(industry_data, how='left', on=['WORK_DATE', 'INDUSTRY_ONE_HOT']) \
             .drop('INDUSTRY_ONE_HOT', axis=1)
         
@@ -484,12 +497,12 @@ def get_sale_mon_data():
     file_raw.columns = new_cols
 
     file_raw = file_raw[['SALE_MON_1', 'SALE_MON_4', 'SALE_MON_5', 'SALE_MON_6']]
-    file_raw.columns = ['STOCK_SYMBOL', 'WORK_DATE', 
+    file_raw.columns = ['SYMBOL', 'WORK_DATE', 
                         'EX_DIVIDENDS_PRICE', 'EX_DIVIDENDS_DONE']
     file_raw = file_raw.dropna()
     
     
-    file1 = file_raw[['STOCK_SYMBOL', 'WORK_DATE', 'EX_DIVIDENDS_PRICE']]
+    file1 = file_raw[['SYMBOL', 'WORK_DATE', 'EX_DIVIDENDS_PRICE']]
     file1['WORK_DATE'] = '20' + file1['WORK_DATE']
     file1['WORK_DATE'] = file1['WORK_DATE'].str.replace("'", "")
     file1['WORK_DATE'] = file1['WORK_DATE'].str.replace("/", "")
@@ -502,8 +515,8 @@ def get_sale_mon_data():
                             cols=['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE'])
 
     # 填息
-    file2 = file_raw[['STOCK_SYMBOL', 'EX_DIVIDENDS_DONE']]
-    file2.columns = ['STOCK_SYMBOL', 'WORK_DATE']
+    file2 = file_raw[['SYMBOL', 'EX_DIVIDENDS_DONE']]
+    file2.columns = ['SYMBOL', 'WORK_DATE']
     file2['WORK_DATE'] = '20' + file2['WORK_DATE']
     file2['WORK_DATE'] = file2['WORK_DATE'].str.replace("'", "")
     file2['WORK_DATE'] = file2['WORK_DATE'].str.replace("/", "")
@@ -517,7 +530,7 @@ def get_sale_mon_data():
 # .............
 
 
-def select_stock_symbols():
+def select_symbols():
 
     '''
     Version Note
@@ -531,8 +544,8 @@ def select_stock_symbols():
 
 
     # Exclude ETF ......
-    all_symbols = stock_info_raw[['STOCK_SYMBOL']]
-    df = all_symbols.merge(market_data_raw, on=['STOCK_SYMBOL']) 
+    all_symbols = stock_info_raw[['SYMBOL']]
+    df = all_symbols.merge(market_data_raw, on=['SYMBOL']) 
 
 
     # Exclude low volume in the past 7 days
@@ -542,20 +555,20 @@ def select_stock_symbols():
     
     low_volume = df[(df['WORK_DATE']>=loc_begin) & (df['WORK_DATE']<=data_end)]
     low_volume = low_volume \
-                .groupby(['STOCK_SYMBOL']) \
+                .groupby(['SYMBOL']) \
                 .agg({'VOLUME':'min'}) \
                 .reset_index()
         
     low_volume = low_volume[low_volume['VOLUME']<=volume_thld * 1000]
-    low_volume = low_volume[['STOCK_SYMBOL']].drop_duplicates()
+    low_volume = low_volume[['SYMBOL']].drop_duplicates()
     
     global low_volume_symbols
-    low_volume_symbols = low_volume['STOCK_SYMBOL'].tolist()
+    low_volume_symbols = low_volume['SYMBOL'].tolist()
     
     # 為了避免low_volume_symbols的數量過多，導致計算效率差，因此採用df做anti_merge，
     # 而不是直接用list
     if len(low_volume_symbols) > 0:
-        df = cbyz.df_anti_merge(df, low_volume, on='STOCK_SYMBOL')
+        df = cbyz.df_anti_merge(df, low_volume, on='SYMBOL')
         
     # Add log
     log_msg = 'low_volume_symbols - ' + str(len(low_volume_symbols))
@@ -593,37 +606,41 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # Market Data ......
-    
-    # market_data
+    # market_data_raw
     get_market_data_raw(trade_value=trade_value)
     
-
+    
+    有些新股因為上市時間較晚，在MA_LAG中會有較多的NA，應該在get_data中就return一個df
+    記錄新股的上市日期，這樣後面就可以直接排除；可以設為global var
+    
     # Load Historical Data ......
-    main_data, norm_orig = \
+    main_data_raw, norm_orig = \
         sam_load_data(industry=industry, trade_value=trade_value) 
-    print('Bug - 執行到這裡時，main_data裡面會有NA, 主要是INDUSTRY的問題')
+
         
+    main_data = main_data_raw.copy()
+    chk = cbyz.df_chk_col_na(df=main_data_raw)
     
     # TODC Shareholdings Spread ......
     # sharehold = stk.tdcc_get_sharehold_spread(shift_begin, end_date=None,
     #                                           local=local) 
     
     # main_data = main_data.merge(sharehold, how='left', 
-    #                           on=['STOCK_SYMBOL', 'WORK_DATE'])      
+    #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
     # Government Invest ......
     gov_invest = stk.opd_get_gov_invest(path=path_resource)
-    main_data = main_data.merge(gov_invest, how='left', on=['STOCK_SYMBOL'])
+    main_data = main_data.merge(gov_invest, how='left', on=['SYMBOL'])
     main_data = cbyz.df_conv_na(df=main_data, cols=['GOV_INVEST'])
 
 
     # 除權息資料 ......
     # Close Lag ...
-    daily_close = market_data_raw[['WORK_DATE', 'STOCK_SYMBOL', 'CLOSE']]
+    daily_close = market_data_raw[['WORK_DATE', 'SYMBOL', 'CLOSE']]
     daily_close, _ = cbyz.df_add_shift(df=daily_close, 
                                     cols='CLOSE', shift=1,
-                                    group_by=['STOCK_SYMBOL'],
+                                    group_by=['SYMBOL'],
                                     suffix='_LAG', 
                                     remove_na=False)
     daily_close = daily_close \
@@ -635,7 +652,7 @@ def get_model_data(industry=True, trade_value=True):
     
     # Data 1 - 除權息日期及價錢 ...
     sale_mon_data1 = daily_close.merge(sale_mon_data1, how='left', 
-                                       on=['WORK_DATE', 'STOCK_SYMBOL'])
+                                       on=['WORK_DATE', 'SYMBOL'])
     
     sale_mon_data1['EX_DIVIDENDS_PRICE'] = \
         sale_mon_data1['EX_DIVIDENDS_PRICE'] / sale_mon_data1['CLOSE']    
@@ -649,7 +666,7 @@ def get_model_data(industry=True, trade_value=True):
              cbml.ml_data_process(df=sale_mon_data1, 
                                   ma=False, normalize=True, lag=False, 
                                   ma_group_by=[],
-                                  norm_group_by=['STOCK_SYMBOL'], 
+                                  norm_group_by=['SYMBOL'], 
                                   lag_group_by=[],
                                   ma_cols_contains=[], ma_except_contains=[],
                                   norm_cols_contains=[], 
@@ -664,9 +681,9 @@ def get_model_data(industry=True, trade_value=True):
     sale_mon_data2, _, _ = \
         cbml.ml_data_process(df=sale_mon_data2, 
                              ma=False, normalize=True, lag=False, 
-                             ma_group_by=['STOCK_SYMBOL'],
-                             norm_group_by=['STOCK_SYMBOL'], 
-                             lag_group_by=['STOCK_SYMBOL'],
+                             ma_group_by=['SYMBOL'],
+                             norm_group_by=['SYMBOL'], 
+                             lag_group_by=['SYMBOL'],
                              ma_cols_contains=[], 
                              ma_except_contains=['EX_DIVIDENDS_DONE'],
                              norm_cols_contains=[], 
@@ -678,8 +695,8 @@ def get_model_data(industry=True, trade_value=True):
                              lag_period=predict_period)    
         
     main_data = main_data \
-        .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'STOCK_SYMBOL']) \
-        .merge(sale_mon_data2, how='left', on=['WORK_DATE', 'STOCK_SYMBOL'])
+        .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'SYMBOL']) \
+        .merge(sale_mon_data2, how='left', on=['WORK_DATE', 'SYMBOL'])
     
     # Convert NA
     temp_cols = ['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE', 'EX_DIVIDENDS_DONE']    
@@ -700,10 +717,10 @@ def get_model_data(industry=True, trade_value=True):
     
     other_cols = cbyz.df_get_cols_except(df=ewtinst1c, 
                                    except_cols=hroi_cols \
-                                       + ['STOCK_SYMBOL', 'WORK_DATE'])
+                                       + ['SYMBOL', 'WORK_DATE'])
     
     # Keep Needed Symbols Only
-    ewtinst1c = ewtinst1c.merge(stock_symbol_df, on=['STOCK_SYMBOL'])
+    ewtinst1c = ewtinst1c.merge(symbol_df, on=['SYMBOL'])
     
     ewtinst1c, _, _ = \
         cbml.ml_data_process(df=ewtinst1c, 
@@ -723,9 +740,9 @@ def get_model_data(industry=True, trade_value=True):
     ewtinst1c, cols, _ = \
         cbml.ml_data_process(df=ewtinst1c, 
                              ma=True, normalize=True, lag=True, 
-                             ma_group_by=['STOCK_SYMBOL'],
-                             norm_group_by=['STOCK_SYMBOL'], 
-                             lag_group_by=['STOCK_SYMBOL'],
+                             ma_group_by=['SYMBOL'],
+                             norm_group_by=['SYMBOL'], 
+                             lag_group_by=['SYMBOL'],
                              ma_cols_contains=['_HAP'], 
                              ma_except_contains=[],
                              norm_cols_contains=['_HAP'], 
@@ -738,7 +755,7 @@ def get_model_data(industry=True, trade_value=True):
         
         
     main_data = main_data.merge(ewtinst1c, how='left', 
-                              on=['STOCK_SYMBOL', 'WORK_DATE'])  
+                              on=['SYMBOL', 'WORK_DATE'])  
     
     main_data = cbyz.df_conv_na(df=main_data, cols=cols)
 
@@ -748,14 +765,14 @@ def get_model_data(industry=True, trade_value=True):
     # 1. 主要邏輯就是顯示最新的營收資料
     # print('Update - 增加date index')
     # ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
-    #                             stock_symbol=symbols, trade=True)
+    #                             SYMBOL=symbols, trade=True)
     
     # ewsale, cols, _ = \
     #     cbml.ml_data_process(df=ewsale, 
     #                          ma=False, normalize=True, lag=False, 
-    #                          ma_group_by=['STOCK_SYMBOL'],
-    #                          norm_group_by=['STOCK_SYMBOL'], 
-    #                          lag_group_by=['STOCK_SYMBOL'],
+    #                          ma_group_by=['SYMBOL'],
+    #                          norm_group_by=['SYMBOL'], 
+    #                          lag_group_by=['SYMBOL'],
     #                          ma_cols_contains=[], 
     #                          ma_except_contains=[],
     #                          norm_cols_contains=['D000'], 
@@ -768,7 +785,7 @@ def get_model_data(industry=True, trade_value=True):
     
     # ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
     #                                      cols=['D0001', 'D0002', 'D0003'], 
-    #                                      shift=-1, group_by=['STOCK_SYMBOL'],
+    #                                      shift=-1, group_by=['SYMBOL'],
     #                                      suffix='_PRE', remove_na=False)
     
     # # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
@@ -783,7 +800,7 @@ def get_model_data(industry=True, trade_value=True):
     #                                 'D0003':'D0003_CUR'})
     
     # main_data = main_data \
-    #         .merge(ewsale, how='left', on=['STOCK_SYMBOL', 'YEAR', 'MONTH'])  
+    #         .merge(ewsale, how='left', on=['SYMBOL', 'YEAR', 'MONTH'])  
 
     # cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
     # main_data['D0001'] = np.where(cond, 
@@ -872,9 +889,9 @@ def get_model_data(industry=True, trade_value=True):
     # na_df = main_data_final[id_keys+model_x]
     # na_df = na_df[na_df['WORK_DATE']<predict_date[0]]
     # na_df = na_df[na_df.isna().any(axis=1)]
-    # symbols_removed = na_df['STOCK_SYMBOL'].unique().tolist()
+    # symbols_removed = na_df['SYMBOL'].unique().tolist()
     
-    # main_data = main_data_final[~main_data['STOCK_SYMBOL'].isin(symbols_removed)] \
+    # main_data = main_data_final[~main_data['SYMBOL'].isin(symbols_removed)] \
     #             .reset_index(drop=True)
             
 
@@ -950,14 +967,25 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     
     # v1.09
     # - Add Ultra_Tuner
-    # - Rename stock_type and stock_symbol >> Done
+    # - Rename stock_type and SYMBOL >> Done
     # - Set df_fillna with interpolate method in arsenal_stock
     # - Fix Date Issues
+    # - Add correlations detection
+    # - select_symbols用過去一周的總成交量檢查
         
     
     # v1.10
     # - Combine cbyz >> detect_cycle.py, including support_resistance and 
     #    season_decompose
+    
+    
+    # v1.11
+    # - Daily backup
+    # >> tw_get_stock_info_twse
+    # - 合併Yahoo Finance和TEJ的market data，兩邊都有可能缺資料。現在的方法是用interpolate，
+    #   但如果begin_date剛好缺值，這檔股票就會被排除
+    
+    
     
     # Bug
     # 1. 處理除權息的問題
@@ -1044,7 +1072,7 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     
     var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
                'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
-    id_keys = ['STOCK_SYMBOL', 'WORK_DATE']    
+    id_keys = ['SYMBOL', 'WORK_DATE']    
     
     
     # 0707 - industry可以提高提精準，trade_value會下降
@@ -1174,7 +1202,7 @@ def check():
 # %% Manually Analyze ------
 
 
-def select_stock_symbols_manually(data_begin, data_end):
+def select_symbols_manually(data_begin, data_end):
 
 
     # Select Rules
@@ -1194,19 +1222,19 @@ def select_stock_symbols_manually(data_begin, data_end):
     
     # 1-1. 挑選中大型股 ......
     level3_symbol = stock_info[stock_info['CAPITAL_LEVEL']>=2]
-    level3_symbol = level3_symbol['STOCK_SYMBOL'].tolist()
+    level3_symbol = level3_symbol['SYMBOL'].tolist()
     
     data_raw = stk.get_data(data_begin=data_begin, data_end=data_end, 
-                            stock_symbol=level3_symbol, 
+                            SYMBOL=level3_symbol, 
                             price_change=True,
                             shift=0, stock_type=market)
     
-    data = data_raw[data_raw['STOCK_SYMBOL'].isin(level3_symbol)]
+    data = data_raw[data_raw['SYMBOL'].isin(level3_symbol)]
     
 
     # 1-2. 不排除 ......
     data = stk.get_data(data_begin=data_begin, data_end=data_end, 
-                            stock_symbol=[], 
+                            SYMBOL=[], 
                             price_change=True,
                             shift=0, stock_type=market)
     
@@ -1214,7 +1242,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     # Section 2. 依價格篩選 ......
     
     # 2-1. 不篩選 .....
-    target_symbols = data[['STOCK_SYMBOL']] \
+    target_symbols = data[['SYMBOL']] \
                     .drop_duplicates() \
                     .reset_index(drop=True)
     
@@ -1224,16 +1252,16 @@ def select_stock_symbols_manually(data_begin, data_end):
     last_date = data['WORK_DATE'].max()
     last_price = data[data['WORK_DATE']==last_date]
     last_price = last_price[last_price['CLOSE']>80]
-    last_price = last_price[['STOCK_SYMBOL']].drop_duplicates()
+    last_price = last_price[['SYMBOL']].drop_duplicates()
     
     
-    target_symbols = cbyz.df_anti_merge(data, last_price, on='STOCK_SYMBOL')
-    target_symbols = target_symbols[['STOCK_SYMBOL']].drop_duplicates()
+    target_symbols = cbyz.df_anti_merge(data, last_price, on='SYMBOL')
+    target_symbols = target_symbols[['SYMBOL']].drop_duplicates()
     
     
     # 2-3. 3天漲超過10%  .....
     data, cols_pre = cbyz.df_add_shift(df=data, 
-                                       group_by=['STOCK_SYMBOL'], 
+                                       group_by=['SYMBOL'], 
                                        cols=['CLOSE'], shift=3,
                                        remove_na=False)
     
@@ -1246,7 +1274,7 @@ def select_stock_symbols_manually(data_begin, data_end):
     
     
     summary = results_raw \
-                .groupby(['STOCK_SYMBOL']) \
+                .groupby(['SYMBOL']) \
                 .size() \
                 .reset_index(name='COUNT')
                 
@@ -1254,17 +1282,17 @@ def select_stock_symbols_manually(data_begin, data_end):
     # Select Symboles ......
     target_symbols = results_raw.copy()
     target_symbols = cbyz.df_add_size(df=target_symbols,
-                                      group_by='STOCK_SYMBOL',
+                                      group_by='SYMBOL',
                                       col_name='TIMES')
         
     target_symbols = target_symbols \
-                    .groupby(['STOCK_SYMBOL']) \
+                    .groupby(['SYMBOL']) \
                     .agg({'CLOSE':'mean',
                           'TIMES':'mean'}) \
                     .reset_index()
     
     target_symbols = target_symbols.merge(stock_info, how='left', 
-                                          on='STOCK_SYMBOL')
+                                          on='SYMBOL')
     
     target_symbols = target_symbols \
                         .sort_values(by=['TIMES', 'CLOSE'],
@@ -1299,17 +1327,17 @@ def select_stock_symbols_manually(data_begin, data_end):
 def check_price_limit():
     
     loc_stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
-    loc_stock_info = loc_stock_info[['STOCK_SYMBOL', 'CAPITAL_LEVEL']]
+    loc_stock_info = loc_stock_info[['SYMBOL', 'CAPITAL_LEVEL']]
     
     
     loc_market = stk.get_data(data_begin=20190101, 
                         data_end=20210829, 
-                        stock_type='tw', stock_symbol=[], 
+                        stock_type='tw', SYMBOL=[], 
                         price_change=True, price_limit=True, 
                         trade_value=True)
     
     loc_main = loc_market.merge(loc_stock_info, how='left', 
-                                on=['STOCK_SYMBOL'])
+                                on=['SYMBOL'])
 
     # Check Limit Up ......
     chk_limit = loc_main[~loc_main['CAPITAL_LEVEL'].isna()]
@@ -1327,7 +1355,7 @@ def check_price_limit():
     # 1          1    131    
     chk_volum = loc_main[loc_main['CAPITAL_LEVEL']==1]
     chk_volum = chk_volum \
-                .groupby(['STOCK_SYMBOL']) \
+                .groupby(['SYMBOL']) \
                 .agg({'VOLUME':'min'}) \
                 .reset_index()
                 
@@ -1484,20 +1512,20 @@ def split_data():
     cur_predict_data = model_data[model_data['WORK_DATE']>=predict_date[0]]    
 
 
-    # if len(stock_symbol) == 0:
+    # if len(SYMBOL) == 0:
     #     cur_model_data = model_data[model_data['WORK_DATE']<predict_date[0]] \
     #                     .reset_index(drop=True)
         
     #     # Predict Data ......
     #     cur_predict_data = model_data[model_data['WORK_DATE']>=predict_date[0]]
     # else:
-    #     cur_model_data = model_data[(model_data['STOCK_SYMBOL']==symbol) \
+    #     cur_model_data = model_data[(model_data['SYMBOL']==symbol) \
     #             & (model_data['WORK_DATE']<predict_date[0])] \
     #         .reset_index(drop=True)
     
     #     # Predict Data ......
     #     cur_predict_data = model_data[
-    #         (model_data['STOCK_SYMBOL']==symbol) \
+    #         (model_data['SYMBOL']==symbol) \
     #             & (model_data['WORK_DATE']>=predict_date[0])]
         
 
@@ -1507,7 +1535,7 @@ def split_data():
             
     # Predict            
     X_predict = cur_predict_data[model_x + id_keys]
-    # X_predict = X_predict[X_predict['STOCK_SYMBOL'].isin(stock_symbol)]
+    # X_predict = X_predict[X_predict['SYMBOL'].isin(SYMBOL)]
  
     
     # Traning And Test
@@ -1543,7 +1571,7 @@ def get_model(y_index, cv=2, dev=False,
    
     
     import xgboost as xgb    
-    global stock_symbol, model_data, predict_date
+    global SYMBOL, model_data, predict_date
 
     global X_train, y_train, X_test, y_test, X_predict
     global X_train_lite, X_test_lite, y_train_lite, y_test_lite, X_predict_lite
@@ -1696,7 +1724,7 @@ def get_model(y_index, cv=2, dev=False,
     
 #     # results
 #     results_pivot = results \
-#                     .pivot_table(index=['STOCK_SYMBOL', 'WORK_DATE'],
+#                     .pivot_table(index=['SYMBOL', 'WORK_DATE'],
 #                                  columns='Y',
 #                                  values='VALUES') \
 #                     .reset_index()
@@ -1955,6 +1983,18 @@ def tw_fix_symbol_error():
     
     for i in range(3):
         file['SYMBOL'] = '0' + file['SYMBOL'] 
+
+
+# %% Debug ------
+
+def debug():
+    
+
+    chk = main_data[main_data['INDUSTRY_TRADE_VALUE_MA_6_LAG'].isna()]
+    chk = chk[['SYMBOL']].drop_duplicates()
+    
+    stock_info = stk.tw_get_stock_info(path=path_temp)
+    chk_main = chk.merge(stock_info, how='left', on=['SYMBOL'])
 
 
 # %% Execution ------

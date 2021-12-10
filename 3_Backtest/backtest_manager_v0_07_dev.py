@@ -792,7 +792,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
             'fast':[True],  # 之後用train_mode代替
             'kbest':['all'],
             'dev':[True],
-            'symbols':[[2520, 2605, 6116, 6191, 3481, 
+            'symbols':[[1101, 2520, 2605, 6116, 6191, 3481, 
                         2409, 2603, 2611, 3051, 3562]],
             }
     
