@@ -73,7 +73,7 @@ import tejapi
 # 斜槓方案
 tejapi.ApiConfig.api_key = '22DZ20gwIuY3tfezbVnf1zjnp8cfnB'
 info = tejapi.ApiConfig.info()
-info['todayRows']
+print('todayRows - ' + str(info['todayRows']))
 
 
 
@@ -156,7 +156,8 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
             
             # Delete incomplete data.
             sql = (" delete from " + table + " "
-                   " where date_format(mdate, '%Y%m%d') >= " + str(begin))
+                   " where date_format(mdate, '%Y%m%d') >= " + str(begin) + ""
+                   " and date_format(mdate, '%Y%m%d') <= " + str(end) + "")
             
             ar.db_execute(sql, commit=True)    
     
@@ -386,7 +387,7 @@ def check():
 # %% Check ------    
     
 
-def chk_last_date(ewprcd2=True, ewtinst1c=True, 
+def chk_date(ewprcd2=True, ewtinst1c=True, 
            ewprcd=True, ewsale=True, ewifinq=True, ewnprcstd=True,
            delete=False, upload=True):
     
@@ -422,32 +423,55 @@ def chk_last_date(ewprcd2=True, ewtinst1c=True,
     for i in range(len(tables)):
         
         table = tables[i][0]
-        sql = (" select max(date_format(mdate, '%Y%m%d')) last_date "
+        sql = (" select min(date_format(mdate, '%Y%m%d')) min_date, "
+               " max(date_format(mdate, '%Y%m%d')) max_date "
                " from " + table + " ")
+        
+
         
         try:
             query = ar.db_query(sql)
-            last_date = query.values[0][0]
+            min_date = query.loc[0, 'MIN_DATE']
+            max_date = query.loc[0, 'MAX_DATE']
             error = ''
             
         except Exception as e:
-            last_date = np.nan
+            min_date = np.nan
+            max_date = np.nan
             error = e
     
-        li.append([table, last_date, error])
+        li.append([table, min_date, max_date, error])
     
-    result = pd.DataFrame(li, columns=['TABEL', 'LAST_DATE', 'ERROR'])
+    result = pd.DataFrame(li, 
+                          columns=['TABEL', 'MIN_DATE', 
+                                   'MAX_DATE', 'ERROR'])
     print(result)
     return result
     
 
 if __name__ == '__main__':
     
+    info = tejapi.ApiConfig.info()    
+    print('todayRows - ' + str(info['todayRows']))
+    
+    # 目前的模式是全部一起刪除後再一起update，可能會刪除完後，在update的時候出錯
+    # Table 'twstock.ewprcd2' doesn't exist    
+    # Table 'twstock.ewifinq' doesn't exist
+    # Table 'twstock.ewnprcstd' doesn't exist   
+    
     # Check
-    chk = chk_last_date()
-
+    chk = chk_date()
+    
     update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
-           ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-           delete=True, upload=True) 
+            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+            delete=True, upload=True)     
 
-    chk2 = chk_last_date() 
+    # ewsale有bug
+    # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
+    # >> ewsale是不是手動上傳的？
+        
+    # update(begin=20160401, end=20160630, ewprcd=True, ewtinst1c=True, 
+    #         ewsale=False, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+    #         delete=True, upload=True)        
+
+    chk2 = chk_date() 

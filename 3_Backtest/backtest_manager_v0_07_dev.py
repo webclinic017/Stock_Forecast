@@ -635,17 +635,15 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # - Add buy_signal
     # v0.05
     # - Change local variable as host
-
     # v0.06
     # - Update for cbyz and cbml
     # - Include low volume symbols in the excel
     # v0.062
     # - Add Close Level To BUY_SIGNAL column  
-
-
     # v0.064
     # Export to specific sheet
     # 這個版本有Bug，不改了，直接跳v0_07    
+    
     
     # v0.07
     # - Update for ultra_tuner
@@ -654,8 +652,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # - 增加一個欄位，標示第二天為負，為了和DAY_TRADING配合快速篩選
     
     
-    
-
     
     # print predict date in sam to fix missing date issues
     # Backtest也可以用parameter做A/B    
@@ -774,7 +770,14 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # predict_begin = date_df.loc[0, 'PREDICT_BEGIN']
     # predict_end = date_df.loc[0, 'PREDICT_END']  
     # calendar = date_manager.calendar_lite    
-    
+
+
+    if dev:
+        symbols = [2520, 2605, 6116, 6191, 3481, 
+                   2409, 2520, 2603,
+                   2409, 2603, 2611, 3051, 3562]
+    else:
+        symbols = []    
 
 
     # Dev
@@ -792,8 +795,8 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
             'fast':[True],  # 之後用train_mode代替
             'kbest':['all'],
             'dev':[True],
-            'symbols':[[1101, 2520, 2605, 6116, 6191, 3481, 
-                        2409, 2603, 2611, 3051, 3562]],
+            'symbols':[symbols],
+            'debug':[False]
             }
     
     global param_holder
@@ -816,14 +819,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
             param_df = param_df.append(new_df)
         else:
             param_df = cbyz.df_cross_join(param_df, new_df)
-
-
-
-    if dev:
-        symbols = [2520, 2605, 6116, 6191, 3481, 
-                   2409, 2603, 2611, 3051, 3562]
-    else:
-        symbols = []
 
 
     _interval = interval
