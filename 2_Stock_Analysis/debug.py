@@ -1,28 +1,55 @@
 
 
 
-
-chk = chk_min_max[chk_min_max['MIN_VALUE']<0]
-
-
-chk_na = cbyz.df_chk_col_na(df=loc_main)
-
-cbyz.df_chk_col_na(df=market_data_raw,
-                        cols=['VOLUME_CHANGE_RATIO', 
-                              'VOLUME_CHANGE_ABS_RATIO'])
-
-chk = market_data_raw[market_data_raw['VOLUME_CHANGE_RATIO']==np.inf]
+chk = market_data_raw[market_data_raw['CLOSE_CHANGE_ABS_RATIO']>1]
 chk
 
 
-chk['VOLUME_CHANGE_RATIO'].isna()
-
-
-
-chk_min_max = cbyz.df_chk_col_min_max(df=loc_main)
-
-
 # 1611中電在20211211-20211219都沒有交易，導致交易量為0；1732毛寶在20190903也是一樣的情形
+
+
+
+
+chk = hist_df[hist_df['DLR_SELL_MA_60_LAG'].isna()]
+chk
+
+
+
+cbyz.df_chk_col_na(df=main_data)
+
+
+results[results['WEEK_NUM'].isna()]
+
+
+chk = loc_main[(~loc_main['OPEN_CHANGE_RATIO'].isna()) \
+               & (loc_main['K_LINE_TYPE_8_MA_6_LAG'].isna())]
+
+    
+summary = chk \
+    .groupby(['SYMBOL']) \
+        .size() \
+            .reset_index()
+
+
+summary
+
+
+20190617
+
+chk = loc_main[loc_main['SYMBOL']=='1102']
+chk
+    
+    
+7196 - 3279
+
+
+chk = cbyz.df_chk_col_min_max(df=loc_main)
+chk
+
+chk2 = chk[chk['COLUMN'].isin(cols)]
+chk2
+
+
 
 
 
