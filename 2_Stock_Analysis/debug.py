@@ -5,6 +5,8 @@
 chk = chk_min_max[chk_min_max['MIN_VALUE']<0]
 
 
+chk_na = cbyz.df_chk_col_na(df=loc_main)
+
 cbyz.df_chk_col_na(df=market_data_raw,
                         cols=['VOLUME_CHANGE_RATIO', 
                               'VOLUME_CHANGE_ABS_RATIO'])
@@ -17,7 +19,7 @@ chk['VOLUME_CHANGE_RATIO'].isna()
 
 
 
-chk_min_max = cbyz.df_chk_col_min_max(df=market_data_raw)
+chk_min_max = cbyz.df_chk_col_min_max(df=loc_main)
 
 
 # 1611中電在20211211-20211219都沒有交易，導致交易量為0；1732毛寶在20190903也是一樣的情形
@@ -82,6 +84,15 @@ chk = market_data_raw[market_data_raw['WORK_DATE']==20211207]
 chk
 
 
+chk['CLOSE_CHANGE_RATIO'].min()
+chk['CLOSE_CHANGE_RATIO'].max()
+
+
+
+summary = market_data_raw \
+    .groupby(['WORK_DATE']) \
+    .agg({'CLOSE_CHANGE_RATIO':'max'}) \
+.reset_index()        
 
 
 

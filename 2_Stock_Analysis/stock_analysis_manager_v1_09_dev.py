@@ -114,7 +114,8 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                 data_begin=loc_begin, 
                 data_end=data_end, 
                 market=market, 
-                symbol=[], 
+                symbol=[],
+                adj=True,
                 price_change=True, 
                 price_limit=True, 
                 trade_value=trade_value
@@ -125,7 +126,8 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                 data_begin=loc_begin,
                 data_end=data_end, 
                 market=market, 
-                symbol=symbols, 
+                symbol=symbols,
+                adj=True,
                 price_change=True, 
                 price_limit=True,
                 trade_value=trade_value
@@ -199,18 +201,14 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         cbml.ml_data_process(
             df=calendar_proc, 
             ma=False, normalize=True, lag=False, 
-            ma_group_by=[],
-            norm_group_by=[], 
-            lag_group_by=[],
-            ma_cols_contains=[], 
-            ma_except_contains=[],
-            norm_cols_contains=[], 
-            norm_except_contains=['WORK_DATE', 'TRADE_DATE'],
-            lag_cols_contains=[], lag_except_contains=[], 
-            drop_except_contains=[],
+            group_by=[],
+            cols=[], 
+            except_cols=['WORK_DATE', 'TRADE_DATE'],
+            cols_mode='equal',
+            drop_except=[],
             ma_values=ma_values, 
             lag_period=predict_period
-            )   
+            )
         
     
     # Merge As Main Data
@@ -308,19 +306,25 @@ def sam_load_data(industry=True, trade_value=True):
                                  )
 
 
+    # Check NA ......
     # 有些新股因為上市時間較晚，在MA_LAG中會有較多的NA，所以只處理MA的欄位
-    na_cols = cbyz.df_chk_col_na(df=loc_main)
-    na_cols = na_cols[na_cols['COLUMN'].str.contains('MA')]
-    na_cols = na_cols['COLUMN'].tolist()
+    # na_cols = cbyz.df_chk_col_na(df=loc_main)
+    # na_cols = na_cols[na_cols['COLUMN'].str.contains('MA')]
+    # na_cols = na_cols['COLUMN'].tolist()
     
-    loc_main = loc_main.dropna(subset=na_cols, axis=0)
-            
+    # loc_main = loc_main.dropna(subset=na_cols, axis=0)
+    
+
+    # Check again after deleting 
+    # na_cols = cbyz.df_chk_col_na(df=loc_main)
+    # max_value = na_cols['NA_COUNT'].max()
+    # min_value = na_cols['NA_COUNT'].min()
+    # assert max_value == min_value, 'max and min should be the same'
+    
     
     # Normalize By Stock ......
     except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
                     + ratio_cols
-    
-    assert 2 < 1, '這裡的na數量不一致'
     
     loc_main, _, _ = \
         cbml.ml_data_process(df=loc_main, 
@@ -334,6 +338,9 @@ def sam_load_data(industry=True, trade_value=True):
                              ma_values=ma_values, 
                              lag_period=predict_period
                              )
+
+    # assert 2 < 1, '這裡的na數量不一致'    
+    # na_cols = cbyz.df_chk_col_na(df=loc_main)
     
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
@@ -498,8 +505,9 @@ def sam_load_data(industry=True, trade_value=True):
         
     # Check for min max
     chk_min_max = cbyz.df_chk_col_min_max(df=loc_main)
+    chk_min_max = chk_min_max[chk_min_max['COLUMN']!='WORK_DATE']
     chk_min_max = chk_min_max[(chk_min_max['MIN_VALUE']<0) \
-                              | (chk_min_max['MAX_VALUE']>0)]
+                              | (chk_min_max['MAX_VALUE']>1)]
         
     assert len(chk_min_max) == 0, 'chk_min_max failed'
     
@@ -518,6 +526,8 @@ def get_sale_mon_data():
     '''
     
     file_raw = pd.DataFrame()
+    
+    assert 1 > 2, 'bug - 目前只有到2018'
     years = list(range(2018, 2022))
 
     for y in years:
@@ -698,14 +708,10 @@ def get_model_data(industry=True, trade_value=True):
     sale_mon_data1, _, _ = \
              cbml.ml_data_process(df=sale_mon_data1, 
                                   ma=False, normalize=True, lag=False, 
-                                  ma_group_by=[],
-                                  norm_group_by=['SYMBOL'], 
-                                  lag_group_by=[],
-                                  ma_cols_contains=[], ma_except_contains=[],
-                                  norm_cols_contains=[], 
-                                  norm_except_contains=[],
-                                  lag_cols_contains=[], lag_except_contains=[], 
-                                  drop_except_contains=[],
+                                  group_by=['SYMBOL'], 
+                                  cols=[],
+                                  except_cols=[],
+                                  drop_except=[],
                                   ma_values=ma_values, 
                                   lag_period=predict_period)    
     
@@ -1008,6 +1014,7 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     # v1.10
     # - Combine cbyz >> detect_cycle.py, including support_resistance and 
     #    season_decompose
+    # - Add 流通股數 from ewprcd
     
     
     # v1.11
@@ -1169,7 +1176,7 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
         return_result, return_scores, return_params, return_features, \
                 log_scores, log_params, log_features = \
                     tuner.fit(data=cur_model_data, model_params=model_params,
-                              k=kbest, cv=_cv, threshold=threshold, 
+                              k=kbest, cv=cv, threshold=threshold, 
                               norm_orig=norm_orig,
                               export_model=True, export_log=True)
                     

@@ -384,12 +384,23 @@ def check():
     
     
     
+# %% Manually Operate
+
+def operate_sql():
+    # sql = " truncate table ewtinst1c "
+    # ar.db_execute(sql)
+    
+    # sql = " select count(*) from ewtinst1c "
+    # ar.db_query(sql)
+    pass
+    
+    
 # %% Check ------    
     
 
 def chk_date(ewprcd2=True, ewtinst1c=True, 
-           ewprcd=True, ewsale=True, ewifinq=True, ewnprcstd=True,
-           delete=False, upload=True):
+             ewprcd=True, ewsale=True, ewifinq=True, ewnprcstd=True,
+             delete=False, upload=True):
     
     tables = []
     
@@ -419,15 +430,16 @@ def chk_date(ewprcd2=True, ewtinst1c=True,
 
 
     # Query ......    
+    # 1. 如果沒有設!='00000000'的話，min_date都會是00000000
     li = []    
     for i in range(len(tables)):
         
         table = tables[i][0]
         sql = (" select min(date_format(mdate, '%Y%m%d')) min_date, "
                " max(date_format(mdate, '%Y%m%d')) max_date "
-               " from " + table + " ")
-        
-
+               " from " + table + " "
+               " where date_format(mdate, '%Y%m%d') != '00000000' "
+              )
         
         try:
             query = ar.db_query(sql)
@@ -463,8 +475,8 @@ if __name__ == '__main__':
     chk = chk_date()
     
     update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
-            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-            delete=True, upload=True)     
+           ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+           delete=True, upload=True)     
 
     # ewsale有bug
     # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
