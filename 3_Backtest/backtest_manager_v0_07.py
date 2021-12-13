@@ -461,7 +461,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
     
 
-
 # .................
 
 
@@ -675,6 +674,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     #                           cols=close,
     #                           value=-1000)        
     # 2. hold symbols沒有順利標示
+    # 3. cal_profit中的last不要用還原股價，不然看的時候會很麻煩
     
     
     # print predict date in sam to fix missing date issues
@@ -771,9 +771,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # data_period = int(365 * 3.5)
     # ma_values = [6,10,20,60]
     # volume_thld = 500
-    
     # hold = [8105, 2610, 3051, 1904, 2611]
-    # _hold = [str(i) for i in hold]
 
     # Wait for update
     # date_manager = cbyz.Date_Manager(predict_begin=predict_begin, 
@@ -1030,19 +1028,19 @@ if __name__ == '__main__':
     
     hold = [8105, 4414, 1904, 1440]
     
-    master(bt_last_begin=20211213, predict_period=5, 
-           interval=4, bt_times=1, 
-           data_period=int(365 * 1), 
-           ma_values=[5,10,20], volume_thld=400,
-           market='tw', hold=hold,
-           dev=True)
-    
-    
-    # master(bt_last_begin=20211101, predict_period=5, 
+    # master(bt_last_begin=20211213, predict_period=5, 
     #        interval=4, bt_times=1, 
-    #        data_period=int(365 * 3.5), 
-    #        ma_values=[5,10,20,60], volume_thld=400,
+    #        data_period=int(365 * 1), 
+    #        ma_values=[5,10,20], volume_thld=400,
     #        market='tw', hold=hold,
-    #        dev=False)
+    #        dev=True)
+    
+    
+    master(bt_last_begin=20211101, predict_period=5, 
+            interval=4, bt_times=1, 
+            data_period=int(365 * 3.5), 
+            ma_values=[5,10,20,60], volume_thld=400,
+            market='tw', hold=hold,
+            dev=False)
 
 

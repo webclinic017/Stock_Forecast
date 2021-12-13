@@ -474,16 +474,18 @@ if __name__ == '__main__':
     # Check
     chk = chk_date()
     
-    update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
-           ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-           delete=True, upload=True)     
+    # update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
+    #        ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+    #        delete=True, upload=True)     
 
     # ewsale有bug
     # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
     # >> ewsale是不是手動上傳的？
         
-    # update(begin=20160401, end=20160630, ewprcd=True, ewtinst1c=True, 
-    #         ewsale=False, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-    #         delete=True, upload=True)        
+    update(begin=20151101, end=20151231, ewprcd=True, ewtinst1c=True, 
+            ewsale=False, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+            delete=True, upload=True)        
 
-    chk2 = chk_date() 
+    chk2 = chk_date()
+    info = tejapi.ApiConfig.info()    
+    print('todayRows - ' + str(info['todayRows']))
