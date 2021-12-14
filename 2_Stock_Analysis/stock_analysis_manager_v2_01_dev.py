@@ -46,8 +46,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211212',
-                 r'/home/jupyter/Arsenal/20211212',
+                 r'/home/jupyter/Codebase_YZ/20211214',
+                 r'/home/jupyter/Arsenal/20211214',
                  path + '/Function']
 
 
@@ -60,7 +60,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v0_16_dev as ut
+import ultra_tuner_v0_20 as ut
 
 ar.host = host
 
@@ -78,6 +78,7 @@ path_export = path + '/Export'
 
 cbyz.os_create_folder(path=[path_resource, path_function, 
                          path_temp, path_export])        
+
 
 
 # %% Inner Function ------
@@ -118,7 +119,8 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                 adj=True,
                 price_change=True, 
                 price_limit=True, 
-                trade_value=trade_value
+                trade_value=trade_value,
+                restore=True
                 )
     else:
         market_data_raw = \
@@ -130,7 +132,8 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                 adj=True,
                 price_change=True, 
                 price_limit=True,
-                trade_value=trade_value
+                trade_value=trade_value,
+                restore=True
                 )
 
     # Check        
@@ -2065,9 +2068,9 @@ if __name__ == '__main__':
     #             fast=True)
         
         
-    sam.master(param_holder=param_holder,
-               predict_begin=20211201,
-               load_model=False,
+    master(param_holder=param_holder,
+           predict_begin=20211201,
+           load_model=False,
                threshold=30000)        
         
 

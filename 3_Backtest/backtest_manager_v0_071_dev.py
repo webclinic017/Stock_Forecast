@@ -31,8 +31,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211212',
-                 r'/home/jupyter/Arsenal/20211212',
+                 r'/home/jupyter/Codebase_YZ/20211214',
+                 r'/home/jupyter/Arsenal/20211214',
                  path + '/Function',
                  path_sam]
 
@@ -50,7 +50,7 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v1_06 as sam
 # import stock_analysis_manager_v1_07 as sam
 # import stock_analysis_manager_v1_08 as sam
-import stock_analysis_manager_v2_00_dev as sam
+import stock_analysis_manager_v2_01_dev as sam
 
 
 
@@ -69,7 +69,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
-# %% ------
+# %% Inner Function ------
 
 
 
@@ -126,39 +126,30 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     # Work area ----------
     global bt_results, precision, features, model_y, _volume_thld
+    global pred_scores, pred_features
     
     bt_results_raw = pd.DataFrame()
     precision = pd.DataFrame()
-    features = pd.DataFrame()
     
     # Predict ......
     for i in range(0, len(bt_seq)):
         
-        begin = bt_seq[i]
+        sam_result, sam_scores, \
+            sam_params, sam_features = \
+                sam.master(param_holder=param_holder,
+                           predict_begin=bt_seq[i],
+                           load_model=load_model,
+                           threshold=30000)
 
-        print('Bug - 還沒處理好predict_date')
-        # results_raw = sam.master(param_holder)
+        sam_result['BACKTEST_ID'] = i
+        sam_scores['BACKTEST_ID'] = i
         
-        
-        # pred_result, pred_scores, pred_params, pred_features
-        results_raw = sam.master(param_holder=param_holder,
-                                 predict_begin=begin,
-                                 load_model=load_model,
-                                 threshold=30000)
-
-        print('Update - 還沒改')
-        new_result = results_raw[0]
-        new_result['BACKTEST_ID'] = i
-        
-        new_precision = results_raw[1]
-        new_precision['BACKTEST_ID'] = i
-        
-        # new_features = results_raw[2]
-        # new_features['BACKTEST_ID'] = i
-        
-        bt_results_raw = bt_results_raw.append(new_result)
-        precision = precision.append(new_precision)
-        # features = features.append(new_features)
+        if i == 0:
+            pred_scores = sam_scores.copy()
+            pred_features = sam_features.copy()
+            
+        bt_results_raw = bt_results_raw.append(sam_result)
+        precision = precision.append(sam_scores)
 
 
     # Organize ......
@@ -190,7 +181,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 
     # Prepare columns ......
-    
     model_y_last = [i + '_LAST' for i in model_y]
     model_y_hist = [s + '_HIST' for s in model_y]
     
@@ -228,7 +218,8 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                                  data_end=_bt_last_end, 
                                  market=market, 
                                  symbol=symbols, 
-                                 price_change=True)
+                                 price_change=True,
+                                 restore=False)
     
     temp_cols = ['WORK_DATE', 'SYMBOL'] + ohlc
     hist_data_raw = hist_data_raw[temp_cols]
@@ -241,7 +232,8 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     date_last = date_last[0] \
                 .dropna(subset=['WORK_DATE_PREV'], axis=0) \
-                .rename(columns={'WORK_DATE_PREV':'LAST_DATE'})
+                .rename(columns={'WORK_DATE_PREV':'LAST_DATE'}) \
+                .reset_index(drop=True)
                 
     date_last = cbyz.df_conv_col_type(df=date_last, cols='LAST_DATE', 
                                       to='int')
@@ -268,8 +260,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 
     # Organize ......
-    
-    print('Bug, bt_main的work_date會變成object')
+    # print('Bug, bt_main的work_date會變成object')
     # ValueError: You are trying to merge on object and int64 columns. If you wish to proceed you should use pd.concat
     bt_results = cbyz.df_conv_col_type(df=bt_results, 
                                        cols='WORK_DATE', 
@@ -293,7 +284,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
             group_by=['SYMBOL', 'BACKTEST_ID']
             )
 
-    # Check na ......
+    # Check NA ......
     # 這裡有na是合理的，因為hist可能都是na
     chk = cbyz.df_chk_col_na(df=main_data)
     # main_data = main_data.dropna(subset=last_cols)
@@ -595,24 +586,31 @@ def eval_metrics(export_file=False, upload=False):
         ar.db_upload(data=stock_metrics, table_name='forecast_records')
 
 
+# %% View And Log ------
+
 
 def view_yesterday():
+
+    
+    global actions
+    last_date = actions['LAST_DATE'].min()
+        
 
     # Stock Info
     stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)
     stock_info = stock_info[['SYMBOL', 'INDUSTRY']]
     
+    
     # Market Data
-    loc_data = stk.get_data(data_begin=20211207, 
-                          data_end=20211208, 
-                          market='tw', 
-                          symbol=[], 
-                          price_change=True)    
+    loc_data = stk.get_data(data_begin=last_date, 
+                            data_end=last_date, 
+                            market='tw', 
+                            symbol=[], 
+                            price_change=True,
+                            restore=False) 
     
     loc_data = loc_data[['SYMBOL', 'WORK_DATE', 'CLOSE_CHANGE_RATIO']]
-    
-    print('還沒處理除權息的問題，所以會有超過10，先手動排除')
-    loc_data = loc_data[abs(loc_data['CLOSE_CHANGE'])]
+    # loc_data = loc_data[abs(loc_data['CLOSE_CHANGE_RATIO'])]
     
     
     # Combine
@@ -626,9 +624,8 @@ def view_yesterday():
             .reset_index(drop=True)
             
     # Write
-    stk.write_sheet(data=summary, sheet='Yesterday')            
-            
-
+    stk.write_sheet(data=summary, sheet='YD_Industry')            
+        
 
 
 # %% Master ------
@@ -668,13 +665,10 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # - 增加一個欄位，標示第二天為負，為了和DAY_TRADING配合快速篩選
     
     
-    # v0.07 Bug
-    # 1.檢查cal_profit中這一段
-    # actions = cbyz.df_conv_na(df=actions,
-    #                           cols=close,
-    #                           value=-1000)        
-    # 2. hold symbols沒有順利標示
-    # 3. cal_profit中的last不要用還原股價，不然看的時候會很麻煩
+    # v0.071
+    # 1. hold symbols沒有順利標示 - Done
+    # 2. cal_profit中的last不要用還原股價，不然看的時候會很麻煩 - Done
+    # 4. View yesterday，還沒處理日期的問題 - Done
     
     
     # print predict date in sam to fix missing date issues
@@ -683,7 +677,6 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
-    # 2. Features現在是空的
     # 3.低交易量的symbol可能會完全消失在excel中，如預測20211019時的3051力特
     # 4. Fix Google Sheet可能刪不乾淨的問題
     
@@ -754,8 +747,9 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     global _interval, _bt_times, _volume_thld, _ma_values, _hold
     global symbols, _market
     global _bt_last_begin, _bt_last_end    
-    
-    _hold = hold
+
+    _hold = [str(i) for i in hold]
+
 
     # Parameters
     
@@ -880,7 +874,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     
     
     # Profit ------    
-    # y_thld=0.05
+    # y_thld=0.02
     # time_thld=predict_period
     # prec_thld=0.03
     # export_file=True
@@ -902,10 +896,10 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     execute_begin = int(str(execute_begin)[2:] + '0000')
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
-    cal_profit(y_thld=0.05, time_thld=_predict_period, prec_thld=0.05,
+    cal_profit(y_thld=0.02, time_thld=_predict_period, prec_thld=0.05,
                execute_begin=execute_begin, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=False)
+               file_name=None, upload_metrics=True)
     
     
     # Export ......
@@ -948,8 +942,12 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
                     predict_begin=_bt_last_begin)
     
     
-    # .....
-    # view_yesterday()
+    # View And Log .....
+    view_yesterday()
+
+    global pred_features
+    stk.write_sheet(data=pred_features, sheet='Features')
+
 
 
 # %% Check ------
@@ -1026,21 +1024,28 @@ def dev():
 if __name__ == '__main__':
     
     
-    hold = [8105, 4414, 1904, 1440]
+    hold = [1909, 2009, 2413, 2485, 2605, 3041, 4967]
     
-    # master(bt_last_begin=20211213, predict_period=5, 
-    #        interval=4, bt_times=1, 
-    #        data_period=int(365 * 1), 
-    #        ma_values=[5,10,20], volume_thld=400,
-    #        market='tw', hold=hold,
-    #        dev=True)
+    # master(bt_last_begin=20211213, predict_period=5,
+    #         interval=4, bt_times=1, 
+    #         data_period=int(365 * 1), 
+    #         ma_values=[5,10,20], volume_thld=400,
+    #         market='tw', hold=hold,
+    #         dev=True)
     
     
-    master(bt_last_begin=20211101, predict_period=5, 
-            interval=4, bt_times=1, 
-            data_period=int(365 * 3.5), 
-            ma_values=[5,10,20,60], volume_thld=400,
+    master(bt_last_begin=20211215, predict_period=3, 
+            interval=7, bt_times=1, 
+            data_period=int(365 * 5), 
+            ma_values=[5,10,20,60], volume_thld=300,
             market='tw', hold=hold,
             dev=False)
 
+
+    master(bt_last_begin=20211215, predict_period=10, 
+            interval=7, bt_times=1, 
+            data_period=int(365 * 5), 
+            ma_values=[10,20,60], volume_thld=300,
+            market='tw', hold=hold,
+            dev=False)
 
