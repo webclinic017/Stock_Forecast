@@ -591,9 +591,10 @@ def eval_metrics(export_file=False, upload=False):
 
 def view_yesterday():
 
-    
+    # LAST_DATE might be float
     global actions
     last_date = actions['LAST_DATE'].min()
+    last_date = int(last_date)
         
 
     # Stock Info
