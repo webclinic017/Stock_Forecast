@@ -31,8 +31,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211214',
-                 r'/home/jupyter/Arsenal/20211214',
+                 r'/home/jupyter/Codebase_YZ/20211215',
+                 r'/home/jupyter/Arsenal/20211215',
                  path + '/Function',
                  path_sam]
 
@@ -47,10 +47,8 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-# import stock_analysis_manager_v1_06 as sam
-# import stock_analysis_manager_v1_07 as sam
-# import stock_analysis_manager_v1_08 as sam
-import stock_analysis_manager_v2_01_dev as sam
+# import stock_analysis_manager_v2_01 as sam
+import stock_analysis_manager_v2_02_dev as sam
 
 
 
@@ -146,7 +144,12 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         if i == 0:
             pred_scores = sam_scores.copy()
+
+            # Optimize, sort in SAM or in UT            
             pred_features = sam_features.copy()
+            pred_features = pred_features \
+                .sort_values(by=['IMPORTANCE'], ascending=False) \
+                .reset_index(drop=True)
             
         bt_results_raw = bt_results_raw.append(sam_result)
         precision = precision.append(sam_scores)
@@ -166,8 +169,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
 def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
-               export_file=True, load_file=False, path=None, file_name=None,
-               upload_metrics=False):
+               export_file=True, load_file=False, path=None, file_name=None):
     '''
     應用場景有可能全部作回測，而不做任何預測，因為data_end直接設為bt_last_begin
     '''
@@ -313,7 +315,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                                prec_thld=prec_thld)
         
     # Evaluate Precision ......
-    eval_metrics(export_file=False, upload=upload_metrics)            
+    eval_metrics(export_file=False)            
     
     
     # Forecast Records ......
@@ -456,7 +458,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
 
 
-def eval_metrics(export_file=False, upload=False):
+def eval_metrics(export_file=False, threshold=800):
 
     
     # MAPE ......
@@ -467,11 +469,10 @@ def eval_metrics(export_file=False, upload=False):
     model_y_hist = [y + '_HIST' for y in model_y]
     mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
     
-    print('eval_metrics - Bug，不做回測時，mape_main的length一定會等於0')
-    # assert len(mape_main) > 0, 'eval_metrics - mape_main is empty.'
 
+    # 不做回測時，mape_main的length一定會等於0
     if len(mape_main) == 0:
-        return ''
+        return
     
     
     # ......
@@ -582,7 +583,7 @@ def eval_metrics(export_file=False, upload=False):
                              + time_serial + '.csv', 
                              index=False)
             
-    if upload:
+    if len(bt_main) > threshold:
         ar.db_upload(data=stock_metrics, table_name='forecast_records')
 
 
@@ -632,9 +633,9 @@ def view_yesterday():
 # %% Master ------
 
 
-def master(bt_last_begin, predict_period=14, interval=360, bt_times=2, 
-           data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
-           market='tw', hold=[],
+def master(bt_last_begin, predict_period=14, long=False, interval=360, 
+           bt_times=2, data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
+           market='tw', hold=[], load_model=False,
            dev=False):
     '''
     主工作區
@@ -669,7 +670,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     # v0.071
     # 1. hold symbols沒有順利標示 - Done
     # 2. cal_profit中的last不要用還原股價，不然看的時候會很麻煩 - Done
-    # 4. View yesterday，還沒處理日期的問題 - Done
+    # 3. View yesterday，還沒處理日期的問題 - Done
     
     
     # print predict date in sam to fix missing date issues
@@ -867,7 +868,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
                      predict_period=_predict_period, 
                      interval=interval,
                      data_period=data_period,
-                     load_model=False, cv=2, fast=True, dev=dev)
+                     load_model=load_model, cv=2, fast=True, dev=dev)
     
     
     # Debug for prices columns issues
@@ -900,7 +901,7 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     cal_profit(y_thld=0.02, time_thld=_predict_period, prec_thld=0.05,
                execute_begin=execute_begin, 
                export_file=True, load_file=True, path=path_temp,
-               file_name=None, upload_metrics=True)
+               file_name=None)
     
     
     # Export ......
@@ -938,16 +939,20 @@ def master(bt_last_begin, predict_period=14, interval=360, bt_times=2,
     writer.save()
 
 
-    # Write Google Sheets
-    stk.write_sheet(data=actions, sheet='TW',
-                    predict_begin=_bt_last_begin)
     
+    if len(actions) > 800:
+        # Write Google Sheets
+        stk.write_sheet(data=actions, sheet='TW', long=long,
+                        predict_begin=_bt_last_begin)
     
-    # View And Log .....
-    view_yesterday()
+        # View And Log .....
+        view_yesterday()
 
-    global pred_features
-    stk.write_sheet(data=pred_features, sheet='Features')
+        global pred_features
+        stk.write_sheet(data=pred_features, sheet='Features')
+    
+    
+    gc.collect()
 
 
 
@@ -1035,18 +1040,22 @@ if __name__ == '__main__':
     #         dev=True)
     
     
+    # Bug，現在long和short的model沒辦法區分
+    
+    
     master(bt_last_begin=20211215, predict_period=3, 
-            interval=7, bt_times=1, 
-            data_period=int(365 * 5), 
-            ma_values=[5,10,20,60], volume_thld=300,
-            market='tw', hold=hold,
-            dev=False)
+           long=False, interval=7, bt_times=1, 
+           data_period=int(365 * 5), 
+           ma_values=[5,10,20,60], volume_thld=300,
+           market='tw', hold=hold, load_model=False,
+           dev=True)
 
 
-    master(bt_last_begin=20211215, predict_period=10, 
-            interval=7, bt_times=1, 
-            data_period=int(365 * 5), 
-            ma_values=[10,20,60], volume_thld=300,
-            market='tw', hold=hold,
-            dev=False)
+    # master(bt_last_begin=20211215, predict_period=10, 
+    #        long=True, interval=7, bt_times=1, 
+    #        data_period=int(365 * 5), 
+    #        ma_values=[10,20,60], volume_thld=300,
+    #        market='tw', hold=hold, load_model=False,
+    #        dev=True)
+
 

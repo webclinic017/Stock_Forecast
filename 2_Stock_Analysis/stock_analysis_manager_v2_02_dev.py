@@ -46,8 +46,8 @@ elif host == 2:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211214',
-                 r'/home/jupyter/Arsenal/20211214',
+                 r'/home/jupyter/Codebase_YZ/20211215',
+                 r'/home/jupyter/Arsenal/20211215',
                  path + '/Function']
 
 
@@ -60,7 +60,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v0_20 as ut
+import ultra_tuner_v0_21 as ut
 
 ar.host = host
 
@@ -996,20 +996,20 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     # - Add low_volume_symbols
     # v1.08
     # - Add 每月投報率 data
-    
-    
     # v2.00
     # - Add Ultra_Tuner
     # - Fix Ex-dividend issues
     # - Rename stock_type and stock_symbol
     # - Set df_fillna with interpolate method in arsenal_stock
-
     # v2.01
-    # - Add 台股指數 and support_resist
     # - Fix Date Issues
-    # - Add correlations detection
+
+    # v2.02
+    # - Add correlations detection > Done
+    
+    # v2.03
+    # - Add 台股指數 and support_resist
     # - select_symbols用過去一周的總成交量檢查
-        
     
     # cbyz.df_get_cols_contains(df, string=[], exclude=[])不需要用for loop，可以直接
     # 合併，並用|
@@ -1095,7 +1095,7 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     
     
     global version, exe_serial
-    version = 2.00
+    version = 2.02
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
     global log, error_msg, ohlc
@@ -1113,11 +1113,6 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
                                predict_period=predict_period,
                                data_period=data_period,
                                shift=data_shift)  
-
-    # .......
-    # global symbols, market
-    # market = _market
-    # symbols = _symbols
 
 
     # ......
@@ -1139,7 +1134,21 @@ def master(param_holder, predict_begin, export_model=True, load_model=False,
     model_data = data_raw['MODEL_DATA']
     model_x = data_raw['MODEL_X']
     norm_orig = data_raw['NORM_ORIG']
-
+    
+    
+    # Check Correlation ......
+    msg = 'Update - Will it cause saved models useless? '
+    print(msg)
+    
+    global corr, corr_drop_cols
+    corr, corr_drop_cols, keep_cols = \
+        cbml.get_high_correlated_features(df=model_data, threshold=0.90,
+                                          except_cols=id_keys + var_y)
+        
+    model_data = model_data.drop(corr_drop_cols, axis=1)
+    
+    
+    # .......
     print('WEEK_NUM的type是OBJ，先排除')
     model_data = model_data.drop('WEEK_NUM', axis=1)
 
