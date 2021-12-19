@@ -222,7 +222,6 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
     
     '''
     
-    
     tables = []
     
     if ewtinst1c:
@@ -256,7 +255,8 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
         
         # Get file list
         file_path = path_export + '/' + table
-        files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
+        files = cbyz.os_get_dir_list(path=file_path, level=0, 
+                                     extensions='csv',
                                      remove_temp=True)
 
         files = files['FILES']
@@ -267,13 +267,18 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
             name = files.loc[j, 'FILE_NAME']
             file = pd.read_csv(file_path + '/' + name)
     
-            file['mdate'] = pd.to_datetime(file.mdate)
-            file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        
-            # ewsale
-            # file['annd_s'] = pd.to_datetime(file.annd_s)
-            # file['annd_s'] = file['annd_s'].dt.strftime('%Y-%m-%d %H:%M:%S')        
-        
+            table_info = ar.db_get_table_info(table)
+            table_info = table_info[table_info['DATA_TYPE']=='datetime'] \
+                        .reset_index(drop=True)
+            date_cols = table_info['COLUMN_NAME'].tolist()
+
+
+            for k in range(len(date_cols)):
+                date_col = date_cols[k]
+                file[date_col] = pd.to_datetime(file[date_col])
+                file[date_col] = file[date_col].dt.strftime('%Y-%m-%d %H:%M:%S')                
+
+
             ar.db_upload(data=file, table_name=table)
 
 
@@ -401,10 +406,8 @@ if __name__ == '__main__':
     # - 未完成
 
 
-    
     info = tejapi.ApiConfig.info()    
     print('todayRows - ' + str(info['todayRows']))
-
 
     
     # 目前的模式是全部一起刪除後再一起update，可能會刪除完後，在update的時候出錯
@@ -424,11 +427,12 @@ if __name__ == '__main__':
     # 1. ewsale是不是手動上傳的？
     # 2. TEJ只開放五年的資料
         
-    update(begin=20161101, end=20161231, ewprcd=False, ewtinst1c=False, 
-            ewsale=False, ewprcd2=True, ewifinq=False, ewnprcstd=False,
-            delete=True, upload=True)        
+    update(begin=20170701, end=20170930, ewprcd=False, ewtinst1c=False, 
+           ewsale=False, ewprcd2=True, ewifinq=False, ewnprcstd=False,
+           delete=True, upload=True)        
 
     chk2 = chk_date()
+    
     info = tejapi.ApiConfig.info()    
     print('todayRows - ' + str(info['todayRows']))
     

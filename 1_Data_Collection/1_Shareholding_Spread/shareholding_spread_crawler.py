@@ -13,14 +13,13 @@ import numpy as np
 import sys, time, os, gc
 
 
-local = False
-local = True
+host = 0
 
 
 # Path .....
-if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection/1_Stock_Ratio'
-else:
+if host == 0:
+    path = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection/1_Shareholding_Spread'
+elif host == 2:
     path = '/home/aronhack/stock_forecast/dashboard/'
 
 
@@ -41,9 +40,6 @@ import arsenal_stock as stk
 
 
 
-data = stk.get_data(data_begin=20210630, data_end=20210703, stock_symbol=['0050'])
-
-
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
  
@@ -55,9 +51,8 @@ path_function = path + '/Function'
 path_temp = path + '/Temp'
 path_export = path + '/Export'
 
-
 cbyz.os_create_folder(path=[path_resource, path_function, 
-                         path_temp, path_export])      
+                            path_temp, path_export])      
 
 
 
@@ -76,11 +71,12 @@ def read_single_files():
     
     # Get file list
     file_path = path_resource
-    files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
-                             remove_temp=True)
+    files = cbyz.os_get_dir_list(path=file_path, level=0, 
+                                 extensions='csv',
+                                 remove_temp=True)
     
     files = files['FILES']
-    files = files[files['FILE_NAME'].str.contains('集保戶股權分散表')] \
+    files = files[files['FILE_NAME'].str.contains('TDCC_OD_1-5')] \
                 .reset_index(drop=True)
     
     file_date = []
@@ -109,10 +105,10 @@ def master():
     from selenium.webdriver.support.ui import Select
     
     
-    
     # https://www.tdcc.com.tw/smWeb/QryStockAjax.do
     link = 'https://www.tdcc.com.tw/portal/zh/smWeb/qryStock'
-    webdriver_path = '/Users/Aron/Documents/GitHub/Arsenal/geckodriver'
+    
+    webdriver_path = '/Users/aron/Documents/GitHub/Arsenal/geckodriver'
     driver = webdriver.Firefox(executable_path=webdriver_path)
     driver.get(link)
     
@@ -122,11 +118,16 @@ def master():
     dropdown = driver.find_element_by_name("scaDate")
     options = [x for x in dropdown.find_elements_by_tag_name("option")]
     
+    # driver.find_element_by_name("scaDate")
+    # <ipython-input-13-cfefc7bef0f9>:1: DeprecationWarning: find_element_by_* commands are deprecated. Please use find_element() instead
+    #   dropdown = driver.find_element_by_name("scaDate")    
+    # dropdown = driver.find_element(tagname="scaDate")
+    # options = [x for x in dropdown.find_elements("option")]
+    
+    
     for option in options:
         date_li_raw.append(option.get_attribute("value"))
         
-    
-    # date_li_raw.sort(reverse=True)     
     date_li_raw.sort(reverse=False) 
     
     
@@ -135,62 +136,58 @@ def master():
     date_list = cbyz.li_remove_items(date_li_raw, file_date)
     
     
-    
     # Stock Symbol ......
     symbols_raw = stk.twse_get_data()
-    symbols = symbols_raw['STOCK_SYMBOL'].tolist()
+    symbols = symbols_raw['SYMBOL'].tolist()
     
     
     # Merge ......
-    symbols_tb = symbols_raw[['STOCK_SYMBOL']]
+    symbols_tb = symbols_raw[['SYMBOL']]
     date_df = pd.DataFrame({'WORK_DATE':date_list})
     main_tb_pre = cbyz.df_cross_join(date_df, symbols_tb)
     
     
     # Bug，要考慮還沒有file的狀況
-    load_fail = False
+    load_success = False
     level = '持股/單位數分級'
     
     try:
         file = pd.read_csv(path_resource + '/stock_ratio.csv')
-        file['STOCK_SYMBOL'] = file['STOCK_SYMBOL'].str.replace('ID_', '')
-        
-    except:
-        load_fail = True
-    
-    
+        file['SYMBOL'] = file['SYMBOL'].str.replace('ID_', '')
+    except Exception as e:
+        print(e)
+    else:
+        load_success = True
     
     
     # Exclude finished rows    
-    if load_fail == False and len(file) > 0:
+    if load_success and len(file) > 0:
         
         file = cbyz.df_conv_col_type(df=file, 
-                                     cols=['STOCK_SYMBOL', 'WORK_DATE'],
+                                     cols=['SYMBOL', 'WORK_DATE'],
                                      to='str')
     
-        main_tb = main_tb_pre.merge(file, how='left', 
-                                    on=['STOCK_SYMBOL', 'WORK_DATE'])
+        main_tb = main_tb_pre \
+                .merge(file, how='left', on=['SYMBOL', 'WORK_DATE'])
         
         main_tb = main_tb[main_tb[level].isna()].reset_index(drop=True)
         
         # Summary, for notice noly
-        summary = main_tb.groupby(['WORK_DATE']).size().reset_index(name='COUNT')
+        summary = main_tb.groupby(['WORK_DATE']) \
+                    .size() \
+                    .reset_index(name='COUNT')
     
     else:
         main_tb = main_tb_pre.copy()
     
     
     
-    
     # NoSuchElementException: Unable to locate element: //select[@name='scaDate']/option[text()='20200710']
     # 這個程式的哲學是盡量減少sleep的時間，雖然這可能會導致抓不到某些element，但下一次再回洗它就可以了。
-    
 
     
     # Query ......
-            
     result = pd.DataFrame()
-    
     
     for i in range(len(date_list)):
         
@@ -205,7 +202,7 @@ def master():
             symbol = symbols[s]
             
             # 已經存在現有檔案中
-            chk = temp_tb[temp_tb['STOCK_SYMBOL']==symbol]
+            chk = temp_tb[temp_tb['SYMBOL']==symbol]
             if len(chk) == 0:
                 continue
             
@@ -281,7 +278,7 @@ def master():
     
             
             # 存成csv的時候，股票編號可能會被當成數字，像是0050會變成50，因此在前面加上ID_
-            new_df['STOCK_SYMBOL'] = 'ID_' + symbol
+            new_df['SYMBOL'] = 'ID_' + symbol
             new_df['WORK_DATE'] = d
             
             result = result.append(new_df)
@@ -295,8 +292,9 @@ def master():
                 try:
                     file = pd.read_csv(path_resource + '/stock_ratio.csv')
                     file = file.append(result)
-                except:
+                except Exception as e:
                     file = result
+                    print(e)
         
                 file.to_csv(path_resource + '/stock_ratio.csv', 
                             index=False, encoding='utf-8-sig')
@@ -315,13 +313,11 @@ def master():
         file = file.append(result)
     
         file.to_csv(path_resource + '/stock_ratio.csv', 
-                      index=False, encoding='utf-8-sig')
+                    index=False, encoding='utf-8-sig')
         
         result = pd.DataFrame()        
         print('update_file')
 
-
-    return
 
 
 # ........
@@ -330,16 +326,16 @@ def master():
 def tdcc_upload_shareholdings_spread():
     
     
-    cols = ['WORK_DATE', 'STOCK_SYMBOL', 'LEVEL', 
+    cols = ['WORK_DATE', 'SYMBOL', 'LEVEL', 
                     'COUNT', 'VOLUME', 'RATIO']    
     
     # .......
     file0 = pd.read_csv(path_resource + '/stock_ratio.csv')
     file0.columns = ['LEVEL', 'LEVE_DESCR', 'COUNT', 'VOLUME', 
-                     'RATIO', 'STOCK_SYMBOL', 'WORK_DATE', ]
+                     'RATIO', 'SYMBOL', 'WORK_DATE', ]
     
     file0 = file0[cols]
-    file0['STOCK_SYMBOL'] = file0['STOCK_SYMBOL'].str.replace('ID_', '')
+    file0['SYMBOL'] = file0['SYMBOL'].str.replace('ID_', '')
     
     
     # ......
@@ -364,7 +360,7 @@ def tdcc_upload_shareholdings_spread():
     
     # 
     file = file \
-        .sort_values(by=['STOCK_SYMBOL', 'WORK_DATE']) \
+        .sort_values(by=['SYMBOL', 'WORK_DATE']) \
         .reset_index(drop=True)
         
 
