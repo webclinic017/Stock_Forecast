@@ -104,6 +104,7 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
     
     tables = []
     
+    
     if ewtinst1c:
         # 三大法人持股成本
         tables.append(['ewtinst1c', 'd']) 
@@ -159,12 +160,19 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
                    " where date_format(mdate, '%Y%m%d') >= " + str(begin) + ""
                    " and date_format(mdate, '%Y%m%d') <= " + str(end) + "")
             
-            ar.db_execute(sql, commit=True)    
+            try:
+                ar.db_execute(sql, commit=True)    
+            except Exception as e:
+                print('Delete Error')
+                print(e)
+            
     
     
     # Query ......
     # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
     # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
+    global data
+    
     for i in range(len(tables)):
         
         table = tables[i][0]
@@ -203,97 +211,6 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
 
 
 # .............
-
-
-def update_20211010(ewprcd2=True, ewtinst1c=True, ewprcd=True, delete=False, 
-           upload=True):
-    '''
-    證券交易資料表
-    - 一個月51034筆
-    '''
-    
-    tables = []
-    
-    if ewtinst1c:
-        tables.append('ewtinst1c') # 三大法人持股成本
-    elif ewprcd:
-        tables.append('ewprcd') # 證券交易資料表
-    elif ewprcd2:
-        tables.append('ewprcd2') # 報酬率資訊表
-
-
-    begin = 20211006
-    end = 20211006
-    
-    # 每一天要分開query，但假日的時候不需要
-    today = cbyz.date_get_today()
-    # today = 20211003
-    
-
-
-    begin_str = cbyz.ymd(begin)
-    begin_str = begin_str.strftime('%Y-%m-%d')
-
-    end_str = cbyz.ymd(end)
-    end_str = end_str.strftime('%Y-%m-%d')    
-    
-    
-    
-    # Delete Data ......
-    if delete:
-        
-        for i in range(len(tables)):
-            table = tables[i]
-            
-            # Delete incomplete data.
-            sql = (" delete from " + table + " "
-                   " where date_format(mdate, '%Y%m%d') >= " + str(begin))
-            
-            ar.db_execute(sql, commit=True)    
-    
-    
-    # Query ......
-    # 系統限制單次取得最大筆數為10,000筆，可使用 paginate=True 參數分次取得資料，
-    # 但總筆數單次最多為1,000,000筆。請斟酌使用篩選條件降低筆數。
-    for i in range(len(tables)):
-        
-        table = tables[i]
-        data = tejapi.get('TWN/' + table.upper(),
-                          mdate={'gte':begin_str, 'lte':end_str},
-                          paginate=True)
-    
-        data.to_csv(path_export + '/' + table + '/' + table +'_' \
-                    + begin_str + '_' + end_str + '.csv', 
-                    index=False)
-
-
-    # Upload ......
-    # Update, auto delete the latest file
-    if upload:
-        
-        for i in range(len(tables)):
-            
-            table = tables[i]
-            
-            # Get file list
-            file_path = path_export + '/' + table
-            files = cbyz.os_get_dir_list(path=file_path, level=0, extensions='csv',
-                                     remove_temp=True)
-
-            files = files['FILES']
-        
-        
-            for j in range(len(files)):
-                
-                name = files.loc[j, 'FILE_NAME']
-                file = pd.read_csv(file_path + '/' + name)
-        
-                file['mdate'] = pd.to_datetime(file.mdate)
-                file['mdate'] = file['mdate'].dt.strftime('%Y-%m-%d %H:%M:%S')
-            
-                ar.db_upload(data=file, table_name=table)
-
-
 
 
 def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True, 
@@ -462,9 +379,33 @@ def chk_date(ewprcd2=True, ewtinst1c=True,
     
 
 if __name__ == '__main__':
+
+    
+    # ewtinst1c
+    # - 三大法人持股成本
+    # - 2016-2020已完成
+    # ewprcd
+    # - 證券交易資料表，一個月51034筆
+    # - 2016-2020已完成
+    # ewifinq
+    # - 單季財務資料表，資料量等同於股票檔數
+    # - 2016-2020已完成
+    # ewnprcstd
+    # - 證券屬性表，3125筆，資料量等同於股票檔數
+    # ewsale
+    # - 月營收資料表，一個月約2000筆，等同於股票檔數
+    # - 2016-2020已完成    
+    
+    # ewprcd2
+    # - 報酬率資訊表，兩個月約100000筆
+    # - 未完成
+
+
     
     info = tejapi.ApiConfig.info()    
     print('todayRows - ' + str(info['todayRows']))
+
+
     
     # 目前的模式是全部一起刪除後再一起update，可能會刪除完後，在update的時候出錯
     # Table 'twstock.ewprcd2' doesn't exist    
@@ -480,12 +421,15 @@ if __name__ == '__main__':
 
     # ewsale有bug
     # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
-    # >> ewsale是不是手動上傳的？
+    # 1. ewsale是不是手動上傳的？
+    # 2. TEJ只開放五年的資料
         
-    update(begin=20151101, end=20151231, ewprcd=True, ewtinst1c=True, 
-            ewsale=False, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+    update(begin=20161101, end=20161231, ewprcd=False, ewtinst1c=False, 
+            ewsale=False, ewprcd2=True, ewifinq=False, ewnprcstd=False,
             delete=True, upload=True)        
 
     chk2 = chk_date()
     info = tejapi.ApiConfig.info()    
     print('todayRows - ' + str(info['todayRows']))
+    
+    

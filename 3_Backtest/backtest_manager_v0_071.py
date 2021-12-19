@@ -48,7 +48,8 @@ import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
 # import stock_analysis_manager_v2_01 as sam
-import stock_analysis_manager_v2_02_dev as sam
+# import stock_analysis_manager_v2_02 as sam
+import stock_analysis_manager_v2_03_dev as sam
 
 
 
@@ -672,16 +673,13 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # 2. cal_profit中的last不要用還原股價，不然看的時候會很麻煩 - Done
     # 3. View yesterday，還沒處理日期的問題 - Done
     
-    
-    # print predict date in sam to fix missing date issues
-    # Backtest也可以用parameter做A/B    
-    
+
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
     # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
     # 3.低交易量的symbol可能會完全消失在excel中，如預測20211019時的3051力特
     # 4. Fix Google Sheet可能刪不乾淨的問題
-    
+    # 5. print predict date in sam to fix missing date issues    
     
     # Optimization
     # 1. Add hold variable as parameters of master
@@ -689,6 +687,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # 4. Calculate IRR, remove outliers
     # 5. Google Sheet Add Manual Tick
     # 6. Think how to optimize stop loss
+    # 7. Backtest也可以用parameter做A/B        
 
 
 
@@ -755,13 +754,13 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
     # Parameters
     
-    # Not Collected Parameters
+    # # Not Collected Parameters ......
     # bt_times = 1
     # interval = 4
     # market = 'tw'
     # dev = True    
     
-    # Collected Parameters
+    # # Collected Parameters ......
     # bt_last_begin = 20210913
     # predict_period = 6
     # data_period = int(365 * 3.5)
@@ -797,8 +796,9 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     else:
         symbols = []    
 
-
-    # Dev
+    # Arguments
+    # 1. 目前的parameter都只有一個，但如果有多個parameter需要做A/B test時，應該要在
+    #    sam中extract，或是在btm中extract
     args = {'bt_last_begin':[bt_last_begin],
             'predict_period': [predict_period], 
             'data_period':[data_period],
@@ -1039,16 +1039,13 @@ if __name__ == '__main__':
     #         market='tw', hold=hold,
     #         dev=True)
     
-    
-    # Bug，現在long和short的model沒辦法區分
-    
-    
     master(bt_last_begin=20211215, predict_period=3, 
-           long=False, interval=7, bt_times=1, 
-           data_period=int(365 * 5), 
-           ma_values=[5,10,20,60], volume_thld=300,
-           market='tw', hold=hold, load_model=False,
-           dev=True)
+            long=False, interval=7, bt_times=1, 
+            data_period=int(365 * 5), 
+            ma_values=[5,10,20,60], volume_thld=300,
+            market='tw', hold=hold, load_model=False,
+            dev=True)
+
 
 
     # master(bt_last_begin=20211215, predict_period=10, 
