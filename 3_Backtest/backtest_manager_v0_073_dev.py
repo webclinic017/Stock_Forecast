@@ -20,17 +20,17 @@ market = 'tw'
 
 # Path .....
 if host == 0:
-    path = '/Users/Aron/Documents/GitHub/Stock_Forecast/3_Backtest'
-    path_sam = '/Users/Aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
+    path = '/Users/aron/Documents/GitHub/Stock_Forecast/3_Backtest'
+    path_sam = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
 
 elif host == 2:
     path = '/home/jupyter/3_Backtest'
     path_sam = '/home/jupyter/2_Stock_Analysis'    
 
 # Codebase ......
-path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
+path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
+                 r'/Users/aron/Documents/GitHub/Codebase_YZ',
                  r'/home/jupyter/Codebase_YZ/20211219',
                  r'/home/jupyter/Arsenal/20211219',
                  path + '/Function',
@@ -49,7 +49,8 @@ import arsenal as ar
 import arsenal_stock as stk
 # import stock_analysis_manager_v2_01 as sam
 # import stock_analysis_manager_v2_02 as sam
-import stock_analysis_manager_v2_03 as sam
+# import stock_analysis_manager_v2_03 as sam
+import stock_analysis_manager_v2_04_dev as sam
 
 
 
@@ -772,6 +773,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # ma_values = [6,10,20,60]
     # volume_thld = 500
     # hold = [8105, 2610, 3051, 1904, 2611]
+    # long = False
 
     # Wait for update
     # date_manager = cbyz.Date_Manager(predict_begin=predict_begin, 
