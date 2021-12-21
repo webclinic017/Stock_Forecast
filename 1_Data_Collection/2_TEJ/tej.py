@@ -427,8 +427,8 @@ if __name__ == '__main__':
     # 1. ewsale是不是手動上傳的？
     # 2. TEJ只開放五年的資料
         
-    update(begin=20170701, end=20170930, ewprcd=False, ewtinst1c=False, 
-           ewsale=False, ewprcd2=True, ewifinq=False, ewnprcstd=False,
+    update(begin=20211201, end=20211221, ewprcd=True, ewtinst1c=True, 
+           ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
            delete=True, upload=True)        
 
     chk2 = chk_date()

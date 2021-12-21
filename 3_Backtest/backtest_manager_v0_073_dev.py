@@ -31,8 +31,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211219',
-                 r'/home/jupyter/Arsenal/20211219',
+                 r'/home/jupyter/Codebase_YZ/20211221',
+                 r'/home/jupyter/Arsenal/20211221',
                  path + '/Function',
                  path_sam]
 
@@ -564,7 +564,7 @@ def eval_metrics(export_file=False, threshold=800):
     
     stock_metrics_raw = stock_metrics_raw \
                         .rename(columns={'WORK_DATE':'FORECAST_DATE',
-                                         'PRECISION':'MODEL_PRECISION',
+                                         'TEST_PRECISION':'MODEL_PRECISION',
                                          'MAPE':'FORECAST_PRECISION'}) \
                         .round({'MODEL_PRECISION':3,
                                 'FORECAST_PRECISION':3})
@@ -636,7 +636,7 @@ def view_yesterday():
 
 def master(bt_last_begin, predict_period=14, long=False, interval=360, 
            bt_times=2, data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
-           market='tw', hold=[], dev=False):
+           compete_mode=1, market='tw', hold=[], dev=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -686,6 +686,8 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # 3.低交易量的symbol可能會完全消失在excel中，如預測20211019時的3051力特
     # 4. Fix Google Sheet可能刪不乾淨的問題
     # 5. print predict date in sam to fix missing date issues    
+    # 6. 如果local沒有forecast_records時，cal_profit中的get_forecast_records會出錯：
+    #    AttributeError: 'list' object has no attribute 'rename'
     
     # Optimization
     # 1. Add hold variable as parameters of master
@@ -816,7 +818,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
             'industry':[True],
             'trade_value':[True],
             'market':['tw'],
-            'compete_mode':[2],
+            'compete_mode':[compete_mode],
             'train_mode':[2],            
             'cv':[2],
             'kbest':['all'],
@@ -1045,6 +1047,7 @@ if __name__ == '__main__':
            long=False, interval=4, bt_times=1, 
            data_period=int(365 * 1), 
            ma_values=[5,10,20], volume_thld=400,
+           compete_mode=2,
            market='tw', hold=hold,
            dev=True)
     

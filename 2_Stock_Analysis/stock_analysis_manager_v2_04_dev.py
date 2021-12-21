@@ -38,15 +38,15 @@ if host == 0:
     
 elif host == 2:
     path = '/home/jupyter//2_Stock_Analysis'
-    path_dcm = '/home/jupyter//_Data_Collection'
+    path_dcm = '/home/jupyter//1_Data_Collection'
 
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211219',
-                 r'/home/jupyter/Arsenal/20211219',
+                 r'/home/jupyter/Codebase_YZ/20211221',
+                 r'/home/jupyter/Arsenal/20211221',
                  path + '/Function']
 
 
@@ -213,6 +213,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         
     
     # Merge As Main Data
+    global main_data_frame, main_data_frame_calendar
     main_data_frame = cbyz.df_cross_join(symbol_df, calendar_proc)
     main_data_frame = \
         main_data_frame[
@@ -222,6 +223,13 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
 
     market_data_raw = main_data_frame \
         .merge(market_data_raw, how='left', on=['SYMBOL', 'WORK_DATE'])
+    
+    
+    main_data_frame = main_data_frame[['WORK_DATE', 'SYMBOL']]
+    main_data_frame_calendar = main_data_frame[['WORK_DATE']] \
+                                .drop_duplicates() \
+                                .sort_values(by='WORK_DATE') \
+                                .reset_index(drop=True)
     
 
     # Check ......
@@ -643,12 +651,13 @@ def get_model_data(industry=True, trade_value=True):
     
     
     global shift_begin, shift_end, data_begin, data_end, ma_values
-    global predict_date, predict_period, calendar    
+    global predict_date, predict_period, calendar, calendar_lite
+    global main_data_frame, main_data_frame_calendar, market_data_raw
     global symbols
     global var_y
-    global market_data_raw  
     global params, error_msg
     global id_keys
+    global main_data
     
 
     # Check ......
@@ -759,21 +768,23 @@ def get_model_data(industry=True, trade_value=True):
                                           end_date=None, 
                                           trade=True)
     
-    ewtinst1c = ewtinst1c_raw.copy()
+    ewtinst1c = main_data_frame \
+                .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
+                .merge(symbol_df, on=['SYMBOL'])
+
+    cols = cbyz.df_get_cols_except(df=ewtinst1c,
+                                   except_cols=['WORK_DATE', 'SYMBOL']) 
     
+    ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
+                               sort_keys=['SYMBOL', 'WORK_DATE'], 
+                               group_by=[], method='ffill')                    
+                
+        
     # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
     hroi_cols = cbyz.df_get_cols_contains(df=ewtinst1c, 
                                          string=['_HROI', '_SELL', '_BUY'])
     
-    # other_cols = cbyz.df_get_cols_except(
-    #     df=ewtinst1c, 
-    #     except_cols=hroi_cols + ['SYMBOL', 'WORK_DATE'])
-    
-    
     # Keep Needed Symbols Only
-    ewtinst1c = ewtinst1c.merge(symbol_df, on=['SYMBOL'])
-    
-    print('ewtinst1c - 這段結束時會有NA')
     ewtinst1c, cols_1, _ = \
         cbml.ml_data_process(df=ewtinst1c, 
                              ma=True, normalize=True, lag=True, 
@@ -803,8 +814,10 @@ def get_model_data(industry=True, trade_value=True):
     main_data = main_data \
         .merge(ewtinst1c, how='left', on=['SYMBOL', 'WORK_DATE'])  
     
+    print('ewtinst1c Check')
     print('Check - 全部填NA是否合理？')
     main_data = cbyz.df_conv_na(df=main_data, cols=cols_1 + cols_2)
+    cbyz.df_chk_col_na(df=main_data)
 
 
     # 月營收資料表 ......
@@ -892,14 +905,14 @@ def get_model_data(industry=True, trade_value=True):
     
     
     # S&P 500 ......
-    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin, 
-                                     end_date=predict_date[-1])
-
+    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
     main_data = main_data.merge(snp, how='left', on=['WORK_DATE'])
     
     
     # COVID-19 ......
     covid19, _ = cbyz.get_covid19_data()
+    covid19 = main_data_frame_calendar \
+                .merge(covid19, how='left', on=['WORK_DATE'])
     
     covid19, covid19_cols, _ = \
                 cbml.ml_data_process(df=covid19, 
@@ -913,7 +926,6 @@ def get_model_data(industry=True, trade_value=True):
                                      ma_values=ma_values, 
                                      lag_period=predict_period
                                      )
-        
         
     main_data = main_data.merge(covid19, how='left', on='WORK_DATE')
     main_data = cbyz.df_conv_na(df=main_data, cols=covid19_cols)
@@ -930,6 +942,7 @@ def get_model_data(industry=True, trade_value=True):
 
 
     # Check NA ......
+    global hist_df, predict_df
     hist_df = main_data[main_data['WORK_DATE']<predict_date[0]]
     cbyz.df_chk_col_na(df=hist_df, mode='stop')
     
@@ -980,8 +993,13 @@ def get_model_data(industry=True, trade_value=True):
 
 def sam_od_tw_get_index(begin_date, end_date):
     
-    global ma_values, predict_period    
+    global ma_values, predict_period
+    global main_data_frame_calendar
+    
     loc_df = stk.od_tw_get_index(path=path_dcm)
+    
+    loc_df = main_data_frame_calendar \
+                .merge(loc_df, how='left', on='WORK_DATE')    
     
     # Process
     loc_df, cols, _ = \
@@ -996,13 +1014,19 @@ def sam_od_tw_get_index(begin_date, end_date):
                              ma_values=ma_values, 
                              lag_period=predict_period
                              )        
+        
+    loc_df = loc_df[(loc_df['WORK_DATE']>=begin_date) \
+                    & (loc_df['WORK_DATE']<=end_date)]
+        
     return loc_df
 
 
-def sam_od_us_get_snp_data(begin_date, end_date):
+def sam_od_us_get_snp_data(begin_date):
     
     
-    global ma_values, predict_period
+    global ma_values, predict_period, predict_date
+    global main_data_frame_calendar
+    
     loc_df = stk.od_us_get_snp_data(daily_backup=True, path=path_temp)
     loc_df = loc_df.rename(columns={'WORK_DATE':'WORK_DATE_ORIG'})
     
@@ -1013,8 +1037,22 @@ def sam_od_us_get_snp_data(begin_date, end_date):
                               cols='WORK_DATE_ORIG')
     
     loc_df = loc_df.drop('WORK_DATE_ORIG', axis=1)
+
+
+    # Fillna .......
+    # 1. 因為美股的交易時間可能和台灣不一樣，包含特殊節日等，為了避免日期無法對應，用fillna
+    #    補上完整的日期
+    # 2. 先執行fillna再ml_data_process比較合理
+    loc_calendar = ar.get_calendar(begin_date=begin_date, 
+                                   end_date=predict_date[-1])
+    loc_calendar = loc_calendar[['WORK_DATE']]
     
     
+    loc_df = loc_calendar.merge(loc_df, how='left', on='WORK_DATE')
+    cols = cbyz.df_get_cols_except(df=loc_df, except_cols='WORK_DATE')
+    loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
+                            group_by=[], method='ffill')
+
     # Process
     loc_df, cols, _ = \
         cbml.ml_data_process(df=loc_df, 
@@ -1029,24 +1067,10 @@ def sam_od_us_get_snp_data(begin_date, end_date):
                              lag_period=predict_period
                              )    
         
-    # Fillna .......
-    # 1. 因為美股的交易時間可能和台灣不一樣，包含特殊節日等，為了避免日期無法對應，用fillna
-    #    補上完整的日期
-    # 2. 先執行ml_data_process再fillna比較合理
-    loc_calendar = ar.get_calendar(begin_date=begin_date, end_date=end_date)
-    loc_calendar = loc_calendar[['WORK_DATE']]
-    
-    loc_df = loc_calendar.merge(loc_df, how='left', on='WORK_DATE')
-    loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
-                            group_by=[], method='ffill')
-        
-    
     # Fillter the target period        
     if begin_date != None:
         loc_df = loc_df[(loc_df['WORK_DATE'])>=begin_date]
         
-    if end_date != None:
-        loc_df = loc_df[(loc_df['WORK_DATE'])<=end_date]
         
     # 因為傳進來的begin_date是alert，所以有na是正常的
     # cbyz.df_chk_col_na(df=loc_df, mode='alert')
@@ -1104,6 +1128,7 @@ def master(param_holder, predict_begin, export_model=True,
     
     # v2.04
     # - Add 台股指數 - Done
+    # - Fix terrible date lag issues in get_model_data - Done
     # - Add support_resist
     # - select_symbols用過去一周的總成交量檢查
     # - Short term model and long term model be overwirtted
@@ -1112,21 +1137,21 @@ def master(param_holder, predict_begin, export_model=True,
     version = 2.04
 
 
-    Add global model_data to debug
+    # Add global model_data to debug
     
-                          COLUMN  NA_COUNT
-    0    TW_INDEX_OPEN_MA_20_LAG        72
-    1    TW_INDEX_OPEN_MA_10_LAG        72
-    2     TW_INDEX_OPEN_MA_5_LAG        72
-    3    TW_INDEX_HIGH_MA_20_LAG        72
-    4    TW_INDEX_HIGH_MA_10_LAG        72
-    5     TW_INDEX_HIGH_MA_5_LAG        72
-    6     TW_INDEX_LOW_MA_20_LAG        72
-    7     TW_INDEX_LOW_MA_10_LAG        72
-    8      TW_INDEX_LOW_MA_5_LAG        72
-    9   TW_INDEX_CLOSE_MA_20_LAG        72
-    10  TW_INDEX_CLOSE_MA_10_LAG        72
-    11   TW_INDEX_CLOSE_MA_5_LAG        72
+    #                       COLUMN  NA_COUNT
+    # 0    TW_INDEX_OPEN_MA_20_LAG        72
+    # 1    TW_INDEX_OPEN_MA_10_LAG        72
+    # 2     TW_INDEX_OPEN_MA_5_LAG        72
+    # 3    TW_INDEX_HIGH_MA_20_LAG        72
+    # 4    TW_INDEX_HIGH_MA_10_LAG        72
+    # 5     TW_INDEX_HIGH_MA_5_LAG        72
+    # 6     TW_INDEX_LOW_MA_20_LAG        72
+    # 7     TW_INDEX_LOW_MA_10_LAG        72
+    # 8      TW_INDEX_LOW_MA_5_LAG        72
+    # 9   TW_INDEX_CLOSE_MA_20_LAG        72
+    # 10  TW_INDEX_CLOSE_MA_10_LAG        72
+    # 11   TW_INDEX_CLOSE_MA_5_LAG        72
     
     
     # Next
@@ -1219,15 +1244,15 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     global shift_begin, shift_end, data_begin, data_end
-    global predict_date, calendar        
+    global predict_date, calendar
     
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \
                 stk.get_period(predict_begin=predict_begin,
                                predict_period=predict_period,
                                data_period=data_period,
-                               shift=data_shift)  
-
+                               shift=data_shift)
+                
 
     # ......
     global model_data
@@ -1294,13 +1319,13 @@ def master(param_holder, predict_begin, export_model=True,
                             'max_depth':[4],                
                             }
                         },
-                        {'model': SGDRegressor(),
-                          'params': {
-                              # 'max_iter': [1000],
-                              # 'tol': [1e-3],
-                              # 'penalty': ['l2', 'l1'],
-                              }                     
-                          }
+                        # {'model': SGDRegressor(),
+                        #   'params': {
+                        #       # 'max_iter': [1000],
+                        #       # 'tol': [1e-3],
+                        #       # 'penalty': ['l2', 'l1'],
+                        #       }                     
+                        #   }
                        ] 
 
     # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業
@@ -1939,13 +1964,8 @@ def test_support_resistance():
 
 def debug():
     
-
-    chk = main_data[main_data['INDUSTRY_TRADE_VALUE_MA_6_LAG'].isna()]
-    chk = chk[['SYMBOL']].drop_duplicates()
-    
-    stock_info = stk.tw_get_stock_info(path=path_temp)
-    chk_main = chk.merge(stock_info, how='left', on=['SYMBOL'])
-
+    tw_index = sam_od_tw_get_index(begin_date=20170101, 
+                                   end_date=20211210)
 
 # %% Execution ------
 
