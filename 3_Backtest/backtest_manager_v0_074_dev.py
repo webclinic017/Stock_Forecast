@@ -73,36 +73,130 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
-def set_calendar():
-
-    global calendar, _bt_last_begin, _bt_last_end, _predict_period   
-    calendar_end = cbyz.date_cal(_bt_last_begin, _predict_period + 20, 'd')
+def set_frame():
     
+
+    global symbols
+    global calendar, calendar_lite, frame
+    global _bt_last_begin, _bt_last_end, _predict_period
+    global predict_date
+    global actions_main
+    
+
+    # Set Calendar    
+    calendar_end = cbyz.date_cal(_bt_last_begin, _predict_period + 20, 'd')
     calendar = stk.get_market_calendar(begin_date=20140101, 
                                        end_date=calendar_end,
                                        market=market)
     
-    calendar['TRADE'] = np.where(calendar['TRADE_DATE']==0, 0, 1)
+    calendar = calendar[calendar['TRADE_DATE']>0]
     
     
-    calendar, _ = cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
-                                    shift=_predict_period - 1, 
-                                    group_by=['TRADE'], 
-                                    suffix='_LAST', remove_na=False)
+    # df_add_shift will cause NA, it's essential to drop to convert to int
+    calendar, _ = \
+        cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
+                          shift=_predict_period - 1, 
+                          group_by=['TRADE_DATE'], 
+                          suffix='_LAST', remove_na=True
+                          )
+
+    calendar = calendar.rename(columns={'WORK_DATE_LAST':'LAST_DATE'})
+    calendar = cbyz.df_conv_col_type(df=calendar, cols='LAST_DATE', to='int')
+    calendar_lite = calendar[['WORK_DATE', 'LAST_DATE']]
+
     
-    _bt_last_end = calendar[calendar['WORK_DATE_LAST']==_bt_last_begin]
+    # Get the last date
+    _bt_last_end = calendar[calendar['LAST_DATE']==_bt_last_begin]
     _bt_last_end = int(_bt_last_end['WORK_DATE'])    
 
 
+    # Get predict date
+    predict_date = calendar[(calendar['WORK_DATE']>=_bt_last_begin) \
+                        & (calendar['WORK_DATE']<=_bt_last_end)]
+
+    predict_date = predict_date['WORK_DATE'].tolist()    
+
+
+
+    global ohlc, ohlc_ratio, ohlc_last
+    
+    # LAST用來參考，HIST用來算Precision
+    ohlc = stk.get_ohlc(orig=True, ratio=False)
+    ohlc_ratio = stk.get_ohlc(orig=False, ratio=True)
+    ohlc_last = [i + '_LAST' for i in ohlc]
+    ohlc_hist = [i + '_HIST' for i in ohlc]
+
+
+
+    # Hist Data ......
+    # - predict_period * 2 to ensure to get the complete data
+    bt_first_begin = \
+        cbyz.date_cal(_bt_last_begin, 
+                      -_interval * _bt_times - _predict_period * 2, 
+                      'd')    
+    
+    hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
+                                 data_end=_bt_last_end, 
+                                 market=market, 
+                                 symbol=symbols, 
+                                 price_change=True,
+                                 restore=False)
+    
+    hist_data_raw = hist_data_raw[['WORK_DATE', 'SYMBOL'] + ohlc]
+    
+    
+    # Check Symbols
+    if len(symbols) > 0:
+        symbol_df = pd.DataFrame({'SYMBOL':symbols})
+    else:
+        temp_symbol = hist_data_raw['SYMBOL'].unique().tolist()
+        symbol_df = pd.DataFrame({'SYMBOL':temp_symbol})        
+    
+    
+    # Set Frame
+    frame = cbyz.df_cross_join(symbol_df, calendar_lite)
+    frame = frame \
+        .sort_values(by=['SYMBOL', 'WORK_DATE']) \
+        .reset_index(drop=True)
+
+
+    # 
+    ohlc_last_dict = cbyz.li_to_dict(ohlc, ohlc_last)        
+    
+    actions_main = hist_data_raw \
+            .rename(columns=ohlc_last_dict) \
+            .rename(columns={'WORK_DATE':'LAST_DATE'})
+            
+    actions_main = frame \
+        .merge(actions_main, how='left', on=['LAST_DATE', 'SYMBOL'])
+    
+    actions_main = actions_main[(actions_main['WORK_DATE']>=_bt_last_begin) \
+                                & (actions_main['WORK_DATE']<=_bt_last_end)]
+        
+        
+    # Hist Main    
+    ohlc_hist_dict = cbyz.li_to_dict(ohlc, ohlc_hist)        
+    hist_main = hist_data_raw \
+        .rename(columns=ohlc_hist_dict) 
+
+    hist_main = frame \
+        .merge(hist_main, how='left', on=['WORK_DATE', 'SYMBOL']) \
+        .drop('LAST_DATE', axis=1)
+
+    actions_main = actions_main[(actions_main['WORK_DATE']>=_bt_last_begin) \
+                                & (actions_main['WORK_DATE']<=_bt_last_end)]
+        
 
 # ..........
     
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
-                     data_period, cv=2, dev=False):
+                     data_period, dev=False):
     
-    
+    global calendar, calendar_lite
     global symbols, _market, bt_info, _bt_times, _ma_values
+    
+    
     
     # Prepare For Backtest Records ......
     print('backtest_predict - 這裡有bug，應該用global calendar')
@@ -124,7 +218,8 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Work area ----------
-    global bt_results, precision, features, model_y, _volume_thld
+    global bt_results_raw, bt_results
+    global precision, features, var_y, _volume_thld
     global pred_scores, pred_features
     
     bt_results_raw = pd.DataFrame()
@@ -157,9 +252,17 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
     # Organize ......
-    global model_y
-    bt_results = bt_results_raw.reset_index(drop=True)
-    model_y = cbyz.df_get_cols_except(
+    global var_y
+    
+    # ValueError: You are trying to merge on object and int64 columns. 
+    # If you wish to proceed you should use pd.concat
+    bt_results = cbyz.df_conv_col_type(df=bt_results_raw, 
+                                       cols='WORK_DATE', 
+                                       to='int')    
+    
+    bt_results = bt_results.reset_index(drop=True)
+    
+    var_y = cbyz.df_get_cols_except(
         df=bt_results, 
         except_cols=['SYMBOL', 'WORK_DATE', 'BACKTEST_ID']
         )
@@ -169,130 +272,49 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
 
+
+
 def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                export_file=True, load_file=False, path=None, file_name=None):
     '''
     應用場景有可能全部作回測，而不做任何預測，因為data_end直接設為bt_last_begin
     '''
     
+    
+    global ohlc, ohlc_last
     global _predict_period
     global _interval, _bt_times 
-    global bt_results, rmse, bt_main, actions, model_y
+    global bt_results, rmse, bt_main, actions, var_y
     global symbols, _market
     global _bt_last_begin, _bt_last_end    
     global calendar
 
 
     # Prepare columns ......
-    model_y_last = [i + '_LAST' for i in model_y]
-    model_y_hist = [s + '_HIST' for s in model_y]
-    
-    # Y And OHLC
-    ohlc = ['OPEN', 'HIGH', 'LOW', 'CLOSE', 
-            'OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-            'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
-
-    ohlc_hist = [i + '_HIST' for i in ohlc]
-    ohlc_hist_dict = cbyz.li_to_dict(ohlc, ohlc_hist)    
-
-    ohlc_last = [i + '_LAST' for i in ohlc]
+    var_y_last = [i + '_LAST' for i in var_y]
+    var_y_hist = [s + '_HIST' for s in var_y]
     
     
     # close = 'CLOSE'
     close = 'CLOSE_CHANGE_RATIO'
     
-
-    # Period ......
-    # predict_period * 2是為了保險起見
-    bt_first_begin = cbyz.date_cal(_bt_last_begin, 
-                                   -_interval * _bt_times - _predict_period * 2, 
-                                    'd')
-    
-    forecast_calendar = ar.get_calendar(begin_date=_bt_last_begin, 
-                                        end_date=_bt_last_end,
-                                        simplify=True)    
-    
-    forecast_calendar = forecast_calendar[['WORK_DATE']]
-    forecast_calendar = forecast_calendar['WORK_DATE'].tolist()
-    
-
-    # Hist Data ......
-    hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
-                                 data_end=_bt_last_end, 
-                                 market=market, 
-                                 symbol=symbols, 
-                                 price_change=True,
-                                 restore=False)
-    
-    temp_cols = ['WORK_DATE', 'SYMBOL'] + ohlc
-    hist_data_raw = hist_data_raw[temp_cols]
-    
- 
-    # Get Last Date ....        
-    print('Optimize - 這裡的work_date從2014開始')
-    date_last = calendar[calendar['TRADE_DATE']>0]
-    date_last = cbyz.df_add_shift(df=date_last, cols='WORK_DATE', shift=1)
-    
-    date_last = date_last[0] \
-                .dropna(subset=['WORK_DATE_PREV'], axis=0) \
-                .rename(columns={'WORK_DATE_PREV':'LAST_DATE'}) \
-                .reset_index(drop=True)
-                
-    date_last = cbyz.df_conv_col_type(df=date_last, cols='LAST_DATE', 
-                                      to='int')
-    
-    # ......
-    if len(symbols) > 0:
-        symbol_df = pd.DataFrame({'SYMBOL':symbols})
-    else:
-        temp_symbol = hist_data_raw['SYMBOL'].unique().tolist()
-        symbol_df = pd.DataFrame({'SYMBOL':temp_symbol})        
-
         
     # Merge hist data ......
-    main_data_pre = cbyz.df_cross_join(date_last, symbol_df)
-    main_data_pre = main_data_pre \
-                .merge(hist_data_raw, how='left', on=['WORK_DATE', 'SYMBOL'])
+    global frame, actions_main
     
-    # Add last price
-    main_data_pre, _ = cbyz.df_add_shift(df=main_data_pre, cols=ohlc, 
-                                         shift=1, group_by=['SYMBOL'], 
-                                         suffix='_LAST', remove_na=False)
-
-    main_data_pre = main_data_pre.rename(columns=ohlc_hist_dict)
-
-
-    # Organize ......
-    # print('Bug, bt_main的work_date會變成object')
-    # ValueError: You are trying to merge on object and int64 columns. If you wish to proceed you should use pd.concat
-    bt_results = cbyz.df_conv_col_type(df=bt_results, 
-                                       cols='WORK_DATE', 
-                                       to='int')
-    
-    main_data = bt_results.merge(main_data_pre, how='left', 
-                                 on=['WORK_DATE', 'SYMBOL'])
+    main_data = actions_main \
+        .merge(bt_results, how='left', on=['WORK_DATE', 'SYMBOL'])
 
     main_data = main_data[['BACKTEST_ID', 'SYMBOL', 
                            'WORK_DATE', 'LAST_DATE'] \
-                          + model_y + ohlc_hist + ohlc_last]
-
-
-    # 把LAST全部補上最後一個交易日的資料
-    # 因為回測的時間有可能是假日，所以這裡的LAST可能會有NA
-    main_data = \
-        cbyz.df_shift_fillna(
-            df=main_data, 
-            loop_times=_predict_period+1, 
-            cols=ohlc_last, 
-            group_by=['SYMBOL', 'BACKTEST_ID']
-            )
+                          + var_y + ohlc_last]
 
     # Check NA ......
     # 這裡有na是合理的，因為hist可能都是na
     chk = cbyz.df_chk_col_na(df=main_data)
-    # main_data = main_data.dropna(subset=last_cols)
+
     
-    if len(chk) > len(model_y):
+    if len(chk) > len(var_y):
         print('Err01. cal_profit - main_data has na in columns.')
         
         
@@ -309,8 +331,8 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                                precision=precision,
                                date='WORK_DATE', 
                                last_date='LAST_DATE', 
-                               y=model_y, 
-                               y_last=model_y_last,
+                               y=var_y, 
+                               y_last=var_y_last,
                                y_thld=y_thld, 
                                time_thld=time_thld,
                                prec_thld=prec_thld)
@@ -391,10 +413,10 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
               'BUY_SIGNAL', 'DAY_TRADING_SIGNAL', 'HOLD', 
               'WORK_DATE', 'LAST_DATE']
 
-    cols_2 = ['PRECISION_'+ s for s in model_y]    
+    cols_2 = ['PRECISION_'+ s for s in var_y]    
     
     new_cols = cols_1 + profit_cols + ohlc + ohlc_last \
-                + model_y_hist + cols_2
+                + var_y_hist + cols_2
 
 
     # Merge Data ......
@@ -439,7 +461,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
     
     
-    # Close裡面有NA，可能是已經下檔的Symbol？
+    print('Close裡面有NA，可能是已經下檔的Symbol？')
     # Cannot convert non-finite values (NA or inf) to integer
     actions = cbyz.df_conv_na(df=actions,
                               cols=close,
@@ -454,7 +476,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                  99, actions['PERCENTAGE'])
 
     
-
 # .................
 
 
@@ -467,8 +488,8 @@ def eval_metrics(export_file=False, threshold=800):
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
     
-    model_y_hist = [y + '_HIST' for y in model_y]
-    mape_main = bt_main.dropna(subset=model_y_hist, axis=0)
+    var_y_hist = [y + '_HIST' for y in var_y]
+    mape_main = bt_main.dropna(subset=var_y_hist, axis=0)
     
 
     # 不做回測時，mape_main的length一定會等於0
@@ -483,9 +504,9 @@ def eval_metrics(export_file=False, threshold=800):
     stock_metrics_raw = pd.DataFrame()
     
     
-    for i in range(len(model_y)):
+    for i in range(len(var_y)):
         
-        y = model_y[i]
+        y = var_y[i]
         
         
         if 'CHANGE_RATIO' in y:
@@ -664,30 +685,28 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # - 列出前一天大漲的產業
     # - 增加一個欄位，標示第二天為負，為了和DAY_TRADING配合快速篩選
     # v0.071
-    # 1. hold symbols沒有順利標示 - Done
-    # 2. cal_profit中的last不要用還原股價，不然看的時候會很麻煩 - Done
-    # 3. View yesterday，還沒處理日期的問題 - Done
+    # - hold symbols沒有順利標示 - Done
+    # - cal_profit中的last不要用還原股價，不然看的時候會很麻煩 - Done
+    # - View yesterday，還沒處理日期的問題 - Done
     # v0.072
-    # 1. Remove fast and load_model parameter - Done
-    # 2. 把high和short的model分開，避免覆寫模型 - Done
-    # 3. 當load_model為False，且bt_times > 1時，只有第一次會retrain，第二次會load - Done
-    
-    
-    
+    # - Remove fast and load_model parameter - Done
+    # - 把high和short的model分開，避免覆寫模型 - Done
+    # - 當load_model為False，且bt_times > 1時，只有第一次會retrain，第二次會load - Done
     # v0.073
-    # 1. The features sheet of the Actions will be overwrited by both 
-    #    long and short.
-    
+    # - The features sheet of the Actions will be overwrited by both 
+    #    long and short. - Done
+
+
+    # v0.074
+    # - Fix last_price issues - Done, wait for checking 
     
 
     # Bug
     # print('backtest_predict - 這裡有bug，應該用global calendar')
-    # 1.Excel中Last Priced地方不應該一直copy最後一筆資料
-    # 3.低交易量的symbol可能會完全消失在excel中，如預測20211019時的3051力特
-    # 4. Fix Google Sheet可能刪不乾淨的問題
     # 5. print predict date in sam to fix missing date issues    
     # 6. 如果local沒有forecast_records時，cal_profit中的get_forecast_records會出錯：
     #    AttributeError: 'list' object has no attribute 'rename'
+    # 7. precision列出來的，好像都不是score最佳的log
     
     # Optimization
     # 1. Add hold variable as parameters of master
@@ -736,23 +755,8 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     # Worklist
     # 1.Add price increse but model didn't catch
-    # 2.Retrieve one symbol historical data to ensure calendar
-
     
     
-    
-    # 在台灣投資股票的交易成本包含手續費與交易稅，
-    # 手續費公定價格是0.1425%，買進和賣出時各要收取一次，
-    # 股票交易稅是0.3%，如果投資ETF交易稅是0.1%，僅在賣出時收取。
-    
-    
-    # To do action
-    # (1) 集成
-    # (2) 用迴歸，看哪一支model的成效好
-    # (3) 多數決
-    # (4) RMSE > How many model agree > RMSE (Chosen)
-    
-
     global _interval, _bt_times, _volume_thld, _ma_values, _hold
     global symbols, _market
     global _bt_last_begin, _bt_last_end    
@@ -776,6 +780,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # volume_thld = 500
     # hold = [8105, 2610, 3051, 1904, 2611]
     # long = False
+    # compete_mode = 0
 
     # Wait for update
     # date_manager = cbyz.Date_Manager(predict_begin=predict_begin, 
@@ -870,7 +875,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     _predict_period = predict_period
     _bt_last_begin = bt_last_begin
     
-    set_calendar()
+    set_frame()
 
     
     # Predict ------
@@ -879,7 +884,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
                      predict_period=_predict_period, 
                      interval=interval,
                      data_period=data_period,
-                     cv=2, dev=dev)
+                     dev=dev)
     
     
     # Debug for prices columns issues

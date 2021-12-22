@@ -1357,9 +1357,6 @@ def master(param_holder, predict_begin, export_model=True,
                               norm_orig=norm_orig,
                               export_model=True, export_log=True)
                     
-        # ut的norm_orig有bug，所以先獨立出來
-        # return_result = cbml.df_normalize_restore(df=return_result, 
-        #                                        original=norm_orig)
 
         if i == 0:
             pred_result = return_result.copy()
@@ -1374,7 +1371,7 @@ def master(param_holder, predict_begin, export_model=True,
         
         
     # Upload to Google Sheet
-    if predict_period == bt_last_begin:
+    if predict_begin == bt_last_begin:
         stk.write_sheet(data=pred_features, sheet='Features')
         
     
