@@ -72,15 +72,13 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 # %% Inner Function ------
 
 
-
-def set_frame():
+def set_calendar():
     
-
-    global symbols
-    global calendar, calendar_lite, frame
+    # global symbols
+    global calendar, calendar_lite
     global _bt_last_begin, _bt_last_end, _predict_period
     global predict_date
-    global actions_main
+    # global actions_main
     
 
     # Set Calendar    
@@ -106,8 +104,9 @@ def set_frame():
 
     
     # Get the last date
-    _bt_last_end = calendar[calendar['LAST_DATE']==_bt_last_begin]
-    _bt_last_end = int(_bt_last_end['WORK_DATE'])    
+    _bt_last_end = calendar[calendar['LAST_DATE']==_bt_last_begin] \
+                    .reset_index(drop=True)
+    _bt_last_end = int(_bt_last_end.loc[0, 'WORK_DATE'])  
 
 
     # Get predict date
@@ -118,22 +117,45 @@ def set_frame():
 
 
 
+
+def set_frame():
+
+    global symbols
+    global calendar, calendar_lite, frame
+    global _bt_last_begin, _bt_last_end, _predict_period
+    global predict_date
+    global actions_main
+    # global ohlc, ohlc_ratio, ohlc_last
+    
+    global actions_main, hist_main
+    
+    
     global ohlc, ohlc_ratio, ohlc_last
+    global var_y, var_y_last, var_y_hist
     
     # LAST用來參考，HIST用來算Precision
+    # - 因為y可能是price，也可能是ratio，所以在filter dataframe時，盡量用ohlc相關的
+    #   變數，不要用var_y
     ohlc = stk.get_ohlc(orig=True, ratio=False)
     ohlc_ratio = stk.get_ohlc(orig=False, ratio=True)
     ohlc_last = [i + '_LAST' for i in ohlc]
-    ohlc_hist = [i + '_HIST' for i in ohlc]
+    # ohlc_hist = [i + '_HIST' for i in ohlc]
 
+    var_y_last = [i + '_LAST' for i in var_y]
+    var_y_hist = [i + '_HIST' for i in var_y]
 
 
     # Hist Data ......
     # - predict_period * 2 to ensure to get the complete data
+    # - No matter your y is the price or the change ratio, it is essential to
+    #   keep both information in the actions_main
+    
+      
     bt_first_begin = \
         cbyz.date_cal(_bt_last_begin, 
                       -_interval * _bt_times - _predict_period * 2, 
                       'd')    
+    
     
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
                                  data_end=_bt_last_end, 
@@ -142,7 +164,15 @@ def set_frame():
                                  price_change=True,
                                  restore=False)
     
-    hist_data_raw = hist_data_raw[['WORK_DATE', 'SYMBOL'] + ohlc]
+    if 'CLOSE' in var_y:
+        hist_data_raw = hist_data_raw[['WORK_DATE', 'SYMBOL'] + ohlc]
+    else:
+        rename_dict = cbyz.li_to_dict(ohlc, ohlc_last)
+        
+        hist_data_raw = hist_data_raw[['WORK_DATE', 'SYMBOL'] \
+                                      + ohlc + ohlc_ratio] \
+                        .rename(columns=rename_dict)
+            
     
     
     # Check Symbols
@@ -161,30 +191,31 @@ def set_frame():
 
 
     # 
-    ohlc_last_dict = cbyz.li_to_dict(ohlc, ohlc_last)        
+    rename_dict = cbyz.li_to_dict(var_y, var_y_last)        
     
     actions_main = hist_data_raw \
-            .rename(columns=ohlc_last_dict) \
+            .rename(columns=rename_dict) \
             .rename(columns={'WORK_DATE':'LAST_DATE'})
             
     actions_main = frame \
-        .merge(actions_main, how='left', on=['LAST_DATE', 'SYMBOL'])
+        .merge(actions_main, how='left', on=['LAST_DATE', 'SYMBOL']) \
+        .merge(bt_results, how='left', on=['WORK_DATE', 'SYMBOL'])
     
     actions_main = actions_main[(actions_main['WORK_DATE']>=_bt_last_begin) \
                                 & (actions_main['WORK_DATE']<=_bt_last_end)]
         
         
     # Hist Main    
-    ohlc_hist_dict = cbyz.li_to_dict(ohlc, ohlc_hist)        
+    rename_dict = cbyz.li_to_dict(var_y, var_y_hist)        
     hist_main = hist_data_raw \
-        .rename(columns=ohlc_hist_dict) 
+        .rename(columns=rename_dict) 
 
     hist_main = frame \
         .merge(hist_main, how='left', on=['WORK_DATE', 'SYMBOL']) \
         .drop('LAST_DATE', axis=1)
 
-    actions_main = actions_main[(actions_main['WORK_DATE']>=_bt_last_begin) \
-                                & (actions_main['WORK_DATE']<=_bt_last_end)]
+    hist_main = hist_main[(hist_main['WORK_DATE']>=_bt_last_begin) \
+                                & (hist_main['WORK_DATE']<=_bt_last_end)]
         
 
 # ..........
@@ -272,8 +303,6 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
 
-
-
 def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                export_file=True, load_file=False, path=None, file_name=None):
     '''
@@ -290,32 +319,33 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     global calendar
 
 
-    # Prepare columns ......
-    var_y_last = [i + '_LAST' for i in var_y]
-    var_y_hist = [s + '_HIST' for s in var_y]
-    
-    
-    # close = 'CLOSE'
-    close = 'CLOSE_CHANGE_RATIO'
-    
+    global ohlc, ohlc_ratio, ohlc_last
+    global var_y, var_y_last, var_y_hist
+
+
+
         
     # Merge hist data ......
     global frame, actions_main
     
-    main_data = actions_main \
-        .merge(bt_results, how='left', on=['WORK_DATE', 'SYMBOL'])
-
-    main_data = main_data[['BACKTEST_ID', 'SYMBOL', 
-                           'WORK_DATE', 'LAST_DATE'] \
-                          + var_y + ohlc_last]
+    if 'CLOSE_CHANGE_RATIO' in var_y:
+        main_data = actions_main[['BACKTEST_ID', 'SYMBOL', 
+                                  'WORK_DATE', 'LAST_DATE'] \
+                                 + var_y + var_y_last + ohlc_last]
+    elif 'CLOSE' in var_y:
+        main_data = actions_main[['BACKTEST_ID', 'SYMBOL', 
+                                  'WORK_DATE', 'LAST_DATE'] \
+                                 + var_y + var_y_last]
+        
 
     # Check NA ......
-    # 這裡有na是合理的，因為hist可能都是na
-    chk = cbyz.df_chk_col_na(df=main_data)
+    # 1. 這裡有na是合理的，因為hist可能都是na
+    # 2. 在SAM中被排除的Symbol可能會出現在這，導致每一欄的NA_COUNT不一樣
+    cbyz.df_chk_col_na(df=main_data)
 
     
-    if len(chk) > len(var_y):
-        print('Err01. cal_profit - main_data has na in columns.')
+    # if len(chk) > len(var_y):
+    #     print('Err01. cal_profit - main_data has na in columns.')
         
         
     if len(main_data) == 0:
@@ -327,7 +357,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     global precision
     
     bt_main, actions = \
-        stk.gen_predict_action(df=main_data, 
+        stk.gen_predict_action(df=main_data,
                                precision=precision,
                                date='WORK_DATE', 
                                last_date='LAST_DATE', 
@@ -337,17 +367,17 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                                time_thld=time_thld,
                                prec_thld=prec_thld)
         
-    # Evaluate Precision ......
-    eval_metrics(export_file=False)            
-    
-    
+    msg = 'The max value of BACKTEST_ID should be 0.'
+    assert actions['BACKTEST_ID'].max() == 0, msg
+        
+
     # Forecast Records ......
     print('Bug - get_forecast_records中的Action Score根本沒用到')
     records = stk.get_forecast_records(forecast_begin=None, 
-                                       forecast_end=None, 
-                                       execute_begin=execute_begin, 
-                                       execute_end=None, 
-                                       y=['CLOSE_CHANGE_RATIO'], 
+                                       forecast_end=None,
+                                       execute_begin=execute_begin,
+                                       execute_end=None,
+                                       y=['CLOSE_CHANGE_RATIO'],
                                        summary=True)
     
     if len(records)  > 0:
@@ -371,9 +401,8 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     global _hold
     actions['HOLD'] = np.where(actions['SYMBOL'].isin(_hold), 1, 0)
 
-    print('Check BUY_SIGNAL')
+
     actions['BUY_SIGNAL'] = np.nan 
-    
     
     
     # Add OHLC ......
@@ -399,24 +428,26 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     actions['DAY_TRADING_SIGNAL'] = actions['HIGH'] - actions['LOW']
         
     
-    # Rearrange Columns ......            
-    profit_cols = [close + '_PROFIT_PREDICT', 
-                   close + '_PROFIT_RATIO_PREDICT']
-        
-        
-    profit_cols = profit_cols \
-        + ['RECORD_PRECISION_MEDIAN', 'RECORD_PRECISION_STD', 
+    
+    if 'CLOSE_CHANGE' not in action_cols:
+        actions['CLOSE_CHANGE'] = \
+            actions['CLOSE'] - actions['CLOSE_LAST']
+    
+    
+    # Rearrange Columns ......       
+    profit_cols = ['CLOSE_CHANGE', 'CLOSE_CHANGE_RATIO', 
+           'RECORD_PRECISION_MEDIAN', 'RECORD_PRECISION_STD', 
            'DIFF_MEDIAN', 'DIFF_STD']
         
     
-    cols_1 = ['BACKTEST_ID', 'SYMBOL', 'STOCK_NAME', 'INDUSTRY',
+    cols_1 = ['SYMBOL', 'STOCK_NAME', 'INDUSTRY',
               'BUY_SIGNAL', 'DAY_TRADING_SIGNAL', 'HOLD', 
               'WORK_DATE', 'LAST_DATE']
 
     cols_2 = ['PRECISION_'+ s for s in var_y]    
     
     new_cols = cols_1 + profit_cols + ohlc + ohlc_last \
-                + var_y_hist + cols_2
+                + cols_2
 
 
     # Merge Data ......
@@ -424,12 +455,10 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
         actions = actions.merge(records, how='left', on=['SYMBOL'])
     
         actions.loc[:, 'DIFF_MEDIAN'] = \
-            actions[close + '_PROFIT_RATIO_PREDICT'] \
-            - actions['RECORD_PRECISION_MEDIAN']
+            actions['CLOSE_CHANGE_RATIO'] - actions['RECORD_PRECISION_MEDIAN']
     
         actions.loc[:, 'DIFF_STD'] = \
-            actions[close + '_PROFIT_RATIO_PREDICT'] \
-            - actions['RECORD_PRECISION_STD']
+            actions['CLOSE_CHANGE_RATIO'] - actions['RECORD_PRECISION_STD']
     
     else:
         actions['RECORD_PRECISION_STD'] = np.nan
@@ -446,12 +475,12 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     # Decrease On First Day ...
     cond1 = actions[(actions['WORK_DATE']==_bt_last_begin) \
-                   & (actions[close + '_PROFIT_RATIO_PREDICT']<0)]
+                   & (actions['CLOSE_CHANGE_RATIO']<0)]
     cond1 = cond1['SYMBOL'].unique().tolist()
     
     # Estimated Profit ...
     cond2 = actions[(actions['WORK_DATE']>_bt_last_begin) \
-                   & (actions[close + '_PROFIT_RATIO_PREDICT']>=y_thld)]
+                   & (actions['CLOSE_CHANGE_RATIO']>=y_thld)]
     cond2 = cond2['SYMBOL'].unique().tolist()    
     
     # Max Error ...
@@ -463,12 +492,16 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     print('Close裡面有NA，可能是已經下檔的Symbol？')
     # Cannot convert non-finite values (NA or inf) to integer
+    
+    global cal_profit_debug
+    cal_profit_debug = actions[actions['CLOSE'].isna()]
+    
     actions = cbyz.df_conv_na(df=actions,
-                              cols=close,
+                              cols='CLOSE' ,
                               value=-1000)    
     
     # Add Level
-    actions['PERCENTAGE'] = actions[close] * 100
+    actions['PERCENTAGE'] = actions['CLOSE_CHANGE_RATIO'] * 100
     actions['PERCENTAGE'] = actions['PERCENTAGE'].astype('int')
     
     actions['BUY_SIGNAL'] = \
@@ -487,38 +520,37 @@ def eval_metrics(export_file=False, threshold=800):
     global bt_main, bt_info, rmse
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics
+    global var_y, var_y_last, var_y_hist
     
-    var_y_hist = [y + '_HIST' for y in var_y]
-    mape_main = bt_main.dropna(subset=var_y_hist, axis=0)
     
+    
+    loc_main = bt_results.merge(hist_main, on=['SYMBOL', 'WORK_DATE'])
 
     # 不做回測時，mape_main的length一定會等於0
-    if len(mape_main) == 0:
+    if len(loc_main) == 0:
         return
     
-    
     # ......
-    mape = pd.DataFrame()
+    loc_precision = pd.DataFrame()
     mape_group = pd.DataFrame()
     mape_extreme = pd.DataFrame()
     stock_metrics_raw = pd.DataFrame()
     
-    
     for i in range(len(var_y)):
         
         y = var_y[i]
+        y_hist = var_y_hist[i]
         
         
         if 'CHANGE_RATIO' in y:
-            mape_main.loc[:, 'MAPE'] = mape_main[y] - mape_main[y + '_HIST']
+            loc_main['MAPE'] = loc_main[y] - loc_main[y_hist]
         else:
-            mape_main.loc[:, 'MAPE'] = (mape_main[y] \
-                                    - mape_main[y + '_HIST']) \
-                                / mape_main[y + '_HIST']            
+            loc_main['MAPE'] = \
+                (loc_main[y] - loc_main[y_hist]) / loc_main[y_hist]            
                             
                             
-        mape_main.loc[:, 'OVERESTIMATE'] = \
-            np.where(mape_main[y] > mape_main[y + '_HIST'], 1, 0)
+        loc_main['OVERESTIMATE'] = \
+            np.where(loc_main[y] > loc_main[y_hist], 1, 0)
 
         # Absolute ......
         mape_main_abs = mape_main.copy()
@@ -699,18 +731,16 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
     # v0.074
     # - Fix last_price issues - Done, wait for checking 
+    # - Optimize cal_profit - Done
     
 
     # Bug
-    # print('backtest_predict - 這裡有bug，應該用global calendar')
     # 5. print predict date in sam to fix missing date issues    
     # 6. 如果local沒有forecast_records時，cal_profit中的get_forecast_records會出錯：
     #    AttributeError: 'list' object has no attribute 'rename'
     # 7. precision列出來的，好像都不是score最佳的log
     
     # Optimization
-    # 1. Add hold variable as parameters of master
-    # 3. 把market改成market，stock_symbol改成symbol
     # 4. Calculate IRR, remove outliers
     # 5. Google Sheet Add Manual Tick
     # 6. Think how to optimize stop loss
@@ -755,8 +785,6 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     # Worklist
     # 1.Add price increse but model didn't catch
-    
-    
     global _interval, _bt_times, _volume_thld, _ma_values, _hold
     global symbols, _market
     global _bt_last_begin, _bt_last_end    
@@ -868,16 +896,15 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     symbols = symbols
     symbols = cbyz.li_conv_ele_type(symbols, to_type='str')
 
-
     # Set Date ......
     global _bt_last_begin, _predict_period
     global calendar, _bt_last_end
     _predict_period = predict_period
     _bt_last_begin = bt_last_begin
     
-    set_frame()
+    set_calendar()
 
-    
+
     # Predict ------
     global bt_results, precision, features
     backtest_predict(bt_last_begin=bt_last_begin, 
@@ -885,6 +912,9 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
                      interval=interval,
                      data_period=data_period,
                      dev=dev)
+
+    # Set Date ......
+    set_frame()
     
     
     # Debug for prices columns issues
@@ -911,7 +941,14 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     execute_begin = cbyz.date_get_today()
     execute_begin = cbyz.date_cal(execute_begin, -14, 'd')
+    # execute_begin = cbyz.date_cal(execute_begin, -40, 'd')
     execute_begin = int(str(execute_begin)[2:] + '0000')
+    
+    
+    # Evaluate Precision ......
+    
+    # eval_metricsv裡面的bug還沒修好
+    # eval_metrics(export_file=False) 
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
     cal_profit(y_thld=0.02, time_thld=_predict_period, prec_thld=0.05,
@@ -1048,7 +1085,7 @@ if __name__ == '__main__':
     
     hold = [1909, 2009, 2485, 2605, 3041, 2633]
     
-    master(bt_last_begin=20211220, predict_period=5, 
+    master(bt_last_begin=20211201, predict_period=5, 
            long=False, interval=4, bt_times=1, 
            data_period=int(365 * 1), 
            ma_values=[5,10,20], volume_thld=400,

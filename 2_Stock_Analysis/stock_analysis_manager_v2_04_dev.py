@@ -824,56 +824,7 @@ def get_model_data(industry=True, trade_value=True):
     # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
     # 1. 主要邏輯就是顯示最新的營收資料
     # print('Update - 增加date index')
-    # ewsale = stk.tej_get_ewsale(begin_date=shift_begin, end_date=None, 
-    #                             SYMBOL=symbols, trade=True)
-    
-    # ewsale, cols, _ = \
-    #     cbml.ml_data_process(df=ewsale, 
-    #                          ma=False, normalize=True, lag=False, 
-    #                          ma_group_by=['SYMBOL'],
-    #                          norm_group_by=['SYMBOL'], 
-    #                          lag_group_by=['SYMBOL'],
-    #                          ma_cols_contains=[], 
-    #                          ma_except_contains=[],
-    #                          norm_cols_contains=['D000'], 
-    #                          norm_except_contains=[],
-    #                          lag_cols_contains=[], 
-    #                          lag_except_contains=[], 
-    #                          drop_except_contains=[],
-    #                          ma_values=ma_values, 
-    #                          lag_period=predict_period)    
-    
-    # ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
-    #                                      cols=['D0001', 'D0002', 'D0003'], 
-    #                                      shift=-1, group_by=['SYMBOL'],
-    #                                      suffix='_PRE', remove_na=False)
-    
-    # # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
-    # # Bug，但是這裡的year沒有標準化，現在是在get_model_data最後面直接把YEAR刪除
-    # year_month = main_data[['WORK_DATE', 'YEAR', 'MONTH']] \
-    #             .drop_duplicates()
-                
-    # ewsale = ewsale.merge(year_month, how='inner', on=['WORK_DATE'])
-    # ewsale = ewsale.rename(columns={'WORK_DATE':'EWSALE_WORK_DATE',
-    #                                 'D0001':'D0001_CUR',
-    #                                 'D0002':'D0002_CUR',
-    #                                 'D0003':'D0003_CUR'})
-    
-    # main_data = main_data \
-    #         .merge(ewsale, how='left', on=['SYMBOL', 'YEAR', 'MONTH'])  
-
-    # cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
-    # main_data['D0001'] = np.where(cond, 
-    #                               main_data['D0001_CUR'], 
-    #                               main_data['D0001_PRE'])
-    
-    # main_data['D0002'] = np.where(cond, 
-    #                               main_data['D0002_CUR'], 
-    #                               main_data['D0002_PRE'])
-
-    # main_data['D0003'] = np.where(cond, 
-    #                               main_data['D0003_CUR'], 
-    #                               main_data['D0003_PRE'])
+ 
     
     # main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
     #                            axis=1)
@@ -1080,6 +1031,67 @@ def sam_od_us_get_snp_data(begin_date):
 
 
 
+def sam_tej_get_ewsale(begin_date):
+    
+
+    global main_data_frame
+
+    ewsale = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
+                                symbol=symbols, trade=True, host=host)
+    
+    # ewsale, cols, _ = \
+    #     cbml.ml_data_process(df=ewsale, 
+    #                          ma=False, normalize=True, lag=False, 
+    #                          ma_group_by=['SYMBOL'],
+    #                          norm_group_by=['SYMBOL'], 
+    #                          lag_group_by=['SYMBOL'],
+    #                          ma_cols_contains=[], 
+    #                          ma_except_contains=[],
+    #                          norm_cols_contains=['D000'], 
+    #                          norm_except_contains=[],
+    #                          lag_cols_contains=[], 
+    #                          lag_except_contains=[], 
+    #                          drop_except_contains=[],
+    #                          ma_values=ma_values, 
+    #                          lag_period=predict_period)    
+    
+    # ewsale, pre_cols = cbyz.df_add_shift(df=ewsale,
+    #                                      cols=['D0001', 'D0002', 'D0003'], 
+    #                                      shift=-1, group_by=['SYMBOL'],
+    #                                      suffix='_PRE', remove_na=False)
+    
+    # # 因為main_data的YEAR和MONTH已經標準化過了，要直接採用標準化後的數值
+    # # Bug，但是這裡的year沒有標準化，現在是在get_model_data最後面直接把YEAR刪除
+    # year_month = main_data[['WORK_DATE', 'YEAR', 'MONTH']] \
+    #             .drop_duplicates()
+                
+    # ewsale = ewsale.merge(year_month, how='inner', on=['WORK_DATE'])
+    # ewsale = ewsale.rename(columns={'WORK_DATE':'EWSALE_WORK_DATE',
+    #                                 'D0001':'D0001_CUR',
+    #                                 'D0002':'D0002_CUR',
+    #                                 'D0003':'D0003_CUR'})
+    
+    # main_data = main_data \
+    #         .merge(ewsale, how='left', on=['SYMBOL', 'YEAR', 'MONTH'])  
+
+    # cond = main_data['WORK_DATE'] >= main_data['EWSALE_WORK_DATE']
+    # main_data['D0001'] = np.where(cond, 
+    #                               main_data['D0001_CUR'], 
+    #                               main_data['D0001_PRE'])
+    
+    # main_data['D0002'] = np.where(cond, 
+    #                               main_data['D0002_CUR'], 
+    #                               main_data['D0002_PRE'])
+
+    # main_data['D0003'] = np.where(cond, 
+    #                               main_data['D0003_CUR'], 
+    #                               main_data['D0003_PRE'])
+
+    
+    return
+
+
+
 # %% Master ------
 
 def master(param_holder, predict_begin, export_model=True,
@@ -1129,6 +1141,8 @@ def master(param_holder, predict_begin, export_model=True,
     # v2.04
     # - Add 台股指數 - Done
     # - Fix terrible date lag issues in get_model_data - Done
+    
+    
     # - Add support_resist
     # - select_symbols用過去一周的總成交量檢查
     # - Short term model and long term model be overwirtted

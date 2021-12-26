@@ -314,6 +314,11 @@ def operate_sql():
     
     # sql = " select count(*) from ewtinst1c "
     # ar.db_query(sql)
+    
+    
+    # file_path = '/Users/aron/Documents/GitHub/Stock_Forecast/0_Finance_Controller/Resource/ewprcd_restore.csv'
+    # file = pd.read_csv(file_path)
+    # ar.db_upload(data=file, table_name='ewprcd')
     pass
     
     
@@ -427,7 +432,7 @@ if __name__ == '__main__':
     # 1. ewsale是不是手動上傳的？
     # 2. TEJ只開放五年的資料
         
-    update(begin=20211201, end=20211221, ewprcd=True, ewtinst1c=True, 
+    update(begin=20210101, end=20211225, ewprcd=True, ewtinst1c=True, 
            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
            delete=True, upload=True)        
 
@@ -436,4 +441,10 @@ if __name__ == '__main__':
     info = tejapi.ApiConfig.info()    
     print('todayRows - ' + str(info['todayRows']))
     
+    
+    
+
+
+
+
     
