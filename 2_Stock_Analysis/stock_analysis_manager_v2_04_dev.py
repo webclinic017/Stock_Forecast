@@ -59,7 +59,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v0_22 as ut
+import ultra_tuner_v0_24_dev as ut
 
 ar.host = host
 
@@ -510,8 +510,6 @@ def sam_load_data(industry=True, trade_value=True):
             .merge(industry_data, how='left', on=['WORK_DATE', 'INDUSTRY_ONE_HOT']) \
             .drop('INDUSTRY_ONE_HOT', axis=1)
         
-        
-
 
 
     # Check NA ......
@@ -824,7 +822,8 @@ def get_model_data(industry=True, trade_value=True):
     # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
     # 1. 主要邏輯就是顯示最新的營收資料
     # print('Update - 增加date index')
- 
+
+    ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
     
     # main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
     #                            axis=1)
@@ -1035,7 +1034,6 @@ def sam_tej_get_ewsale(begin_date):
     
 
     global main_data_frame
-
     ewsale = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
                                 symbol=symbols, trade=True, host=host)
     
@@ -1267,7 +1265,6 @@ def master(param_holder, predict_begin, export_model=True,
                                data_period=data_period,
                                shift=data_shift)
                 
-
     # ......
     global model_data
     global model_x, var_y, id_keys

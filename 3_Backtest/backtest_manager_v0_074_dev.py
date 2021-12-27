@@ -228,7 +228,6 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     global symbols, _market, bt_info, _bt_times, _ma_values
     
     
-    
     # Prepare For Backtest Records ......
     print('backtest_predict - 這裡有bug，應該用global calendar')
     bt_info_raw = cbyz.date_get_seq(begin_date=bt_last_begin,
