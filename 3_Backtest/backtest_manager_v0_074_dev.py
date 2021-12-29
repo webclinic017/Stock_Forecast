@@ -31,8 +31,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211221',
-                 r'/home/jupyter/Arsenal/20211221',
+                 r'/home/jupyter/Codebase_YZ/20211229',
+                 r'/home/jupyter/Arsenal/20211229',
                  path + '/Function',
                  path_sam]
 
@@ -501,11 +501,19 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     # Add Level
     actions['PERCENTAGE'] = actions['CLOSE_CHANGE_RATIO'] * 100
-    actions['PERCENTAGE'] = actions['PERCENTAGE'].astype('int')
+
+    # There may be some inf values
+    actions = cbyz.df_conv_na(df=actions, cols='PERCENTAGE', value=-1000)
+    actions = cbyz.df_handle_inf(df=actions, cols='PERCENTAGE', value=-1000, 
+                                 drop=False, axis=0)
     
+    actions['PERCENTAGE'] = actions['PERCENTAGE'].astype('int')
+      
     actions['BUY_SIGNAL'] = \
         np.where(actions['SYMBOL'].isin(buy_signal_symbols), 
                  99, actions['PERCENTAGE'])
+
+
 
     
 # .................
@@ -688,7 +696,7 @@ def view_yesterday():
 
 def master(bt_last_begin, predict_period=14, long=False, interval=360, 
            bt_times=2, data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
-           compete_mode=1, market='tw', hold=[], dev=False):
+           cv=2, compete_mode=1, market='tw', hold=[], dev=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -852,7 +860,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
             'market':['tw'],
             'compete_mode':[compete_mode],
             'train_mode':[2],            
-            'cv':[2],
+            'cv':[cv],
             'kbest':['all'],
             'dev':[dev],
             'symbols':[symbols],
@@ -1088,23 +1096,25 @@ if __name__ == '__main__':
            long=False, interval=4, bt_times=1, 
            data_period=int(365 * 1), 
            ma_values=[5,10,20], volume_thld=400,
-           compete_mode=2,
+           compete_mode=2, cv=list(range(2, 7)),
            market='tw', hold=hold,
            dev=True)
     
     
-    # master(bt_last_begin=20211220, predict_period=3, 
+    # master(bt_last_begin=20211230, predict_period=4, 
     #        long=False, interval=7, bt_times=1, 
     #        data_period=int(365 * 5), 
-    #        ma_values=[5,10,20,60], volume_thld=300,
+    #        ma_values=[10,20,60], volume_thld=300,
+    #        compete_mode=1, cv=list(range(3, 8)),
     #        market='tw', hold=hold,
     #        dev=False)
 
 
-    # master(bt_last_begin=20211220, predict_period=10, 
+    # master(bt_last_begin=20211228, predict_period=10, 
     #        long=True, interval=7, bt_times=1, 
     #        data_period=int(365 * 5), 
     #        ma_values=[10,20,60], volume_thld=300,
+    #        compete_mode=1, cv=list(range(3, 7)),
     #        market='tw', hold=hold,
     #        dev=False)
 
