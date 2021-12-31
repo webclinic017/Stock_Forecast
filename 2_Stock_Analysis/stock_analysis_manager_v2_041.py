@@ -1267,6 +1267,9 @@ def master(param_holder, predict_begin, export_model=True,
         
     model_data = model_data.drop(corr_drop_cols, axis=1)
     
+    # Export Model Data
+    model_data.to_csv(path_temp + '/model_data.csv', index=False)    
+    
     
     # .......
     print('WEEK_NUM的type是OBJ，先排除')
@@ -1295,10 +1298,12 @@ def master(param_holder, predict_begin, export_model=True,
                           },
                         {'model': xgb.XGBRegressor(),
                          'params': {
-                            'n_estimators': [200],
-                            'gamma':[0],
-                            'max_depth':[4],                
-                            }
+                            # 'n_estimators': [200],
+                            'eta': [0.03, 0.05],
+                            'min_child_weight': [1],
+                            'max_depth':[8],
+                            'subsample':[0.8]
+                          }
                         },
                         # {'model': SGDRegressor(),
                         #   'params': {

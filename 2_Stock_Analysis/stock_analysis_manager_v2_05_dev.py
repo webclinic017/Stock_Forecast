@@ -45,8 +45,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211229',
-                 r'/home/jupyter/Arsenal/20211229',
+                 r'/home/jupyter/Codebase_YZ/20211231',
+                 r'/home/jupyter/Arsenal/20211231',
                  path + '/Function']
 
 
@@ -59,7 +59,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v0_24_dev as ut
+import ultra_tuner_v0_25_dev as ut
 
 ar.host = host
 
@@ -1119,9 +1119,9 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add 台股指數 - Done
     # - Fix terrible date lag issues in get_model_data - Done
     
-    
     # v2.041
     # - Update for new modules
+    # - Export Model Data
     
     # v2.05
     # - Add Financial Statements
@@ -1133,7 +1133,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - Short term model and long term model be overwirtted
 
     global version
-    version = 2.04
+    version = 2.05
 
 
     # Add global model_data to debug
@@ -1289,6 +1289,9 @@ def master(param_holder, predict_begin, export_model=True,
     print('WEEK_NUM的type是OBJ，先排除')
     model_data = model_data.drop('WEEK_NUM', axis=1)
     
+    # Export Model Data
+    model_data.to_csv(path_temp + '/model_data.csv', index=False)
+    
     
     # Training Model ......
     import xgboost as xgb
@@ -1312,10 +1315,12 @@ def master(param_holder, predict_begin, export_model=True,
                           },
                         {'model': xgb.XGBRegressor(),
                          'params': {
-                            'n_estimators': [200],
-                            'gamma':[0],
-                            'max_depth':[4],                
-                            }
+                            # 'n_estimators': [200],
+                            'eta': [0.03, 0.05],
+                            'min_child_weight': [1],
+                            'max_depth':[8],
+                            'subsample':[0.8]
+                          }
                         },
                         # {'model': SGDRegressor(),
                         #   'params': {

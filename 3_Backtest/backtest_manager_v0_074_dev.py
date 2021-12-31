@@ -31,8 +31,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211229',
-                 r'/home/jupyter/Arsenal/20211229',
+                 r'/home/jupyter/Codebase_YZ/20211231',
+                 r'/home/jupyter/Arsenal/20211231',
                  path + '/Function',
                  path_sam]
 
@@ -50,7 +50,8 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v2_01 as sam
 # import stock_analysis_manager_v2_02 as sam
 # import stock_analysis_manager_v2_03 as sam
-import stock_analysis_manager_v2_04_dev as sam
+# import stock_analysis_manager_v2_04_dev as sam
+import stock_analysis_manager_v2_05_dev as sam
 
 
 
@@ -513,22 +514,31 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
         np.where(actions['SYMBOL'].isin(buy_signal_symbols), 
                  99, actions['PERCENTAGE'])
 
-
-
-    
 # .................
 
 
-
 def eval_metrics(export_file=False, threshold=800):
+    '''
+    
+
+    Parameters
+    ----------
+    export_file : TYPE, optional
+        DESCRIPTION. The default is False.
+    threshold : TYPE, optional
+        DESCRIPTION. The default is 800.
+
+    Returns
+    -------
+    None.
+
+    '''
 
     
-    # MAPE ......
+    global _market
     global bt_main, bt_info, rmse
-    global mape, mape_group, mape_extreme
-    global stock_metrics_raw, stock_metrics
     global var_y, var_y_last, var_y_hist
-    
+    global serial, compete_mode
     
     
     loc_main = bt_results.merge(hist_main, on=['SYMBOL', 'WORK_DATE'])
@@ -538,114 +548,55 @@ def eval_metrics(export_file=False, threshold=800):
         return
     
     # ......
-    loc_precision = pd.DataFrame()
-    mape_group = pd.DataFrame()
-    mape_extreme = pd.DataFrame()
-    stock_metrics_raw = pd.DataFrame()
+    result = pd.DataFrame()
     
     for i in range(len(var_y)):
-        
         y = var_y[i]
         y_hist = var_y_hist[i]
         
         
         if 'CHANGE_RATIO' in y:
-            loc_main['MAPE'] = loc_main[y] - loc_main[y_hist]
+            loc_main['PRECISION'] = loc_main[y] - loc_main[y_hist]
         else:
-            loc_main['MAPE'] = \
+            loc_main['PRECISION'] = \
                 (loc_main[y] - loc_main[y_hist]) / loc_main[y_hist]            
                             
+        loc_main['PRECISION'] = loc_main['PRECISION'].abs()     
+
+
+        new_result = loc_main[['SYMBOL', 'WORK_DATE', 'PRECISION']]
+        new_result = new_result.assign(Y=y)
+        result = result.append(new_result)
                             
-        loc_main['OVERESTIMATE'] = \
-            np.where(loc_main[y] > loc_main[y_hist], 1, 0)
+    
+    result = result.dropna(axis=0)
+    result = result.assign(MARKET=_market)
+    result = result.assign(VERSION=sam.version)
+    result = result.assign(PRECISION_METRIC='MAPE')
+    result = result.assign(SERIAL=serial)
+    
+    # Not Finished Yet
+    result = result.assign(SCORE_METRIC='R2')
+    result = result.assign(MODEL_SCORE=0)
+    result = result.assign(PARAMS='')
+    
+    
+    # WORK_DATE means predict date.
+    result = result[['MARKET', 'VERSION', 'SYMBOL', 'SERIAL', 'Y', 
+                      'WORK_DATE',
+                      'SCORE_METRIC', 'MODEL_SCORE', 
+                      'PRECISION_METRIC', 'PRECISION', 'PARAMS']]
+    
 
-        # Absolute ......
-        mape_main_abs = mape_main.copy()
-        mape_main_abs.loc[mape_main_abs.index, 'MAPE'] = abs(mape_main_abs['MAPE'])
-                 
-        
-        # MAPE Overview
-        new_mape, _ = cbyz.df_summary(df=mape_main_abs, group_by=[], cols=['MAPE'])
-        new_mape.loc[:, 'Y'] = y
-        mape = mape.append(new_mape)
-        
-        
-        # Group MAPE ......
-        new_mape, _ = cbyz.df_summary(df=mape_main_abs, group_by=['OVERESTIMATE'], 
-                                 cols=['MAPE'])
-        new_mape.loc[:, 'Y'] = y
-        mape_group = mape_group.append(new_mape)
-        
-        
-        # Extreme MAPE ......
-        new_mape = mape_main_abs[mape_main_abs['MAPE'] > 0.1]
-        new_mape, _ = cbyz.df_summary(df=new_mape, 
-                                group_by=['BACKTEST_ID', 'OVERESTIMATE'], 
-                                cols=['MAPE'])
-        
-        if len(new_mape) > 0:
-            new_mape.loc[:, 'Y'] = y
-            mape_extreme = mape_extreme.append(new_mape)
-
-
-        # Stock MAPE ......
-        new_metrics = mape_main_abs[['BACKTEST_ID', 'SYMBOL', 
-                                 'WORK_DATE', 'MAPE', 'OVERESTIMATE',
-                                 y, y + '_HIST']] \
-            .rename(columns={y:'FORECAST_VALUE',
-                             y + '_HIST':'HIST_VALUE'})
-
-        new_metrics.loc[:, 'Y'] = y
-        stock_metrics_raw = stock_metrics_raw.append(new_metrics)
+    # Save model only when retrain model
+    if len(bt_main) > threshold and _compete_mode == 2:
+        try:
+            ar.db_upload(data=result, table_name='backtest_records')
+        except Exception as e:
+            print(e)
+            result.to_csv(path_temp + '/backtest_records_' + serial + '.csv',
+                          index=False)
     
-    
-    # Oraganize
-    stock_metrics_raw = stock_metrics_raw \
-                        .merge(bt_info, how='left', on='BACKTEST_ID') \
-                        .merge(precision, how='left', on=['Y', 'BACKTEST_ID'])
-
-
-    print('Update - 還沒把STOCK_TYPE改成Market')
-    stock_metrics_raw['VERSION'] = sam.version
-    stock_metrics_raw['MODEL_METRIC'] = 'RMSE'    
-    stock_metrics_raw['FORECAST_METRIC'] = 'MAPE'
-    stock_metrics_raw['STOCK_TYPE'] = 'TW'
-    
-    
-    execute_id = cbyz.get_time_serial(with_time=True)
-    execute_id = execute_id[2:13].replace('_', '')
-    execute_id = int(execute_id)
-    stock_metrics_raw.loc[:, 'EXECUTE_SERIAL'] = execute_id
-    
-    
-    stock_metrics_raw = \
-        cbyz.df_date_simplify(df=stock_metrics_raw, 
-                              cols=['EXECUTE_SERIAL', 'WORK_DATE'])    
-    
-    stock_metrics_raw = stock_metrics_raw \
-                        .rename(columns={'WORK_DATE':'FORECAST_DATE',
-                                         'TEST_PRECISION':'MODEL_PRECISION',
-                                         'MAPE':'FORECAST_PRECISION'}) \
-                        .round({'MODEL_PRECISION':3,
-                                'FORECAST_PRECISION':3})
-
-                
-    stock_metrics = stock_metrics_raw[['VERSION', 'STOCK_TYPE', 'SYMBOL', 
-                                       'EXECUTE_SERIAL', 'FORECAST_DATE', 
-                                       'PREDICT_PERIOD', 'DATA_PERIOD', 'Y',
-                                       'MODEL_METRIC', 'MODEL_PRECISION',
-                                       'FORECAST_METRIC', 'FORECAST_PRECISION', 
-                                       'OVERESTIMATE']]
-    
-        
-    if export_file:
-        time_serial = cbyz.get_time_serial(with_time=True)
-        stock_metrics.to_csv(path_export + '/Metrics/stock_mape_'\
-                             + time_serial + '.csv', 
-                             index=False)
-            
-    if len(bt_main) > threshold:
-        ar.db_upload(data=stock_metrics, table_name='forecast_records')
 
 
 # %% View And Log ------
@@ -739,6 +690,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # v0.074
     # - Fix last_price issues - Done, wait for checking 
     # - Optimize cal_profit - Done
+    # - Update eval_metrics and rebuild forecast_records
     
 
     # Bug
@@ -794,10 +746,11 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # 1.Add price increse but model didn't catch
     global _interval, _bt_times, _volume_thld, _ma_values, _hold
     global symbols, _market
-    global _bt_last_begin, _bt_last_end    
+    global _bt_last_begin, _bt_last_end
+    global serial
 
     _hold = [str(i) for i in hold]
-
+    serial = cbyz.get_time_serial(with_time=True)
 
     # Parameters
     
@@ -843,7 +796,13 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
                    2409, 2520, 2603,
                    2409, 2603, 2611, 3051, 3562]
     else:
-        symbols = []    
+        symbols = []
+        
+    global _compete_mode
+    
+    _market = market    
+    _compete_mode = compete_mode
+
 
     # Arguments
     # 1. 目前的parameter都只有一個，但如果有多個parameter需要做A/B test時，應該要在
@@ -858,7 +817,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
             'industry':[True],
             'trade_value':[True],
             'market':['tw'],
-            'compete_mode':[compete_mode],
+            'compete_mode':[_compete_mode],
             'train_mode':[2],            
             'cv':[cv],
             'kbest':['all'],
@@ -899,8 +858,6 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # Rename predict period as forecast preiod
     # ......    
     
-    _market = market    
-    symbols = symbols
     symbols = cbyz.li_conv_ele_type(symbols, to_type='str')
 
     # Set Date ......
@@ -946,16 +903,12 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     global stock_metrics_raw, stock_metrics    
     
     
-    execute_begin = cbyz.date_get_today()
-    execute_begin = cbyz.date_cal(execute_begin, -14, 'd')
-    # execute_begin = cbyz.date_cal(execute_begin, -40, 'd')
-    execute_begin = int(str(execute_begin)[2:] + '0000')
+    today = cbyz.date_get_today()
+    execute_begin = cbyz.date_cal(today, -14, 'd')
+    execute_begin = int(str(execute_begin) + '0000')
     
     
     # Evaluate Precision ......
-    
-    # eval_metricsv裡面的bug還沒修好
-    # eval_metrics(export_file=False) 
     
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
     cal_profit(y_thld=0.02, time_thld=_predict_period, prec_thld=0.05,
@@ -965,43 +918,44 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     
     # Export ......
-    time_serial = cbyz.get_time_serial(with_time=True)
-    excel_name = path_export + '/actions_' + time_serial + '.xlsx'
-    writer = pd.ExcelWriter(excel_name, engine='xlsxwriter')
+    # excel_name = path_export + '/actions_' + serial + '.xlsx'
+    # writer = pd.ExcelWriter(excel_name, engine='xlsxwriter')
 
 
-    workbook = writer.book
-    workbook.add_worksheet('stock') 
-    sht = workbook.get_worksheet_by_name("stock")
-    cbyz.excel_add_df(actions, sht, startrow=0, startcol=0, header=True)
+    # workbook = writer.book
+    # workbook.add_worksheet('stock') 
+    # sht = workbook.get_worksheet_by_name("stock")
+    # cbyz.excel_add_df(actions, sht, startrow=0, startcol=0, header=True)
 
 
-    # Add Format
-    digi_format = workbook.add_format({'num_format':'0.0'})
-    percent_format = workbook.add_format({'num_format':'0.0%'})
+    # # Add Format
+    # digi_format = workbook.add_format({'num_format':'0.0'})
+    # percent_format = workbook.add_format({'num_format':'0.0%'})
 
-    cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
-                          startrow=1, endrow=9999,
-                          startcol=8, endcol=8)    
+    # cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
+    #                       startrow=1, endrow=9999,
+    #                       startcol=8, endcol=8)    
     
-    cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
-                          startrow=1, endrow=9999,
-                          startcol=9, endcol=13)
+    # cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
+    #                       startrow=1, endrow=9999,
+    #                       startcol=9, endcol=13)
     
-    cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
-                          startrow=1, endrow=9999,
-                          startcol=14, endcol=17)  
+    # cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
+    #                       startrow=1, endrow=9999,
+    #                       startcol=14, endcol=17)  
     
-    cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
-                          startrow=1, endrow=9999,
-                          startcol=18, endcol=21)
+    # cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
+    #                       startrow=1, endrow=9999,
+    #                       startcol=18, endcol=21)
     
-    writer.save()
+    # writer.save()
 
 
-    
-    if len(actions) > 800:
-        # Write Google Sheets
+
+    # Write Google Sheets        
+    if len(actions) > 800 and bt_last_begin >= today:
+        
+        # Action Workbook
         stk.write_sheet(data=actions, sheet='TW', long=long,
                         predict_begin=_bt_last_begin)
     
@@ -1090,22 +1044,24 @@ def dev():
 if __name__ == '__main__':
     
     
-    hold = [1909, 2009, 2485, 2605, 3041, 2633]
+    set_calendar中有bug，當bt_last_begin是20211230時會出錯
     
-    master(bt_last_begin=20211201, predict_period=5, 
-           long=False, interval=4, bt_times=1, 
-           data_period=int(365 * 1), 
-           ma_values=[5,10,20], volume_thld=400,
-           compete_mode=2, cv=list(range(2, 7)),
-           market='tw', hold=hold,
-           dev=True)
+    hold = [1909, 2009, 2605, 2633, 6209]
     
+    master(bt_last_begin=20211230, predict_period=3, 
+            long=False, interval=4, bt_times=1, 
+            data_period=int(365 * 1), 
+            ma_values=[5,10,20], volume_thld=400,
+            compete_mode=0, cv=list(range(3, 4)),
+            market='tw', hold=hold,
+            dev=True)
+
     
-    # master(bt_last_begin=20211230, predict_period=4, 
+    # master(bt_last_begin=20211227, predict_period=4, 
     #        long=False, interval=7, bt_times=1, 
     #        data_period=int(365 * 5), 
     #        ma_values=[10,20,60], volume_thld=300,
-    #        compete_mode=1, cv=list(range(3, 8)),
+    #        compete_mode=1, cv=list(range(3, 4)),
     #        market='tw', hold=hold,
     #        dev=False)
 
