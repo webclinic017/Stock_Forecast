@@ -15,7 +15,8 @@ import sys, time, os, gc
 
 host = 2
 host = 0
-stock_type = 'tw'
+
+market = 'tw'
 
 
 # Path .....
@@ -181,7 +182,8 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
         
         # Create Folder
         folder = path_export + '/' + table
-        os.mkdir(folder)
+        if not os.path.exists(folder):
+            os.mkdir(folder)
         
         
         if time_unit == 'd':
@@ -393,8 +395,10 @@ def chk_date(ewprcd2=True, ewtinst1c=True,
     return result
     
 
-if __name__ == '__main__':
 
+
+def automation():
+    
     
     # ewtinst1c
     # - 三大法人持股成本
@@ -428,24 +432,29 @@ if __name__ == '__main__':
     # Check
     chk = chk_date()
     
-    # update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
-    #        ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-    #        delete=True, upload=True)     
+    update(begin=None, end=None, ewprcd=True, ewtinst1c=True, 
+            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+            delete=True, upload=True)     
 
     # ewsale有bug
     # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
     # 1. ewsale是不是手動上傳的？
     # 2. TEJ只開放五年的資料
         
-    update(begin=20211216, end=20211231, ewprcd=False, ewtinst1c=False, 
-           ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-           delete=True, upload=True)        
+    # update(begin=20211216, end=20211231, ewprcd=False, ewtinst1c=False, 
+    #        ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+    #        delete=True, upload=True)        
 
     chk2 = chk_date()
     
     info = tejapi.ApiConfig.info()    
     print('todayRows - ' + str(info['todayRows']))
-    
+        
+
+
+if __name__ == '__main__':
+    automation()
+
     
     
 

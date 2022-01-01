@@ -916,6 +916,8 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
                export_file=True, load_file=True, path=path_temp,
                file_name=None)
     
+    eval_metrics()    
+    
     
     # Export ......
     # excel_name = path_export + '/actions_' + serial + '.xlsx'

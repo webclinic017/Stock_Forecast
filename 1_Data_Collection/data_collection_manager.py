@@ -14,22 +14,29 @@ import sys, time, os, gc
 import yfinance as yf
 
 
-local = False
-local = True
+host = 2
+host = 0
 
 
 # Path .....
-if local == True:
-    path = '/Users/Aron/Documents/GitHub/Data/Stock_Forecast/1_Data_Collection'
-else:
+if host == 0:
+    path = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection'
+elif host == 1:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
+elif host == 2:
+    path = '/home/jupyter//1_Data_Collection'
 
 
 # Codebase ......
-path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ']
-
+path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
+                 r'/home/aronhack/stock_predict/Function',
+                 r'/Users/aron/Documents/GitHub/Codebase_YZ',
+                 r'/home/jupyter/Codebase_YZ/20220101',
+                 r'/home/jupyter/Arsenal/20220101',
+                 path + '/1_Shareholding_Spread',
+                 path + '/2_TEJ',
+                 path + '/Function']
 
 for i in path_codebase:    
     if i not in sys.path:
@@ -40,6 +47,10 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 
+import shareholding_spread
+import tej
+
+
 # 自動設定區 -------
 path_resource = path + '/Resource'
 path_function = path + '/Function'
@@ -48,15 +59,13 @@ path_export = path + '/Export'
 
 
 cbyz.os_create_folder(path=[path_resource, path_function, 
-                         path_temp, path_export])     
+                            path_temp, path_export])     
 
 pd.set_option('display.max_columns', 30)
  
 
 
 # Load Data ----------------
-
-
 
 
 def tw_get_capital_flows():
@@ -233,7 +242,64 @@ def yahoo_download_data(stock_list=[], chunk_begin=None, chunk_end=None):
 
 
 
-def master(overwrite=False, upload=True):
+
+
+
+
+
+
+def get_us_stock_data():
+
+        
+    # US Stock --------
+    
+    results = pd.DataFrame()
+    
+    for i in us_stock:
+        
+        data = yf.Ticker(i)
+        df = data.history(period="max")
+        df['STOCK_SYMBOL'] = i
+    
+        results = results.append(df)
+            
+    
+    results.reset_index(level=0, inplace=True)
+    
+    
+    # Rename
+    results.rename(columns={'Date':'WORK_DATE',
+                                'Open':'OPEN',
+                                'High':'HIGH',
+                                'Low':'LOW',
+                                'Close':'CLOSE',
+                                'Volume':'VOLUME'
+                                    }, 
+                           inplace=True)
+    
+    # Filter columns
+    cols = ['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
+            'HIGH', 'LOW', 'CLOSE', 'VOLUME']
+    results = results[cols]
+    
+    
+    # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
+    
+    # results['WORK_DATE'] = results['WORK_DATE'].apply(cbyz.ymd)
+    results['WORK_DATE'] = results['WORK_DATE'].astype('str')
+    
+    ar.db_upload(results,
+                 'stock_data_us')
+
+    
+    return ''
+
+
+
+# %% Archive ------
+
+
+def download_market_data(overwrite=False, upload=True):
     '''
     主工作區
     '''
@@ -309,83 +375,30 @@ def master(overwrite=False, upload=True):
     if upload:
         if stock_type == 'tw':
             ar.db_upload(data=data, 
-                         table_name='stock_data_tw',
-                         local=local)
+                         table_name='stock_data_tw')
             
         elif stock_type == 'us':
             ar.db_upload(data=data, 
-                         table_name='stock_data_us',
-                         local=local)    
+                         table_name='stock_data_us')
     
     return ''
+
+
+
+# %% Execute ------
+
+
+def automation():
+    
+    shareholding_spread.automation()
+    tej.automation()
 
 
 
 
 if __name__ == '__main__':
-    master(overwrite=False, upload=True)
-
-
-
-
-def check():
-    '''
-    資料驗證
-    '''    
     
-    chk = stk.get_data(data_begin=20210630)
-    
-    return ''
-
-
-
-def get_us_stock_data():
-
-        
-    # US Stock --------
-    
-    results = pd.DataFrame()
-    
-    for i in us_stock:
-        
-        data = yf.Ticker(i)
-        df = data.history(period="max")
-        df['STOCK_SYMBOL'] = i
-    
-        results = results.append(df)
-            
-    
-    results.reset_index(level=0, inplace=True)
-    
-    
-    # Rename
-    results.rename(columns={'Date':'WORK_DATE',
-                                'Open':'OPEN',
-                                'High':'HIGH',
-                                'Low':'LOW',
-                                'Close':'CLOSE',
-                                'Volume':'VOLUME'
-                                    }, 
-                           inplace=True)
-    
-    # Filter columns
-    cols = ['WORK_DATE', 'STOCK_SYMBOL', 'OPEN', 
-            'HIGH', 'LOW', 'CLOSE', 'VOLUME']
-    results = results[cols]
-    
-    
-    Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
-    
-    # results['WORK_DATE'] = results['WORK_DATE'].apply(cbyz.ymd)
-    results['WORK_DATE'] = results['WORK_DATE'].astype('str')
-    
-    ar.db_upload(results,
-                 'stock_data_us')
-
-    
-    return ''
-
-
+    automation()
 
 
 

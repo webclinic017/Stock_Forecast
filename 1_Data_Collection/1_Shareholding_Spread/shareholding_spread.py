@@ -13,6 +13,7 @@ import numpy as np
 import sys, time, os, gc
 
 
+host = 2
 host = 0
 
 
@@ -20,7 +21,7 @@ host = 0
 if host == 0:
     path = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection/1_Shareholding_Spread'
 elif host == 2:
-    path = '/home/aronhack/stock_forecast/dashboard/'
+    path = '/home/jupyter//1_Data_Collection/1_Shareholding_Spread'
 
 
 # Codebase ......
@@ -94,10 +95,82 @@ def read_single_files():
 
 
 
+
+def tdcc_upload_shareholdings_spread():
+    
+    
+    cols = ['WORK_DATE', 'SYMBOL', 'LEVEL', 
+            'COUNT', 'VOLUME', 'RATIO']    
+    
+    # .......
+    file0 = pd.read_csv(path_resource + '/stock_ratio.csv')
+    file0.columns = ['LEVEL', 'LEVE_DESCR', 'COUNT', 'VOLUME', 
+                     'RATIO', 'SYMBOL', 'WORK_DATE', ]
+    
+    file0 = file0[cols]
+    file0['SYMBOL'] = file0['SYMBOL'].str.replace('ID_', '')
+    
+    
+    # ......
+    file1 = pd.read_csv(path_resource + '/集保戶股權分散表_0625.csv')
+    file2 = pd.read_csv(path_resource + '/集保戶股權分散表_0702.csv')
+    file3 = pd.read_csv(path_resource + '/集保戶股權分散表_0709.csv')    
+    
+    
+    # .......
+    file = file1.append(file2).append(file3)
+    file.columns = cols
+    
+    file = file.append(file0)
+    file = file[file['RATIO']<100]
+    
+    # 有些資料在「持股/單位數分級」會有一列是「差異數調整」，這種情況下的「人數」會是na
+    file = file[~file['COUNT'].isna()]
+    
+    
+    file = cbyz.df_conv_col_type(df=file, cols=['VOLUME'], to='int')
+    
+    
+    # 
+    file = file \
+        .sort_values(by=['SYMBOL', 'WORK_DATE']) \
+        .reset_index(drop=True)
+        
+
+    cbyz.df_chk_col_na(df=file)
+    
+
+    ar.db_upload(data=file, 
+                 table_name='sharehold_spread',
+                 local=local)    
+
+
+    # chunk = 100000
+    # times = int(len(file) / chunk) + 1
+    # total = 0
+    
+    # for i in range(times):
+        
+    #     temp = file.loc[i * chunk : (i + 1) * chunk - 1]
+    #     total = total + len(temp)
+        
+    #     ar.db_upload(data=temp, 
+    #                  table_name='shareholdings_spread',
+    #                  local=local)    
+    
+    #     print(i)
+
+
+    
+    return
+
+
+
+
 # %%  Master ......
     
 
-def master():
+def crawler():
     
     from selenium import webdriver
     from selenium.webdriver.common.keys import Keys
@@ -320,77 +393,25 @@ def master():
 
 
 
-# ........
-
-
-def tdcc_upload_shareholdings_spread():
+def master():
     
+    # https://data.gov.tw/dataset/11452?page=14
+    url = 'https://opendata.tdcc.com.tw/getOD.ashx?id=1-5'
+    data = pd.read_csv(url)
     
-    cols = ['WORK_DATE', 'SYMBOL', 'LEVEL', 
-                    'COUNT', 'VOLUME', 'RATIO']    
+    serial = data.loc[0, '資料日期']
+    serial = str(serial)
     
-    # .......
-    file0 = pd.read_csv(path_resource + '/stock_ratio.csv')
-    file0.columns = ['LEVEL', 'LEVE_DESCR', 'COUNT', 'VOLUME', 
-                     'RATIO', 'SYMBOL', 'WORK_DATE', ]
+    file_name = path_resource + '/TDCC_OD_1-5_' + serial + '.csv'
     
-    file0 = file0[cols]
-    file0['SYMBOL'] = file0['SYMBOL'].str.replace('ID_', '')
+    if not os.path.exists(file_name):
+        data.to_csv(file_name, index=False)
     
-    
-    # ......
-    file1 = pd.read_csv(path_resource + '/集保戶股權分散表_0625.csv')
-    file2 = pd.read_csv(path_resource + '/集保戶股權分散表_0702.csv')
-    file3 = pd.read_csv(path_resource + '/集保戶股權分散表_0709.csv')    
-    
-    
-    # .......
-    file = file1.append(file2).append(file3)
-    file.columns = cols
-    
-    file = file.append(file0)
-    file = file[file['RATIO']<100]
-    
-    # 有些資料在「持股/單位數分級」會有一列是「差異數調整」，這種情況下的「人數」會是na
-    file = file[~file['COUNT'].isna()]
-    
-    
-    file = cbyz.df_conv_col_type(df=file, cols=['VOLUME'], to='int')
-    
-    
-    # 
-    file = file \
-        .sort_values(by=['SYMBOL', 'WORK_DATE']) \
-        .reset_index(drop=True)
-        
-
-    cbyz.df_chk_col_na(df=file)
     
 
-    ar.db_upload(data=file, 
-                 table_name='sharehold_spread',
-                 local=local)    
-
-
-    # chunk = 100000
-    # times = int(len(file) / chunk) + 1
-    # total = 0
+def automation():
     
-    # for i in range(times):
-        
-    #     temp = file.loc[i * chunk : (i + 1) * chunk - 1]
-    #     total = total + len(temp)
-        
-    #     ar.db_upload(data=temp, 
-    #                  table_name='shareholdings_spread',
-    #                  local=local)    
-    
-    #     print(i)
-
-
-    
-    return
-
+    master()
 
 
 

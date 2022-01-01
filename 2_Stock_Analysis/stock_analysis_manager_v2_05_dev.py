@@ -1322,7 +1322,7 @@ def master(param_holder, predict_begin, export_model=True,
                         {'model': xgb.XGBRegressor(),
                          'params': {
                             # 'n_estimators': [200],
-                            'eta': [0.03, 0.05],
+                            'eta': [0.01, 0.03],
                             'min_child_weight': [1],
                             'max_depth':[8],
                             'subsample':[0.8]
