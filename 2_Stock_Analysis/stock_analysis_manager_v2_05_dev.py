@@ -45,8 +45,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211231',
-                 r'/home/jupyter/Arsenal/20211231',
+                 r'/home/jupyter/Codebase_YZ/20220101',
+                 r'/home/jupyter/Arsenal/20220101',
                  path + '/Function']
 
 
@@ -215,6 +215,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Merge As Main Data
     global main_data_frame, main_data_frame_calendar
     main_data_frame = cbyz.df_cross_join(symbol_df, calendar_proc)
+    
     main_data_frame = \
         main_data_frame[
             (main_data_frame['TRADE_DATE']>=1) \
@@ -823,7 +824,6 @@ def get_model_data(industry=True, trade_value=True):
     # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
     # 1. 主要邏輯就是顯示最新的營收資料
     # print('Update - 增加date index')
-
     ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
     main_data = main_data \
                 .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
@@ -831,13 +831,10 @@ def get_model_data(industry=True, trade_value=True):
     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
     
     
-    # main_data = main_data.drop(['EWSALE_WORK_DATE'] + cols + pre_cols,
-    #                            axis=1)
-    
     
     # 財務報表
     # - 現在只用單季，需確認是否有缺漏
-    sam_tej_get_ewifinq()
+    # sam_tej_get_ewifinq()
     
     
     
@@ -1048,6 +1045,15 @@ def sam_tej_get_ewsale(begin_date):
     loc_df = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
                                 symbol=symbols, fill=True, host=host)
     
+    # Merge will cause NA, so it must to execute df_fillna
+    loc_df = main_data_frame \
+        .merge(loc_df, how='left', on=['SYMBOL', 'WORK_DATE'])
+    
+    
+    loc_df = cbyz.df_fillna(df=loc_df, cols=['D0001'], 
+                               sort_keys=['SYMBOL', 'WORK_DATE'], 
+                               group_by=['SYMBOL'], method='ffill')                    
+                    
     loc_df, cols, _ = \
         cbml.ml_data_process(df=loc_df, 
                               ma=False, normalize=True, lag=False, 
@@ -1068,6 +1074,7 @@ def sam_tej_get_ewifinq():
     loc_df = stk.tej_get_ewifinq(path=path_dcm, fill_date=True)
     
     return loc_df
+
 
 
 # %% Master ------
@@ -1114,11 +1121,10 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add correlations detection > Done
     # - Fix tw_get_stock_info_twse issues
     # v2.03
-    # - Add S&P 500 data - Done
+    # - Add S&P 500 data
     # v2.04
-    # - Add 台股指數 - Done
+    # - Add 台股指數
     # - Fix terrible date lag issues in get_model_data - Done
-    
     # v2.041
     # - Update for new modules
     # - Export Model Data

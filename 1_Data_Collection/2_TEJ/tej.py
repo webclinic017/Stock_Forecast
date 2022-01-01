@@ -178,17 +178,22 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
         table = tables[i][0]
         time_unit = tables[i][1]
         
+        
+        # Create Folder
+        folder = path_export + '/' + table
+        os.mkdir(folder)
+        
+        
         if time_unit == 'd':
             data = tejapi.get('TWN/' + table.upper(),
                               mdate={'gte':begin_str, 'lte':end_str},
                               paginate=True)
             
-            file_path = '/' + table + '/' + table +'_'  \
-                        + begin_str + '_' + end_str + '.csv'
+            file_path = '/' + table +'_' + begin_str + '_' + end_str + '.csv'
             
         elif time_unit == None:     
             data = tejapi.get('TWN/' + table.upper(), paginate=True)
-            file_path = '/' + table + '/' + table + '.csv'            
+            file_path = '/' + table + '.csv'            
 
 
         if len(data) == 0:
@@ -204,7 +209,7 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
             ar.db_upload(data=data, table_name=table)
         except Exception as e:
             print(e)
-            data.to_csv(path_export + file_path, index=False)        
+            data.to_csv(folder + file_path, index=False)        
 
         # Reset Object
         data = []
@@ -432,7 +437,7 @@ if __name__ == '__main__':
     # 1. ewsale是不是手動上傳的？
     # 2. TEJ只開放五年的資料
         
-    update(begin=20210101, end=20211225, ewprcd=True, ewtinst1c=True, 
+    update(begin=20211216, end=20211231, ewprcd=False, ewtinst1c=False, 
            ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
            delete=True, upload=True)        
 

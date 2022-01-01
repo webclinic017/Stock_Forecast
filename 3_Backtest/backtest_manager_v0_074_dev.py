@@ -31,8 +31,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20211231',
-                 r'/home/jupyter/Arsenal/20211231',
+                 r'/home/jupyter/Codebase_YZ/20220101',
+                 r'/home/jupyter/Arsenal/20220101',
                  path + '/Function',
                  path_sam]
 
@@ -95,7 +95,7 @@ def set_calendar():
     calendar, _ = \
         cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
                           shift=_predict_period - 1, 
-                          group_by=['TRADE_DATE'], 
+                          group_by=[], 
                           suffix='_LAST', remove_na=True
                           )
 
@@ -1044,7 +1044,6 @@ def dev():
 if __name__ == '__main__':
     
     
-    set_calendar中有bug，當bt_last_begin是20211230時會出錯
     
     hold = [1909, 2009, 2605, 2633, 6209]
     
