@@ -124,11 +124,8 @@ def set_frame():
     global _bt_last_begin, _bt_last_end, _predict_period
     global predict_date
     global actions_main
-    # global ohlc, ohlc_ratio, ohlc_last
     
     global actions_main, hist_main
-    
-    
     global ohlc, ohlc_ratio, ohlc_last
     global var_y, var_y_last, var_y_hist
     
@@ -148,13 +145,11 @@ def set_frame():
     # - predict_period * 2 to ensure to get the complete data
     # - No matter your y is the price or the change ratio, it is essential to
     #   keep both information in the actions_main
-    
-      
+
     bt_first_begin = \
         cbyz.date_cal(_bt_last_begin, 
                       -_interval * _bt_times - _predict_period * 2, 
                       'd')    
-    
     
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
                                  data_end=_bt_last_end, 
@@ -173,7 +168,6 @@ def set_frame():
                         .rename(columns=rename_dict)
             
     
-    
     # Check Symbols
     if len(symbols) > 0:
         symbol_df = pd.DataFrame({'SYMBOL':symbols})
@@ -185,9 +179,8 @@ def set_frame():
     # Set Frame
     frame = cbyz.df_cross_join(symbol_df, calendar_lite)
     frame = frame \
-        .sort_values(by=['SYMBOL', 'WORK_DATE']) \
-        .reset_index(drop=True)
-
+            .sort_values(by=['SYMBOL', 'WORK_DATE']) \
+            .reset_index(drop=True)
 
     # 
     rename_dict = cbyz.li_to_dict(var_y, var_y_last)        
@@ -198,7 +191,7 @@ def set_frame():
             
     actions_main = frame \
         .merge(actions_main, how='left', on=['LAST_DATE', 'SYMBOL']) \
-        .merge(bt_results, how='left', on=['WORK_DATE', 'SYMBOL'])
+        .merge(bt_result, how='left', on=['WORK_DATE', 'SYMBOL'])
     
     actions_main = actions_main[(actions_main['WORK_DATE']>=_bt_last_begin) \
                                 & (actions_main['WORK_DATE']<=_bt_last_end)]
@@ -226,6 +219,28 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     global calendar, calendar_lite
     global symbols, _market, bt_info, _bt_times, _ma_values
     
+
+    # New Global Vars
+    global bt_results_raw, bt_result
+    global precision, features, var_y, _volume_thld
+    global pred_scores, pred_features, pred_params
+    
+    # Dev
+    # - Add boolean switch
+    # - Comparing create date
+    bt_result_file = path_temp + '/bt_result.csv'
+    
+    if os.path.exists(bt_result_file):
+        
+        bt_result = pd.read_csv(bt_result_file)
+        bt_result['SYMBOL'] = bt_result['SYMBOL'].astype('str')
+        
+        var_y = cbyz.df_get_cols_except(
+            df=bt_result,
+            except_cols=['SYMBOL', 'WORK_DATE', 'BACKTEST_ID']
+            )
+        return
+    
     
     # Prepare For Backtest Records ......
     print('backtest_predict - 這裡有bug，應該用global calendar')
@@ -247,9 +262,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Work area ----------
-    global bt_results_raw, bt_results
-    global precision, features, var_y, _volume_thld
-    global pred_scores, pred_features, pred_params
+
     
     bt_results_raw = pd.DataFrame()
     precision = pd.DataFrame()
@@ -283,23 +296,27 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 
 
     # Organize ......
-    global var_y
     
     # ValueError: You are trying to merge on object and int64 columns. 
     # If you wish to proceed you should use pd.concat
-    bt_results = cbyz.df_conv_col_type(df=bt_results_raw, 
+    bt_result = cbyz.df_conv_col_type(df=bt_results_raw, 
                                        cols='WORK_DATE', 
                                        to='int')    
     
-    bt_results = bt_results.reset_index(drop=True)
+    bt_result = bt_result.reset_index(drop=True)
     
     var_y = cbyz.df_get_cols_except(
-        df=bt_results, 
+        df=bt_result, 
         except_cols=['SYMBOL', 'WORK_DATE', 'BACKTEST_ID']
         )
     
 
-    bt_results.to_csv(path_temp + '/bt_results.csv', index=False)
+    if len(bt_result) > 800:
+        bt_result_file.to_csv(path_temp + '/bt_result_file.csv', 
+                          index=False)
+        
+        precision.to_csv(path_temp + '/precision.csv', 
+                         index=False)
 
 
 # ............
@@ -316,16 +333,12 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     global ohlc, ohlc_last
     global _predict_period
     global _interval, _bt_times 
-    global bt_results, rmse, bt_main, actions, var_y
+    global bt_result, rmse, bt_main, actions, var_y
     global symbols, _market
     global _bt_last_begin, _bt_last_end    
     global calendar
-
-
     global ohlc, ohlc_ratio, ohlc_last
     global var_y, var_y_last, var_y_hist
-
-
 
         
     # Merge hist data ......
@@ -544,7 +557,7 @@ def eval_metrics(export_file=False, threshold=800):
     global serial, compete_mode
     
     
-    loc_main = bt_results.merge(hist_main, on=['SYMBOL', 'WORK_DATE'])
+    loc_main = bt_result.merge(hist_main, on=['SYMBOL', 'WORK_DATE'])
 
     # 不做回測時，mape_main的length一定會等於0
     if len(loc_main) == 0:
@@ -688,17 +701,20 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # v0.073
     # - The features sheet of the Actions will be overwrited by both 
     #    long and short. - Done
-
-
     # v0.074
     # - Fix last_price issues - Done, wait for checking 
     # - Optimize cal_profit - Done
     # - Update eval_metrics and rebuild forecast_records
-    
     # v0.075
     # - Fix bug
 
-
+    # v0.076
+    # - Add capability to read saved bt_result.csv
+    # - Add data to result of view_yesterday
+    
+    
+    # Bug
+    # ut好像沒有順利restore_normalize
 
     # Bug
     # 5. print predict date in sam to fix missing date issues    
@@ -776,6 +792,8 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # hold = [8105, 2610, 3051, 1904, 2611]
     # long = False
     # compete_mode = 0
+    # cv = list(range(2, 3))
+
 
     # Wait for update
     # date_manager = cbyz.Date_Manager(predict_begin=predict_begin, 
@@ -877,7 +895,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
 
     # Predict ------
-    global bt_results, precision, features
+    global bt_result, precision, features
     backtest_predict(bt_last_begin=bt_last_begin, 
                      predict_period=_predict_period, 
                      interval=interval,
@@ -889,7 +907,8 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     
     # Debug for prices columns issues
-    stk.write_sheet(data=bt_results, sheet='Debug')
+    if len(bt_result) > 800:
+        stk.write_sheet(data=bt_result, sheet='Debug')
     
     
     # Profit ------    
@@ -926,53 +945,18 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     eval_metrics()    
     
     
-    # Export ......
-    # excel_name = path_export + '/actions_' + serial + '.xlsx'
-    # writer = pd.ExcelWriter(excel_name, engine='xlsxwriter')
-
-
-    # workbook = writer.book
-    # workbook.add_worksheet('stock') 
-    # sht = workbook.get_worksheet_by_name("stock")
-    # cbyz.excel_add_df(actions, sht, startrow=0, startcol=0, header=True)
-
-
-    # # Add Format
-    # digi_format = workbook.add_format({'num_format':'0.0'})
-    # percent_format = workbook.add_format({'num_format':'0.0%'})
-
-    # cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
-    #                       startrow=1, endrow=9999,
-    #                       startcol=8, endcol=8)    
-    
-    # cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
-    #                       startrow=1, endrow=9999,
-    #                       startcol=9, endcol=13)
-    
-    # cbyz.excel_add_format(sht=sht, cell_format=digi_format, 
-    #                       startrow=1, endrow=9999,
-    #                       startcol=14, endcol=17)  
-    
-    # cbyz.excel_add_format(sht=sht, cell_format=percent_format, 
-    #                       startrow=1, endrow=9999,
-    #                       startcol=18, endcol=21)
-    
-    # writer.save()
-
-
-
-    # Write Google Sheets        
-    if len(actions) > 800 and bt_last_begin >= today:
+    # Write Google Sheets ...... 
+    # if len(actions) > 800 and bt_last_begin >= today:
         
-        # Action Workbook
-        stk.write_sheet(data=actions, sheet='TW', long=long,
-                        predict_begin=_bt_last_begin)
+    #     # Action Workbook
+    #     stk.write_sheet(data=actions, sheet='TW', long=long,
+    #                     predict_begin=_bt_last_begin)
     
-        # View And Log .....
-        view_yesterday()
+    #     # View And Log .....
+    #     view_yesterday()
 
-        global pred_features
-        stk.write_sheet(data=pred_features, sheet='Features')
+    #     global pred_features
+    #     stk.write_sheet(data=pred_features, sheet='Features')
     
     
     gc.collect()
