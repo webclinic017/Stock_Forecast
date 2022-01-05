@@ -32,8 +32,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220103',
-                 r'/home/jupyter/Arsenal/20220103',
+                 r'/home/jupyter/Codebase_YZ/20220106',
+                 r'/home/jupyter/Arsenal/20220106',
                  path + '/Function',
                  path_sam]
 
@@ -92,7 +92,7 @@ def set_calendar():
     # df_add_shift will cause NA, it's essential to drop to convert to int
     calendar, _ = \
         cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
-                          shift=_predict_period - 1, 
+                          shift=1, 
                           group_by=[], 
                           suffix='_LAST', remove_na=True
                           )
@@ -103,10 +103,10 @@ def set_calendar():
 
     
     # Get the last date
-    _bt_last_end = calendar[calendar['LAST_DATE']==_bt_last_begin] \
-                    .reset_index(drop=True)
-    _bt_last_end = int(_bt_last_end.loc[0, 'WORK_DATE'])  
-
+    index = calendar[calendar['WORK_DATE']==_bt_last_begin].index[0]
+    index = index + _predict_period - 1
+    _bt_last_end = calendar.loc[index, 'WORK_DATE']
+    
 
     # Get predict date
     predict_date = calendar[(calendar['WORK_DATE']>=_bt_last_begin) \
@@ -229,11 +229,14 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     # - Add boolean switch
     # - Comparing create date
     bt_result_file = path_temp + '/bt_result.csv'
+    precision_file = path_temp + '/precision.csv' 
     
-    if os.path.exists(bt_result_file):
+    if os.path.exists(bt_result_file) and os.path.exists(precision_file):
         
         bt_result = pd.read_csv(bt_result_file)
         bt_result['SYMBOL'] = bt_result['SYMBOL'].astype('str')
+        
+        precision = pd.read_csv(precision_file)
         
         var_y = cbyz.df_get_cols_except(
             df=bt_result,
@@ -352,7 +355,14 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
         main_data = actions_main[['BACKTEST_ID', 'SYMBOL', 
                                   'WORK_DATE', 'LAST_DATE'] \
                                  + var_y + var_y_last]
-        
+
+            
+            
+    main_data = cbyz.df_fillna(df=main_data, 
+                               cols=ohlc_last, 
+                               sort_keys=['SYMBOL', 'WORK_DATE'],
+                               method='ffill') 
+            
 
     # Check NA ......
     # 1. 這裡有na是合理的，因為hist可能都是na
@@ -402,9 +412,14 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                              'FORECAST_PRECISION_STD':'RECORD_PRECISION_STD'})
             
     # Add Low Volume Symbols    
-    if len(sam.low_volume_symbols) > 0:
-        low_volume_df = pd.DataFrame({'SYMBOL':sam.low_volume_symbols})
-        actions = actions.merge(low_volume_df, how='outer', on='SYMBOL')
+    try:
+        sam.low_volume_symbols
+    except:
+        pass
+    else:
+        if len(sam.low_volume_symbols) > 0:
+            low_volume_df = pd.DataFrame({'SYMBOL':sam.low_volume_symbols})
+            actions = actions.merge(low_volume_df, how='outer', on='SYMBOL')
         
         
     # Add name ......
@@ -560,7 +575,7 @@ def eval_metrics(export_file=False, threshold=800):
     loc_main = bt_result.merge(hist_main, on=['SYMBOL', 'WORK_DATE'])
 
     # 不做回測時，mape_main的length一定會等於0
-    if len(loc_main) == 0:
+    if bt_result['BACKTEST_ID'].max() == 0:
         return
     
     # ......
@@ -586,10 +601,16 @@ def eval_metrics(export_file=False, threshold=800):
                             
     
     result = result.dropna(axis=0)
-    result = result.assign(MARKET=_market)
-    result = result.assign(VERSION=sam.version)
-    result = result.assign(PRECISION_METRIC='MAPE')
-    result = result.assign(SERIAL=serial)
+    result.loc[:, 'MARKET'] = _market
+    result.loc[:, 'PRECISION_METRIC'] = 'MAPE'
+    result.loc[:, 'SERIAL'] = serial
+    
+    # 如果讀取暫存檔的話，會抓不到version
+    try:
+        result.loc[:, 'VERSION'] = sam.version
+    except:
+        pass
+    
     
     # Not Finished Yet
     result = result.assign(SCORE_METRIC='R2')
@@ -727,6 +748,12 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # 5. Google Sheet Add Manual Tick
     # 6. Think how to optimize stop loss
     # 7. Backtest也可以用parameter做A/B        
+    # 1. 再試著把y改回price看看
+    # 2. remove group by from normalization
+
+
+    # Note
+    # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
 
 
 
@@ -914,7 +941,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # Profit ------    
     # y_thld=0.02
     # time_thld=predict_period
-    # prec_thld=0.03
+    # prec_thld=0.05
     # export_file=True
     # load_file=True
     # path=path_temp
@@ -1038,20 +1065,24 @@ if __name__ == '__main__':
     
     
     # cv 5-7會超級久
+
+    # XGB Params ------
+    # eta: 0.1 / 0.01, 0.03, 0.08, 0.2
+    # min_child_weight: 0.8 / 1
+    # max_depth: 10 / 8, 12
+    # subsample: 1 / 0.8    
     
+    hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    hold = [1909, 2009, 2605, 2633, 6209]
-    
-    # master(bt_last_begin=20211230, predict_period=3, 
+    # master(bt_last_begin=20220106, predict_period=3, 
     #        long=False, interval=4, bt_times=1, 
     #        data_period=int(365 * 1), 
     #        ma_values=[5,10,20], volume_thld=400,
     #        compete_mode=0, cv=list(range(3, 4)),
     #        market='tw', hold=hold,
     #        dev=True)
-
     
-    master(bt_last_begin=20220103, predict_period=4, 
+    master(bt_last_begin=20220106, predict_period=4, 
            long=False, interval=7, bt_times=1, 
            data_period=int(365 * 5), 
            ma_values=[10,20,60], volume_thld=300,
@@ -1059,13 +1090,13 @@ if __name__ == '__main__':
            market='tw', hold=hold,
            dev=False)
 
-
-    # master(bt_last_begin=20211228, predict_period=10, 
+    # master(bt_last_begin=20211230, predict_period=10, 
     #        long=True, interval=7, bt_times=1, 
     #        data_period=int(365 * 5), 
     #        ma_values=[10,20,60], volume_thld=300,
-    #        compete_mode=1, cv=list(range(3, 7)),
+    #        compete_mode=1, cv=list(range(3, 4)),
     #        market='tw', hold=hold,
     #        dev=False)
+
 
 
