@@ -217,7 +217,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                      data_period, dev=False):
     
     global calendar, calendar_lite
-    global symbols, _market, bt_info, _bt_times, _ma_values
+    global symbols, _market, bt_info, _bt_times, _ma_values, _load_result
     
 
     # New Global Vars
@@ -228,21 +228,35 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     # Dev
     # - Add boolean switch
     # - Comparing create date
-    bt_result_file = path_temp + '/bt_result.csv'
-    precision_file = path_temp + '/precision.csv' 
     
-    if os.path.exists(bt_result_file) and os.path.exists(precision_file):
+    
+    if _load_result:
+        bt_result_file = path_temp + '/bt_result.csv'
+        precision_file = path_temp + '/precision.csv' 
         
-        bt_result = pd.read_csv(bt_result_file)
-        bt_result['SYMBOL'] = bt_result['SYMBOL'].astype('str')
+        today = cbyz.date_get_today()
         
-        precision = pd.read_csv(precision_file)
-        
-        var_y = cbyz.df_get_cols_except(
-            df=bt_result,
-            except_cols=['SYMBOL', 'WORK_DATE', 'BACKTEST_ID']
-            )
-        return
+        # 為了避免跨日的問題，多計算一天
+        bt_result_mdate = cbyz.os_get_file_modify_date(bt_result_file)
+        bt_result_mdate = cbyz.date_cal(bt_result_mdate, 1, 'd')
+
+        precision_mdate = cbyz.os_get_file_modify_date(precision_file)
+        precision_mdate = cbyz.date_cal(precision_mdate, 1, 'd')
+
+    
+        if os.path.exists(bt_result_file) and os.path.exists(precision_file) \
+            and bt_result_mdate <= today and precision_mdate <= today:
+            
+            bt_result = pd.read_csv(bt_result_file)
+            bt_result['SYMBOL'] = bt_result['SYMBOL'].astype('str')
+            
+            precision = pd.read_csv(precision_file)
+            
+            var_y = cbyz.df_get_cols_except(
+                df=bt_result,
+                except_cols=['SYMBOL', 'WORK_DATE', 'BACKTEST_ID']
+                )
+            return
     
     
     # Prepare For Backtest Records ......
@@ -315,8 +329,8 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
 
     if len(bt_result) > 800:
-        bt_result_file.to_csv(path_temp + '/bt_result_file.csv', 
-                          index=False)
+        bt_result.to_csv(path_temp + '/bt_result_file.csv', 
+                         index=False)
         
         precision.to_csv(path_temp + '/precision.csv', 
                          index=False)
@@ -573,9 +587,10 @@ def eval_metrics(export_file=False, threshold=800):
     
     
     loc_main = bt_result.merge(hist_main, on=['SYMBOL', 'WORK_DATE'])
+    loc_main = loc_main.dropna(axis=0)
 
-    # 不做回測時，mape_main的length一定會等於0
-    if bt_result['BACKTEST_ID'].max() == 0:
+    # All hist columns will be NA if not a backtest
+    if len(loc_main) == 0:
         return
     
     # ......
@@ -684,7 +699,8 @@ def view_yesterday():
 
 def master(bt_last_begin, predict_period=14, long=False, interval=360, 
            bt_times=2, data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
-           cv=2, compete_mode=1, market='tw', hold=[], dev=False):
+           cv=2, compete_mode=1, market='tw', hold=[], load_result=False,
+           dev=False):
     '''
     主工作區
     Update, 增加台灣上班上課行事曆，如果是end_date剛好是休假日，直接往前推一天。
@@ -797,10 +813,11 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     global _interval, _bt_times, _volume_thld, _ma_values, _hold
     global symbols, _market
     global _bt_last_begin, _bt_last_end
-    global serial
+    global serial, _load_result
 
     _hold = [str(i) for i in hold]
     serial = cbyz.get_time_serial(with_time=True)
+    _load_result = load_result
 
     # Parameters
     
@@ -973,17 +990,17 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     
     # Write Google Sheets ...... 
-    # if len(actions) > 800 and bt_last_begin >= today:
+    if len(actions) > 800:
         
-    #     # Action Workbook
-    #     stk.write_sheet(data=actions, sheet='TW', long=long,
-    #                     predict_begin=_bt_last_begin)
+        # Action Workbook
+        stk.write_sheet(data=actions, sheet='TW', long=long,
+                        predict_begin=_bt_last_begin)
     
-    #     # View And Log .....
-    #     view_yesterday()
+        # View And Log .....
+        view_yesterday()
 
-    #     global pred_features
-    #     stk.write_sheet(data=pred_features, sheet='Features')
+        global pred_features
+        stk.write_sheet(data=pred_features, sheet='Features')
     
     
     gc.collect()
@@ -1087,7 +1104,7 @@ if __name__ == '__main__':
            data_period=int(365 * 5), 
            ma_values=[10,20,60], volume_thld=300,
            compete_mode=1, cv=list(range(3, 4)),
-           market='tw', hold=hold,
+           market='tw', hold=hold, load_result=False,
            dev=False)
 
     # master(bt_last_begin=20211230, predict_period=10, 
