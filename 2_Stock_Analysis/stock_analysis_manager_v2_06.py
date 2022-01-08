@@ -29,7 +29,6 @@ import pickle
 
 
 host = 2
-host = 0
 
 
 # Path .....
@@ -46,8 +45,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220103',
-                 r'/home/jupyter/Arsenal/20220103',
+                 r'/home/jupyter/Codebase_YZ/20220106',
+                 r'/home/jupyter/Arsenal/20220106',
                  path + '/Function']
 
 
@@ -945,6 +944,10 @@ def get_model_data(industry=True, trade_value=True):
                    'MODEL_X':model_x,
                    'NORM_ORIG':norm_orig}
     
+    
+    main_data.to_csv(path_temp + '/model_data.csv', index=False)
+    
+    
     return export_dict
 
 
@@ -1319,7 +1322,10 @@ def master(param_holder, predict_begin, export_model=True,
                          }]         
     else:
         
-        # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
+        # eta: 0.1 / 0.01, 0.03, 0.08, 0.2
+        # min_child_weight: 0.8 / 0.6, 1
+        # max_depth: 10 / 8, 12
+        # subsample: 1 / 0.8
         
         model_params = [
                         {'model': LinearRegression(),
@@ -1330,13 +1336,14 @@ def master(param_holder, predict_begin, export_model=True,
                         {'model': xgb.XGBRegressor(),
                          'params': {
                             # 'n_estimators': [200],
-                            # 'eta': [0.08],
-                            'eta': [0.08, 0.1],
-                            'min_child_weight': [1],
-                             # 'min_child_weight': [0.5, 1],
-                            'max_depth':[8],
-                             # 'max_depth':[6, 8, 12],
+                            'eta': [0.1],
+                            # 'eta': [0.1, 0.2],
+                            'min_child_weight': [0.8],
+                            # 'min_child_weight': [0.8, 1],
+                            'max_depth':[10],
+                             # 'max_depth':[10, 12],
                             'subsample':[1]
+                            # 'subsample':[0.8, 1]
                           }
                         },
                         # {'model': SGDRegressor(),

@@ -418,6 +418,8 @@ def automation():
 if __name__ == '__main__':
     
 
+    print('shareholding_spread ------')
+
     # Check, 記錄查無此資料的symbol >>  20201016 - 00894    
     master()
 
