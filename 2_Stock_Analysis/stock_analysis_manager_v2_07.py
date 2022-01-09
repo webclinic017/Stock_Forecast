@@ -159,6 +159,15 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Exclude Low Volume Symbols ......
     market_data_raw = select_symbols()
     
+    
+    # First Trading Day ......
+    # - This object will be used at the end of get_model_data
+    global first_trading_day
+    first_trading_day = market_data_raw[['SYMBOL', 'WORK_DATE']] \
+            .sort_values(by=['SYMBOL', 'WORK_DATE'], ascending=True) \
+            .drop_duplicates(subset=['SYMBOL']) \
+            .rename(columns={'WORK_DATE':'FIRST_TRADING_DAY'})
+            
 
     # Add K line ......
     market_data_raw = market_data_raw \
@@ -183,6 +192,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     #         stk.add_support_resistance(df=market_data_raw, cols='CLOSE',
     #                                    rank_thld=int(data_period * 2 / 360),
     #                                    prominence=4, days=False)
+
 
     # Predict Symbols ......
     # 1. Prevent some symbols excluded by select_symbols(), but still
@@ -213,10 +223,11 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
             )
         
     
-    # Merge As Main Data
+    # Merge As Main Data ......
     global main_data_frame, main_data_frame_calendar
     main_data_frame = cbyz.df_cross_join(symbol_df, calendar_proc)
     
+    # Remove Untrading Day
     main_data_frame = \
         main_data_frame[
             (main_data_frame['TRADE_DATE']>=1) \
@@ -225,8 +236,9 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
 
     market_data_raw = main_data_frame \
         .merge(market_data_raw, how='left', on=['SYMBOL', 'WORK_DATE'])
+
     
-    
+    # Organize
     main_data_frame = main_data_frame[['WORK_DATE', 'SYMBOL']]
     main_data_frame_calendar = main_data_frame[['WORK_DATE']] \
                                 .drop_duplicates() \
@@ -279,7 +291,7 @@ def sam_load_data(industry=True, trade_value=True):
     assert 'CLOSE' not in var_y, msg
 
 
-    # 應要先獨立把y的欄位標準化，否則ml_data_process中處理的會是ma後的欄位
+    # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
     loc_main, norm_orig = \
         cbml.df_normalize(
             df=loc_main,
@@ -354,7 +366,7 @@ def sam_load_data(industry=True, trade_value=True):
                    'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
                     + ratio_cols
     
-    loc_main, _, _ = \
+    loc_main, temp_cols, _ = \
         cbml.ml_data_process(df=loc_main, 
                              ma=True, normalize=True, lag=True,
                              date_col='WORK_DATE',
@@ -886,10 +898,10 @@ def get_model_data(industry=True, trade_value=True):
         cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
     
     
-    
     # 財務報表
     # - 現在只用單季，需確認是否有缺漏
-    # sam_tej_get_ewifinq()
+    print('財務報表現在只用單季，需確認是否有缺漏')
+    # financial_statement = sam_tej_get_ewifinq()
     
     
     
@@ -955,6 +967,18 @@ def get_model_data(industry=True, trade_value=True):
                         .reset_index(drop=True)
 
 
+    # Remove date before first_trading_day
+    # - 由於main_data_frame是用cross_join，所以會出現listing前的日期，但這個步驟要等到
+    #   最後才執行，否則在合併某些以月或季為單位的資料時會出現NA
+    global first_trading_day
+    main_data = main_data \
+        .merge(first_trading_day, how='left', on=['SYMBOL'])
+    
+    main_data = main_data[
+        main_data['WORK_DATE']>=main_data['FIRST_TRADING_DAY']] \
+        .drop('FIRST_TRADING_DAY', axis=1)
+
+
     # Check NA ......
     global hist_df, predict_df
     hist_df = main_data[main_data['WORK_DATE']<predict_date[0]]
@@ -963,7 +987,7 @@ def get_model_data(industry=True, trade_value=True):
     # Debug ......
     # 把normalize的group_by拿掉後，這個地方會出錯，暫時直接drop
     hist_df.to_csv(path_temp + '/debug_hist_df.csv', index=False)
-    hist_df = hist_df.dropna(subset=var_y, axis=0)
+    # hist_df = hist_df.dropna(subset=var_y, axis=0)
     
     # ValueError: ('df_chk_col_na - df中有na',                COLUMN  NA_COUNT
     # 0   OPEN_CHANGE_RATIO      8612
@@ -994,18 +1018,6 @@ def get_model_data(industry=True, trade_value=True):
                        | (chk_min_max['MAX_VALUE']>1))]
     
     assert len(chk_min_max) == 0, 'get_model_data - normalize error'
-
-    #                      COLUMN    MIN_VALUE     MAX_VALUE
-    # 0       VOLUME_CHANGE_RATIO         -1.0           inf
-    # 1   VOLUME_CHANGE_ABS_RATIO          0.0           inf
-    # 2                    VOLUME          0.0  1.281795e+09
-    # 3             VOLUME_CHANGE -834536728.0  1.109633e+09
-    # 4         VOLUME_CHANGE_ABS          0.0  1.109633e+09
-    # 5        SYMBOL_TRADE_VALUE          0.0  1.452704e+08
-    # 7             SHADOW_LENGTH          0.0  1.170000e+02
-    # 8                       BAR          0.0  1.070000e+02
-    # 9                TOP_SHADOW         -2.0  7.300000e+01
-    # 10            BOTTOM_SHADOW         -2.5  6.700000e+01
 
             
     export_dict = {'MODEL_DATA':main_data,
@@ -1181,6 +1193,10 @@ def master(param_holder, predict_begin, export_model=True,
     # - Fix bug after removing group_by params of normalizing
     # - Add GDP and Buffett Indicator
     
+    # v2.08
+    # - Add financial_statement
+    #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
+    
     # Note
     # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己
     #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
@@ -1193,9 +1209,6 @@ def master(param_holder, predict_begin, export_model=True,
     # - Trade value 應該要用mean of high and low
     
     
-    
-    
-    # - Save model_data as csv
     # - Add support_resist
     # - select_symbols用過去一周的總成交量檢查
     # - Short term model and long term model be overwirtted
@@ -1240,7 +1253,6 @@ def master(param_holder, predict_begin, export_model=True,
 
     # 6. Bug - 照目前的寫法，20171231的Week_Num會是NA
     # Update - 上面Week_Num的問題還沒有處理，會導致這一段出錯
-    # Bug - ar.get_calendar中，WEEK_NUM的地方有問題，會讓20171231的Week_Num為NA，導致conv_type出錯
 
 
     # Optimization .....
@@ -1317,7 +1329,7 @@ def master(param_holder, predict_begin, export_model=True,
         
     
     var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-               'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+             'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
     id_keys = ['SYMBOL', 'WORK_DATE']    
     
     
@@ -2049,8 +2061,15 @@ def test_support_resistance():
 
 def debug():
     
-    tw_index = sam_od_tw_get_index(begin_date=20170101, 
-                                   end_date=20211210)
+
+    file = pd.read_csv(path_temp + '/debug_hist_df.csv')
+    chk = cbyz.df_chk_col_na(df=file)
+    chk = chk[~chk['COLUMN'].isin(var_y)]
+    chk['NA_COUNT'].max()
+    
+    chk2 = file[file['COVID19_TW_MA_20_LAG'].isna()]
+    
+
 
 # %% Execution ------
 

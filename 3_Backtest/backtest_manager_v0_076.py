@@ -231,10 +231,6 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     global precision, features, var_y, _volume_thld
     global pred_scores, pred_features, pred_params
     
-    # Dev
-    # - Add boolean switch
-    # - Comparing create date
-    
     
     if _load_result:
         bt_result_file = path_temp + '/bt_result.csv'
@@ -280,13 +276,10 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     bt_info['PREDICT_PERIOD'] = predict_period
     bt_info = bt_info.drop('WORK_DATE', axis=1)
     
-    
     bt_seq = bt_info_raw['WORK_DATE'].tolist()
     
     
     # Work area ----------
-
-    
     bt_results_raw = pd.DataFrame()
     precision = pd.DataFrame()
     
@@ -869,8 +862,9 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
     if dev:
         symbols = [2520, 2605, 6116, 6191, 3481, 
-                   2409, 2520, 2603,
-                   2409, 2603, 2611, 3051, 3562]
+                   2409, 2520, 2603, 2409, 2603, 
+                   2611, 3051, 3562, 2301, 
+                   '2211', '3138', '3530']
     else:
         symbols = []
         
@@ -1100,11 +1094,11 @@ if __name__ == '__main__':
     
     master(bt_last_begin=20220106, predict_period=3, 
            long=False, interval=4, bt_times=1, 
-            data_period=int(365 * 1), 
-            ma_values=[5,10,20], volume_thld=400,
-            compete_mode=0, cv=list(range(3, 4)),
-            market='tw', hold=hold,
-            dev=True)
+           data_period=int(365 * 1), 
+           ma_values=[5,10,20], volume_thld=400,
+           compete_mode=0, cv=list(range(3, 4)),
+           market='tw', hold=hold,
+           dev=True)
     
     # master(bt_last_begin=20220106, predict_period=4, 
     #        long=False, interval=7, bt_times=1, 
