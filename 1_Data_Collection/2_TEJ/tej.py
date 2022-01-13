@@ -442,7 +442,11 @@ def automation():
     # 2. TEJ只開放五年的資料
         
     # update(begin=20211216, end=20211231, ewprcd=False, ewtinst1c=False, 
-    #        ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+    #         ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
+    #         delete=True, upload=True)   
+
+    # update(begin=20210901, end=20211231, ewprcd=False, ewtinst1c=False, 
+    #        ewsale=False, ewprcd2=False, ewifinq=True, ewnprcstd=False,
     #        delete=True, upload=True)        
 
     chk2 = chk_date()
@@ -458,6 +462,27 @@ if __name__ == '__main__':
     
     
 
+
+# %% Dev ------
+
+def dev():
+    
+    Update ewifinq
+    new_data = data.copy()
+    new_data.loc[:, 'year'] = new_data['mdate'].astype('str').str.slice(0, 3)
+    
+    
+    existing_data = result.copy()
+    existing_data.loc[:, 'year'] = existing_data['mdate'].astype('str').str.slice(0, 3)
+    existing_data = existing_data[['coid', 'year', 'sem', 'qflg']].reset_index(drop=True)
+    existing_data = cbyz.df_conv_col_type(df=existing_data, cols='sem', to='str')
+    
+    
+    temp = cbyz.df_anti_merge(new_data, existing_data, on=['coid', 'year', 'sem', 'qflg'])
+    
+    
+    if len(temp) > 0:
+        result = result.append(new_data)    
 
 
 

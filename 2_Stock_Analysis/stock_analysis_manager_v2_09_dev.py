@@ -46,8 +46,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220108',
-                 r'/home/jupyter/Arsenal/20220108',
+                 r'/home/jupyter/Codebase_YZ/20220113',
+                 r'/home/jupyter/Arsenal/20220113',
                  path + '/Function']
 
 
@@ -1192,10 +1192,14 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add GDP and Buffett Indicator
     
     # v2.09
+    # - Update the calculation method of trade value as mean of high and low
+
+
+    # v2.10
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
-    # - Add load data feature - not yes
-    # - Update the calculation method of trade value as mean of high and low
+    # - Add load data feature - not yet
+
     
     # Note
     # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己

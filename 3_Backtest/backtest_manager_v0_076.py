@@ -32,8 +32,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220108',
-                 r'/home/jupyter/Arsenal/20220108',
+                 r'/home/jupyter/Codebase_YZ/20220113',
+                 r'/home/jupyter/Arsenal/20220113',
                  path + '/Function',
                  path_sam]
 
@@ -691,6 +691,8 @@ def view_yesterday():
             .sort_values(by='CLOSE_CHANGE_RATIO_MEAN', ascending=False) \
             .reset_index(drop=True)
             
+    summary.loc[:, 'LAST_DATE'] = last_date
+            
     # Write
     stk.write_sheet(data=summary, sheet='YD_Industry')            
         
@@ -750,6 +752,8 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # v0.076
     # - Add capability to read saved bt_result.csv > Done
     # - Add date to result of view_yesterday
+    
+    # v0.077
     # - 是不是還是必須把bt mape和score合併
     
 
@@ -994,17 +998,17 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     
     # Write Google Sheets ...... 
-    # if len(actions) > 800:
+    if len(actions) > 800:
         
-    #     # Action Workbook
-    #     stk.write_sheet(data=actions, sheet='TW', long=long,
-    #                     predict_begin=_bt_last_begin)
+        # Action Workbook
+        stk.write_sheet(data=actions, sheet='TW', long=long,
+                        predict_begin=_bt_last_begin)
     
-    #     # View And Log .....
-    #     view_yesterday()
+        # View And Log .....
+        view_yesterday()
 
-    #     global pred_features
-    #     stk.write_sheet(data=pred_features, sheet='Features')
+        global pred_features
+        stk.write_sheet(data=pred_features, sheet='Features')
     
     
     gc.collect()
@@ -1075,15 +1079,10 @@ def verify_prediction_results():
 # %% Dev -----
 
 
-def dev():
-
-    ledger = stk.get_ledger()
-
 
 
 # %% Execute ------
 if __name__ == '__main__':
-    
     
     # cv 5-7會超級久
 
@@ -1095,29 +1094,30 @@ if __name__ == '__main__':
     
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    # master(bt_last_begin=20220106, predict_period=3, 
+    # master(bt_last_begin=20220111, predict_period=3, 
     #        long=False, interval=4, bt_times=1, 
     #        data_period=int(365 * 1), 
     #        ma_values=[5,10,20], volume_thld=400,
     #        compete_mode=0, cv=list(range(3, 4)),
-    #        market='tw', hold=hold, load_result=False, 
-    #        dev=True)
+    #        market='tw', hold=hold,
+    #        load_result=False, dev=True)
     
-    master(bt_last_begin=20220113, predict_period=4, 
-            long=False, interval=7, bt_times=1, 
-            data_period=int(365 * 5), 
-            ma_values=[10,20,60], volume_thld=300,
-            compete_mode=1, cv=list(range(3, 4)),
-            market='tw', hold=hold, load_result=True,
-            dev=False)
+    master(bt_last_begin=20220110, predict_period=4, 
+           long=False, interval=7, bt_times=1, 
+           data_period=int(365 * 5), 
+           ma_values=[10,20,60], volume_thld=300,
+           compete_mode=1, cv=list(range(3, 4)),
+           market='tw', hold=hold,
+           load_result=False, dev=False)
 
-    # master(bt_last_begin=20211230, predict_period=10, 
+    # master(bt_last_begin=20220105, predict_period=10, 
     #        long=True, interval=7, bt_times=1, 
     #        data_period=int(365 * 5), 
     #        ma_values=[10,20,60], volume_thld=300,
     #        compete_mode=1, cv=list(range(3, 4)),
     #        market='tw', hold=hold,
-    #        dev=False)
+    #        load_result=False, dev=False)
+
 
 
 
