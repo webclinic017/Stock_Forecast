@@ -48,8 +48,8 @@ import codebase_yz as cbyz
 # import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-# import stock_analysis_manager_v2_06 as sam
-import stock_analysis_manager_v2_07_dev as sam
+import stock_analysis_manager_v2_07 as sam
+# import stock_analysis_manager_v2_09_dev as sam
 
 
 
@@ -241,13 +241,17 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         # 為了避免跨日的問題，多計算一天
         bt_result_mdate = cbyz.os_get_file_modify_date(bt_result_file)
         bt_result_mdate = cbyz.date_cal(bt_result_mdate, 1, 'd')
+        bt_result_date_diff = cbyz.date_diff(today, bt_result_mdate, 
+                                             absolute=True)        
 
         precision_mdate = cbyz.os_get_file_modify_date(precision_file)
         precision_mdate = cbyz.date_cal(precision_mdate, 1, 'd')
+        prec_date_diff = cbyz.date_diff(precision_mdate, bt_result_mdate, 
+                                        absolute=True)
+        
 
-    
         if os.path.exists(bt_result_file) and os.path.exists(precision_file) \
-            and bt_result_mdate <= today and precision_mdate <= today:
+            and bt_result_date_diff <= 2 and  prec_date_diff <= 2:
             
             bt_result = pd.read_csv(bt_result_file)
             bt_result['SYMBOL'] = bt_result['SYMBOL'].astype('str')
@@ -394,7 +398,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
 
     # Generate Actions ......
     global precision
-    
     bt_main, actions = \
         stk.gen_predict_action(df=main_data,
                                precision=precision,
@@ -991,17 +994,17 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     
     # Write Google Sheets ...... 
-    if len(actions) > 800:
+    # if len(actions) > 800:
         
-        # Action Workbook
-        stk.write_sheet(data=actions, sheet='TW', long=long,
-                        predict_begin=_bt_last_begin)
+    #     # Action Workbook
+    #     stk.write_sheet(data=actions, sheet='TW', long=long,
+    #                     predict_begin=_bt_last_begin)
     
-        # View And Log .....
-        view_yesterday()
+    #     # View And Log .....
+    #     view_yesterday()
 
-        global pred_features
-        stk.write_sheet(data=pred_features, sheet='Features')
+    #     global pred_features
+    #     stk.write_sheet(data=pred_features, sheet='Features')
     
     
     gc.collect()
@@ -1092,21 +1095,21 @@ if __name__ == '__main__':
     
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    master(bt_last_begin=20220106, predict_period=3, 
-           long=False, interval=4, bt_times=1, 
-           data_period=int(365 * 1), 
-           ma_values=[5,10,20], volume_thld=400,
-           compete_mode=0, cv=list(range(3, 4)),
-           market='tw', hold=hold,
-           dev=True)
+    # master(bt_last_begin=20220106, predict_period=3, 
+    #        long=False, interval=4, bt_times=1, 
+    #        data_period=int(365 * 1), 
+    #        ma_values=[5,10,20], volume_thld=400,
+    #        compete_mode=0, cv=list(range(3, 4)),
+    #        market='tw', hold=hold, load_result=False, 
+    #        dev=True)
     
-    # master(bt_last_begin=20220106, predict_period=4, 
-    #        long=False, interval=7, bt_times=1, 
-    #        data_period=int(365 * 5), 
-    #        ma_values=[10,20,60], volume_thld=300,
-    #        compete_mode=1, cv=list(range(3, 4)),
-    #        market='tw', hold=hold, load_result=False,
-    #        dev=False)
+    master(bt_last_begin=20220113, predict_period=4, 
+            long=False, interval=7, bt_times=1, 
+            data_period=int(365 * 5), 
+            ma_values=[10,20,60], volume_thld=300,
+            compete_mode=1, cv=list(range(3, 4)),
+            market='tw', hold=hold, load_result=True,
+            dev=False)
 
     # master(bt_last_begin=20211230, predict_period=10, 
     #        long=True, interval=7, bt_times=1, 
