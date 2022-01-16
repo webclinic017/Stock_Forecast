@@ -303,12 +303,14 @@ def sam_load_data(industry=True, trade_value=True):
     #         )  
 
     # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
+    # - 這裡的method要用1，如果用2的話，mse會變成0.8
     loc_main, norm_orig = \
         cbml.df_scaler(
             df=loc_main,
             cols=var_y,
             groupby=[],
-            show_progress=False
+            show_progress=False,
+            method=1
             )  
 
     
