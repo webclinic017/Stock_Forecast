@@ -32,8 +32,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220113',
-                 r'/home/jupyter/Arsenal/20220113',
+                 r'/home/jupyter/Codebase_YZ/20220115',
+                 r'/home/jupyter/Arsenal/20220115',
                  path + '/Function',
                  path_sam]
 
@@ -45,11 +45,14 @@ for i in path_codebase:
 
 
 import codebase_yz as cbyz
-# import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import stock_analysis_manager_v2_07 as sam
-# import stock_analysis_manager_v2_09_dev as sam
+import codebase_ml as cbml
+# import stock_analysis_manager_v2_07 as sam
+# import stock_analysis_manager_v2_071 as sam
+# import stock_analysis_manager_v2_081 as sam
+
+import stock_analysis_manager_v2_09_dev as sam
 
 
 
@@ -755,6 +758,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     # v0.077
     # - 是不是還是必須把bt mape和score合併
+    # - 權殖股，依照產業列出rank
     
 
 
@@ -1029,6 +1033,18 @@ def delete_records():
     ar.db_execute(sql, fetch=False)
 
 
+def debug():
+    
+    cbml.debug_temp_df
+
+    chk = stk.debug_df
+    chk.isna().sum()
+
+
+    chk[chk['D0001'].isna()]
+
+
+
 
 # %% Verify ......
 def verify_prediction_results():
@@ -1094,21 +1110,21 @@ if __name__ == '__main__':
     
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    # master(bt_last_begin=20220111, predict_period=3, 
-    #        long=False, interval=4, bt_times=1, 
-    #        data_period=int(365 * 1), 
-    #        ma_values=[5,10,20], volume_thld=400,
-    #        compete_mode=0, cv=list(range(3, 4)),
-    #        market='tw', hold=hold,
-    #        load_result=False, dev=True)
+    master(bt_last_begin=20220111, predict_period=3, 
+            long=False, interval=4, bt_times=1, 
+            data_period=int(365 * 1), 
+            ma_values=[5,10,20], volume_thld=400,
+            compete_mode=0, cv=list(range(3, 4)),
+            market='tw', hold=hold,
+            load_result=False, dev=True)
     
-    master(bt_last_begin=20220110, predict_period=4, 
-           long=False, interval=7, bt_times=1, 
-           data_period=int(365 * 5), 
-           ma_values=[10,20,60], volume_thld=300,
-           compete_mode=1, cv=list(range(3, 4)),
-           market='tw', hold=hold,
-           load_result=False, dev=False)
+    # master(bt_last_begin=20220110, predict_period=4, 
+    #        long=False, interval=7, bt_times=1, 
+    #        data_period=int(365 * 5), 
+    #        ma_values=[10,20,60], volume_thld=300,
+    #        compete_mode=1, cv=list(range(3, 4)),
+    #        market='tw', hold=hold,
+    #        load_result=False, dev=False)
 
     # master(bt_last_begin=20220105, predict_period=10, 
     #        long=True, interval=7, bt_times=1, 

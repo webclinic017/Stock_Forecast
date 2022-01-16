@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# %%
 """
 Created on Sat Nov 14 17:23:08 2020
 
@@ -293,16 +294,23 @@ def sam_load_data(industry=True, trade_value=True):
 
 
     # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
-    # - 這裡的method要用1，如果用2的話，mse會變成0.8
+    # loc_main, norm_orig = \
+    #     cbml.df_normalize(
+    #         df=loc_main,
+    #         cols=var_y,
+    #         groupby=[],
+    #         show_progress=False
+    #         )  
+
+    # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
     loc_main, norm_orig = \
         cbml.df_scaler(
             df=loc_main,
             cols=var_y,
             groupby=[],
-            show_progress=False,
-            method=1
+            show_progress=False
             )  
-                
+
     
     ratio_cols = []
     if 'CLOSE_CHANGE_RATIO' in loc_main.columns:
@@ -349,38 +357,38 @@ def sam_load_data(industry=True, trade_value=True):
     
     
     # Normalize By Stock ......
-    except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
-                    + ratio_cols
-    
-    loc_main, _, _ = \
-        cbml.ml_data_process(df=loc_main, 
-                              ma=True, normalize=True, lag=True,
-                              date_col='WORK_DATE',
-                              group_by=['SYMBOL'],
-                              cols=[], 
-                              except_cols=except_cols,
-                              drop_except=var_y,
-                              cols_mode='equal',
-                              ma_values=ma_values, 
-                              lag_period=predict_period
-                              )
-        
-    # except_cols = ['SYMBOL', 'WORK_DATE', 'YEAR', 
-    #                'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
+    # except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
     #                 + ratio_cols
     
-    # loc_main, temp_cols, _ = \
+    # loc_main, _, _ = \
     #     cbml.ml_data_process(df=loc_main, 
     #                          ma=True, normalize=True, lag=True,
     #                          date_col='WORK_DATE',
-    #                          group_by=[],
+    #                          group_by=['SYMBOL'],
     #                          cols=[], 
     #                          except_cols=except_cols,
     #                          drop_except=var_y,
     #                          cols_mode='equal',
     #                          ma_values=ma_values, 
     #                          lag_period=predict_period
-    #                          )        
+    #                          )
+        
+    except_cols = ['SYMBOL', 'WORK_DATE', 'YEAR', 
+                   'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
+                    + ratio_cols
+    
+    loc_main, temp_cols, _ = \
+        cbml.ml_data_process(df=loc_main, 
+                             ma=True, normalize=True, lag=True,
+                             date_col='WORK_DATE',
+                             group_by=[],
+                             cols=[], 
+                             except_cols=except_cols,
+                             drop_except=var_y,
+                             cols_mode='equal',
+                             ma_values=ma_values, 
+                             lag_period=predict_period
+                             )        
         
         
 
@@ -558,10 +566,10 @@ def sam_load_data(industry=True, trade_value=True):
 
         
     # Check for min max
-    # chk_min_max = cbyz.df_chk_col_min_max(df=loc_main)
-    # chk_min_max = chk_min_max[chk_min_max['COLUMN']!='WORK_DATE']
-    # chk_min_max = chk_min_max[(chk_min_max['MIN_VALUE']<0) \
-    #                           | (chk_min_max['MAX_VALUE']>1)]
+    chk_min_max = cbyz.df_chk_col_min_max(df=loc_main)
+    chk_min_max = chk_min_max[chk_min_max['COLUMN']!='WORK_DATE']
+    chk_min_max = chk_min_max[(chk_min_max['MIN_VALUE']<0) \
+                              | (chk_min_max['MAX_VALUE']>1)]
         
     # assert len(chk_min_max) == 0, 'chk_min_max failed'
     
@@ -681,7 +689,7 @@ def select_symbols():
 # %% Process ------
 
 
-def get_model_data(industry=True, trade_value=True, load_file=False):
+def get_model_data(industry=True, trade_value=True):
     
     
     global shift_begin, shift_end, data_begin, data_end, ma_values
@@ -692,42 +700,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global params, error_msg
     global id_keys
     global main_data
-    
-    
-    
-    if load_file:
-    
-        main_data_file = path_temp + '/model_data.csv'
-        model_x_file = path_temp + '/model_x.csv'
-        norm_orig_file = path_temp + '/norm_orig.csv'
-        
-
-        # 為了避免跨日的問題，多計算一天
-        today = cbyz.date_get_today()
-        
-        main_data_mdate = cbyz.os_get_file_modify_date(main_data_file)
-        main_data_mdate = cbyz.date_cal(main_data_mdate, 1, 'd')
-        main_data_diff = cbyz.date_diff(today, main_data_mdate, absolute=True)        
-
-        model_x_mdate = cbyz.os_get_file_modify_date(model_x_file)
-        model_x_mdate = cbyz.date_cal(model_x_mdate, 1, 'd')
-        model_x_diff = cbyz.date_diff(today, model_x_mdate, absolute=True)
-        
-        norm_mdate = cbyz.os_get_file_modify_date(norm_orig_file)
-        norm_mdate = cbyz.date_cal(norm_mdate, 1, 'd')
-        norm_diff = cbyz.date_diff(today, norm_mdate, absolute=True)        
-
-
-        # Ensure files were saved recently
-        if main_data_diff <= 2 and  model_x_diff <= 2 and norm_diff <= 2:
-            try:
-                main_data = pd.read_csv(main_data_file)
-                model_x = cbyz.li_read_csv(model_x_file)
-                norm_orig = pd.read_csv(norm_orig_file)
-            except Exception as e:
-                print(e)
-            else:
-                return model_data, model_x, norm_orig                
     
 
     # Check ......
@@ -793,7 +765,10 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         main_data = main_data \
                     .merge(buffett_indicator, how='left', on=['WORK_DATE'])
                 
-
+        # main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+        #                            sort_keys='WORK_DATE', group_by=[], 
+        #                            method='ffill')
+        
 
     # Government Invest ......
     gov_invest = stk.od_tw_get_gov_invest(path=path_resource)
@@ -972,26 +947,25 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     # COVID-19 ......
-    if market == 'tw':
-        covid19, _ = cbyz.get_covid19_data()
-        covid19 = main_data_frame_calendar \
-                    .merge(covid19, how='left', on=['WORK_DATE'])
+    covid19, _ = cbyz.get_covid19_data()
+    covid19 = main_data_frame_calendar \
+                .merge(covid19, how='left', on=['WORK_DATE'])
     
-        covid19, covid19_cols, _ = \
-                    cbml.ml_data_process(df=covid19, 
-                                         ma=True, normalize=True, lag=True, 
-                                         group_by=[],
-                                         cols=[], 
-                                         except_cols=[],
-                                         drop_except=[],
-                                         cols_mode='equal',
-                                         date_col='WORK_DATE',
-                                         ma_values=ma_values, 
-                                         lag_period=predict_period
-                                         )
-            
-        main_data = main_data.merge(covid19, how='left', on='WORK_DATE')
-        main_data = cbyz.df_conv_na(df=main_data, cols=covid19_cols)
+    covid19, covid19_cols, _ = \
+                cbml.ml_data_process(df=covid19, 
+                                     ma=True, normalize=True, lag=True, 
+                                     group_by=[],
+                                     cols=[], 
+                                     except_cols=[],
+                                     drop_except=[],
+                                     cols_mode='equal',
+                                     date_col='WORK_DATE',
+                                     ma_values=ma_values, 
+                                     lag_period=predict_period
+                                     )
+        
+    main_data = main_data.merge(covid19, how='left', on='WORK_DATE')
+    main_data = cbyz.df_conv_na(df=main_data, cols=covid19_cols)
 
 
     # Variables ......
@@ -1022,10 +996,15 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     # Debug ......
-    msg = ("get_model_data - 把normalize的group_by拿掉後，這個地方會出錯，但"
-           "只有一筆資料有問題，暫時直接drop")
-    print(msg)
-    # hist_df.to_csv(path_temp + '/debug_hist_df.csv', index=False)
+    # 把normalize的group_by拿掉後，這個地方會出錯，暫時直接drop
+    hist_df.to_csv(path_temp + '/debug_hist_df.csv', index=False)
+    # hist_df = hist_df.dropna(subset=var_y, axis=0)
+    
+    # ValueError: ('df_chk_col_na - df中有na',                COLUMN  NA_COUNT
+    # 0   OPEN_CHANGE_RATIO      8612
+    # 1   HIGH_CHANGE_RATIO      8612
+    # 2    LOW_CHANGE_RATIO      8612
+    # 3  CLOSE_CHANGE_RATIO      8612)    
     cbyz.df_chk_col_na(df=hist_df, mode='stop')
     
     
@@ -1041,23 +1020,22 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
 
     # Check min max ......
-    # global chk_min_max
-    # chk_min_max = cbyz.df_chk_col_min_max(df=main_data)
+    global chk_min_max
+    chk_min_max = cbyz.df_chk_col_min_max(df=main_data)
     
-    # chk_min_max = \
-    #     chk_min_max[(~chk_min_max['COLUMN'].isin(id_keys)) \
-    #                 & ((chk_min_max['MIN_VALUE']<0) \
-    #                    | (chk_min_max['MAX_VALUE']>1))]
+    chk_min_max = \
+        chk_min_max[(~chk_min_max['COLUMN'].isin(id_keys)) \
+                    & ((chk_min_max['MIN_VALUE']<0) \
+                       | (chk_min_max['MAX_VALUE']>1))]
     
     # assert len(chk_min_max) == 0, 'get_model_data - normalize error'
 
-
-    # Export Model ......
-    main_data.to_csv(path_temp + '/model_data.csv', index=False)
-    cbyz.li_to_csv(model_x, path_temp + '/model_x.csv')
-    norm_orig.to_csv(path_temp + '/norm_orig.csv', index=False)
-        
-    return main_data, model_x, norm_orig
+            
+    export_dict = {'MODEL_DATA':main_data,
+                   'MODEL_X':model_x,
+                   'NORM_ORIG':norm_orig}
+    
+    return export_dict
 
 
 # %% Variables ------
@@ -1158,7 +1136,6 @@ def sam_tej_get_ewsale(begin_date):
     loc_df = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
                                 symbol=symbols, fill=True, host=host)
     
-    
     # Merge will cause NA, so it must to execute df_fillna
     loc_df = main_data_frame \
         .merge(loc_df, how='left', on=['SYMBOL', 'WORK_DATE'])
@@ -1227,27 +1204,27 @@ def master(param_holder, predict_begin, export_model=True,
     # - Fix bug after removing group_by params of normalizing
     # - Add GDP and Buffett Indicator
     
-    # v2.09
-    這個版本有bug，mse達到0.8，需與v2.081 check difference
-    # - Update the calculation method of trade value as mean of high and low > Done
-    # - Add load data feature for get_model_data > Done
-    # - Update cbml and df_scaler > Done
-    # - Remove df_chk_col_min_max > Done
+    # v2.081
+    # - Debug version
 
 
-    # v2.10
-    # - Add financial_statement
-    #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
-
+    # v2.082
+    # - Debug version, replace the first df_normalize in sam_load_data with
+    #   df_scaler    
     
     # Note
     # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己
     #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
     #   改成[]。經測試過後，R2差不多，所以保留新的版本，應該可以提高計算速度。
     
-    
+
+    # - Add financial_statement
+    #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
+    # - Add Load data    
     # - 確認TEJ財務報表的資料會不會自動更新
     # - Fix Support and resistant
+    # - Add 巴菲特指標
+    # - Trade value 應該要用mean of high and low
     
     
     # - Add support_resist
@@ -1257,7 +1234,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 2.09
+    version = 2.08
 
 
 
@@ -1265,9 +1242,7 @@ def master(param_holder, predict_begin, export_model=True,
     # get_model_data - 把normalize的group_by拿掉後，這個地方會出錯，暫時直接drop
     
     
-    # Optimization
-    # - Make progarm can recover automatically. If detect na rows, then throw 
-    #   message and delete na columns
+    # Next
     # - Combine cbyz >> detect_cycle.py, including support_resistance and 
     #    season_decompose
     # - Add 流通股數 from ewprcd
@@ -1280,6 +1255,8 @@ def master(param_holder, predict_begin, export_model=True,
     # Bug
     # 1. get_sale_mon_data - bug - 目前只有到2018
     # 2. Add covid-19 daily backup
+    # 4. Fix industry issues，是不是要做PCA
+    # 1. Fill na with interpolate
     # 3. 在get_market_data_raw中, OPEN_CHANGE_RATIO min_value 
     #    is -0.8897097625329815，暫時移除assert
     # 5. 有些symbole會不見，像正隆
@@ -1290,7 +1267,10 @@ def master(param_holder, predict_begin, export_model=True,
     
     # -NA issues, replace OHLC na in market data function, and add replace 
     # na with interpolation. And why 0101 not excluded?
+    # print('Bug - 執行到這裡時，main_data裡面會有NA, 主要是INDUSTRY的問題')>這是lag的問題
 
+    # 6. Bug - 照目前的寫法，20171231的Week_Num會是NA
+    # Update - 上面Week_Num的問題還沒有處理，會導致這一段出錯
 
 
     # Optimization .....
@@ -1323,6 +1303,7 @@ def master(param_holder, predict_begin, export_model=True,
     dev = holder['dev'][0]   
     symbols = holder['symbols'][0]   
     ma_values = holder['ma_values'][0]   
+    data_shift = -(max(ma_values) * 2)
     
     # Modeling
     predict_period = holder['predict_period'][0]
@@ -1357,7 +1338,7 @@ def master(param_holder, predict_begin, export_model=True,
                 stk.get_period(predict_begin=predict_begin,
                                predict_period=predict_period,
                                data_period=data_period,
-                               shift=-(max(ma_values) * 2))
+                               shift=data_shift)
                 
     # ......
     global model_data
@@ -1381,9 +1362,13 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     # 20210707 - industry可以提高提精準，trade_value會下降
-    model_data, model_x, norm_orig = \
-        get_model_data(industry=industry, 
-                       trade_value=trade_value)
+    data_raw = get_model_data(industry=industry, 
+                              trade_value=trade_value)
+    
+    
+    model_data = data_raw['MODEL_DATA']
+    model_x = data_raw['MODEL_X']
+    norm_orig = data_raw['NORM_ORIG']
     
     
     # Check Correlation ......
@@ -1398,7 +1383,20 @@ def master(param_holder, predict_begin, export_model=True,
     # model_data = model_data.drop(corr_drop_cols, axis=1)
     
 
-
+    # Export Model Data
+    # Update, move to the end of get_model_data
+    model_data.to_csv(path_temp + '/model_data.csv', index=False)
+    
+    try:
+        model_x.to_csv(path_temp + '/model_x.csv', index=False)
+    except Exception as e:
+        print(e)
+        
+    try:
+        norm_orig.to_csv(path_temp + '/norm_orig.csv', index=False)
+    except Exception as e:
+        print(e)        
+    
     
     
     # Training Model ......
@@ -1491,10 +1489,6 @@ def master(param_holder, predict_begin, export_model=True,
     if predict_begin == bt_last_begin:
         stk.write_sheet(data=pred_features, sheet='Features')
         
-        
-    # Bug - 20220116 因為這裡的欄位會出現NORM_MEAN_x, NORM_STD_x, METHOD_x等df_scaler的欄位，
-    # 所以暫時先用這個方式調整
-    pred_result = pred_result[id_keys + var_y]  
     
     return pred_result, pred_scores, pred_params, pred_features
 
@@ -1822,7 +1816,7 @@ def get_google_treneds(begin_date=None, end_date=None,
     
     # ......
     if normalize:
-        main_data, _, _, _ = cbml.df_scaler(df=main_data, cols='VALUE')
+        main_data, _, _, _ = cbml.df_normalize(df=main_data, cols='VALUE')
     
     
     # Pivot
@@ -2098,32 +2092,9 @@ def test_support_resistance():
                            days=True, threshold=0.9, plot_data=False)    
 
 
-def test_scaler():
-    
-    data = \
-        stk.get_data(
-            data_begin=20200101, 
-            data_end=20211231, 
-            market='tw', 
-            symbol=[],
-            adj=True,
-            price_change=False, 
-            price_limit=True, 
-            trade_value=False,
-            restore=True
-            )
-
-    cbml.df_normality_test(df=data, cols=[])
 
 
-    data_norm, norm_orig = cbml.df_scaler(df=data, cols=[], groupby=[],
-                   method=0, show_progress=False)
 
-
-    cbml.df_scaler_restore(df=data_norm, original=norm_orig)
-
-
-    cbml.temp_df
 
 
 # %% Debug ------
@@ -2137,17 +2108,6 @@ def debug():
     chk['NA_COUNT'].max()
     
     chk2 = file[file['COVID19_TW_MA_20_LAG'].isna()]
-    
-    
-    debug_file = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis/debug/model_data.csv'
-    debug_file = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis/debug/reg_model_close_change_ratio_short_result_20220115_170956.csv'
-    
-    file = pd.read_csv(debug_file)    
-    file['CLOSE_CHANGE_RATIO'].min()
-    file['CLOSE_CHANGE_RATIO'].max()
-    
-    cbyz.df_chk_col_na(df=file)
-    cbyz.df_chk_col_min_max(df=file)
     
 
 
@@ -2189,5 +2149,5 @@ if __name__ == '__main__':
         
     master(param_holder=param_holder,
            predict_begin=20211201, threshold=30000)        
-        
+
 
