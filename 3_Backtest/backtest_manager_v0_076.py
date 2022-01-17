@@ -52,7 +52,8 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_071 as sam
 # import stock_analysis_manager_v2_081 as sam
 
-import stock_analysis_manager_v2_09_dev as sam
+# import stock_analysis_manager_v2_09_dev as sam
+import stock_analysis_manager_v2_10_dev as sam
 
 
 
@@ -377,7 +378,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                                  + var_y + var_y_last]
 
             
-            
     main_data = cbyz.df_fillna(df=main_data, 
                                cols=ohlc_last, 
                                sort_keys=['SYMBOL', 'WORK_DATE'],
@@ -480,9 +480,11 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     
     if 'CLOSE_CHANGE' not in action_cols:
-        actions['CLOSE_CHANGE'] = \
+        actions.loc[:, 'CLOSE_CHANGE'] = \
             actions['CLOSE'] - actions['CLOSE_LAST']
     
+        actions.loc[:, 'CLOSE_CHANGE_RATIO'] = \
+            actions['CLOSE_CHANGE'] / actions['CLOSE_LAST']
     
     # Rearrange Columns ......       
     profit_cols = ['CLOSE_CHANGE', 'CLOSE_CHANGE_RATIO', 
@@ -563,6 +565,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     actions['BUY_SIGNAL'] = \
         np.where(actions['SYMBOL'].isin(buy_signal_symbols), 
                  99, actions['PERCENTAGE'])
+
 
 # .................
 
@@ -951,6 +954,9 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
 
     # Predict ------
+    msg = ('Bug - y為price的時候，predict_values全部都會是NA')
+    print(msg)
+    
     global bt_result, precision, features
     backtest_predict(bt_last_begin=bt_last_begin, 
                      predict_period=_predict_period, 

@@ -467,7 +467,7 @@ if __name__ == '__main__':
 
 def dev():
     
-    Update ewifinq
+
     new_data = data.copy()
     new_data.loc[:, 'year'] = new_data['mdate'].astype('str').str.slice(0, 3)
     

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# %%
 """
 Created on Sat Nov 14 17:23:08 2020
 
@@ -46,8 +47,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220115',
-                 r'/home/jupyter/Arsenal/20220115',
+                 r'/home/jupyter/Codebase_YZ/20220113',
+                 r'/home/jupyter/Arsenal/20220113',
                  path + '/Function']
 
 
@@ -61,6 +62,8 @@ import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
 # import ultra_tuner_v0_26 as ut
+# import ultra_tuner_v0_261 as ut
+# import ultra_tuner_v0_27_dev as ut
 import ultra_tuner_v0_28_dev as ut
 
 ar.host = host
@@ -288,8 +291,8 @@ def sam_load_data(industry=True, trade_value=True):
     # 1. 如果y是OHLC Change Ratio的話，by WORK_DATE或SYMBOL的意義不大，反而讓運算
     #    速度變慢，唯一有影響的是一些從來沒有漲跌或跌停的Symbol
     # 2. 如果y是OHLC的價格的話，這一段的normalize邏輯有點怪
-    msg = '如果y是OHLC的價格的話，這一段的normalize邏輯有點怪'
-    assert 'CLOSE' not in var_y, msg
+    # msg = '如果y是OHLC的價格的話，這一段的normalize邏輯有點怪'
+    # assert 'CLOSE' not in var_y, msg
 
 
     # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
@@ -386,7 +389,7 @@ def sam_load_data(industry=True, trade_value=True):
 
     # assert 2 < 1, '這裡的na數量不一致'    
     # na_cols = cbyz.df_chk_col_na(df=loc_main)
-    
+
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
     if 'CLOSE' in var_y:
@@ -401,7 +404,8 @@ def sam_load_data(industry=True, trade_value=True):
         drop_cols = drop_cols['COLUMN'].tolist()
         loc_main = loc_main.drop(drop_cols, axis=1)
     
-        
+
+    
     # Total Market Trade
     if trade_value:
         total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
@@ -443,6 +447,9 @@ def sam_load_data(industry=True, trade_value=True):
     
     loc_main = loc_main.merge(stock_info, how='left', on=['SYMBOL'])      
 
+    global debug3
+    debug3 = loc_main.copy()
+    
 
     # Merge Other Data ......        
     if industry:        
@@ -602,25 +609,24 @@ def get_sale_mon_data():
     
     
     file1 = file_raw[['SYMBOL', 'WORK_DATE', 'EX_DIVIDENDS_PRICE']]
-    file1['WORK_DATE'] = '20' + file1['WORK_DATE']
-    file1['WORK_DATE'] = file1['WORK_DATE'].str.replace("'", "")
-    file1['WORK_DATE'] = file1['WORK_DATE'].str.replace("/", "")
-    file1 = cbyz.df_conv_col_type(df=file1, cols='WORK_DATE', to='int')
+    file1.loc[:, 'WORK_DATE'] = '20' + file1['WORK_DATE']
+    file1.loc[:, 'WORK_DATE'] = file1['WORK_DATE'].str.replace("'", "")
+    file1.loc[:, 'WORK_DATE'] = file1['WORK_DATE'].str.replace("/", "")
+    file1 = cbyz.df_conv_col_type(df=file1, cols='WORK_DATE', to=np.int32)
     file1 = cbyz.df_conv_col_type(df=file1, cols='EX_DIVIDENDS_PRICE',
                                   to='float')    
-
-    file1['SALE_MON_DATE'] = 1
+    file1.loc[:, 'SALE_MON_DATE'] = 1
     file1 = cbyz.df_conv_na(df=file1, 
                             cols=['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE'])
 
     # 填息
     file2 = file_raw[['SYMBOL', 'EX_DIVIDENDS_DONE']]
     file2.columns = ['SYMBOL', 'WORK_DATE']
-    file2['WORK_DATE'] = '20' + file2['WORK_DATE']
-    file2['WORK_DATE'] = file2['WORK_DATE'].str.replace("'", "")
-    file2['WORK_DATE'] = file2['WORK_DATE'].str.replace("/", "")
-    file2 = cbyz.df_conv_col_type(df=file2, cols='WORK_DATE', to='int')
-    file2['EX_DIVIDENDS_DONE'] = 1
+    file2.loc[:, 'WORK_DATE'] = '20' + file2['WORK_DATE']
+    file2.loc[:, 'WORK_DATE'] = file2['WORK_DATE'].str.replace("'", "")
+    file2.loc[:, 'WORK_DATE'] = file2['WORK_DATE'].str.replace("/", "")
+    file2 = cbyz.df_conv_col_type(df=file2, cols='WORK_DATE', to=np.int32)
+    file2.loc[:, 'EX_DIVIDENDS_DONE'] = 1
     
     file2 = cbyz.df_conv_na(df=file2, cols=['EX_DIVIDENDS_DONE'])
     
@@ -748,6 +754,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     # Load Historical Data ......
+    global main_data_raw
     main_data_raw, norm_orig = \
         sam_load_data(industry=industry, trade_value=trade_value) 
 
@@ -1237,8 +1244,9 @@ def master(param_holder, predict_begin, export_model=True,
     # v2.10
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
+    # - Update ewifinq, add symbol params
 
-    
+
     # Note
     # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己
     #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
@@ -1256,7 +1264,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 2.09
+    version = 2.10
 
 
 
@@ -1364,8 +1372,12 @@ def master(param_holder, predict_begin, export_model=True,
     global norm_orig
         
     
-    var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-             'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+    # var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+    #          'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+
+    var_y = ['OPEN', 'HIGH',
+             'LOW', 'CLOSE']    
+    
     id_keys = ['SYMBOL', 'WORK_DATE']    
     
     
@@ -1417,6 +1429,36 @@ def master(param_holder, predict_begin, export_model=True,
         
         # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
         
+        # # Change Ratio
+        # model_params = [
+        #                 {'model': LinearRegression(),
+        #                   'params': {
+        #                       'normalize': [True, False],
+        #                       }
+        #                   },
+        #                 {'model': xgb.XGBRegressor(),
+        #                  'params': {
+        #                     # 'n_estimators': [200],
+        #                     'eta': [0.1],
+        #                     # 'eta': [0.08, 0.1],
+        #                     'min_child_weight': [1],
+        #                      # 'min_child_weight': [0.5, 1],
+        #                     'max_depth':[8],
+        #                      # 'max_depth':[6, 8, 12],
+        #                     'subsample':[1]
+        #                   }
+        #                 },
+        #                 # {'model': SGDRegressor(),
+        #                 #   'params': {
+        #                 #       # 'max_iter': [1000],
+        #                 #       # 'tol': [1e-3],
+        #                 #       # 'penalty': ['l2', 'l1'],
+        #                 #       }                     
+        #                 #   }
+        #                ] 
+
+        
+        # Price
         model_params = [
                         {'model': LinearRegression(),
                           'params': {
@@ -1427,12 +1469,12 @@ def master(param_holder, predict_begin, export_model=True,
                          'params': {
                             # 'n_estimators': [200],
                             # 'eta': [0.08],
-                            'eta': [0.08, 0.1],
-                            'min_child_weight': [1],
+                            'eta': [0.5, 0.7],
+                            'min_child_weight': [3, 10],
                              # 'min_child_weight': [0.5, 1],
-                            'max_depth':[8],
+                            'max_depth':[4],
                              # 'max_depth':[6, 8, 12],
-                            'subsample':[1]
+                            'subsample':[0.5, 0.7]
                           }
                         },
                         # {'model': SGDRegressor(),
@@ -1442,8 +1484,11 @@ def master(param_holder, predict_begin, export_model=True,
                         #       # 'penalty': ['l2', 'l1'],
                         #       }                     
                         #   }
-                       ] 
-
+                       ]         
+        
+        
+        
+        
     # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業
     #    的預測值完全相同
     global pred_result, pred_scores, pred_params, pred_features
@@ -1489,11 +1534,10 @@ def master(param_holder, predict_begin, export_model=True,
     # Upload to Google Sheet
     if predict_begin == bt_last_begin:
         stk.write_sheet(data=pred_features, sheet='Features')
-        
-        
+
     # Bug - 20220116 因為這裡的欄位會出現NORM_MEAN_x, NORM_STD_x, METHOD_x等df_scaler的欄位，
     # 所以暫時先用這個方式調整
-    pred_result = pred_result[id_keys + var_y]  
+    pred_result = pred_result[id_keys + var_y]          
     
     return pred_result, pred_scores, pred_params, pred_features
 
@@ -2188,5 +2232,5 @@ if __name__ == '__main__':
         
     master(param_holder=param_holder,
            predict_begin=20211201, threshold=30000)        
-        
+
 
