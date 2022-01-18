@@ -91,7 +91,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
-    global symbols, market
+    global symbol, market
     global market_data_raw
     global predict_period
     global stock_info_raw
@@ -112,7 +112,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
     loc_begin = cbyz.date_cal(shift_begin, -1, 'd')    
     
-    if len(symbols) == 0:
+    if len(symbol) == 0:
         market_data_raw = \
             stk.get_data(
                 data_begin=loc_begin, 
@@ -131,7 +131,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                 data_begin=loc_begin,
                 data_end=data_end, 
                 market=market, 
-                symbol=symbols,
+                symbol=symbol,
                 adj=True,
                 price_change=True, 
                 price_limit=True,
@@ -160,7 +160,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
             print(msg_max)
         
 
-    # Exclude Low Volume Symbols ......
+    # Exclude Low Volume symbol ......
     market_data_raw = select_symbols()
     
     
@@ -199,7 +199,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
 
 
     # Predict Symbols ......
-    # 1. Prevent some symbols excluded by select_symbols(), but still
+    # 1. Prevent some symbol excluded by select_symbols(), but still
     #    exists.
     global symbol_df    
     all_symbols = market_data_raw['SYMBOL'].unique().tolist()
@@ -275,7 +275,7 @@ def sam_load_data(industry=True, trade_value=True):
     讀取資料及重新整理
     '''
     
-    global symbols
+    global symbol
     global market_data_raw
     global predict_period
     global symbol_df
@@ -693,7 +693,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global shift_begin, shift_end, data_begin, data_end, ma_values
     global predict_date, predict_period, calendar, calendar_lite
     global main_data_frame, main_data_frame_calendar, market_data_raw
-    global symbols
+    global symbol
     global var_y
     global params, error_msg
     global id_keys
@@ -743,8 +743,8 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # Symbols ......
-    symbols = cbyz.conv_to_list(symbols)
-    symbols = cbyz.li_conv_ele_type(symbols, 'str')
+    symbol = cbyz.conv_to_list(symbol)
+    symbol = cbyz.li_conv_ele_type(symbol, 'str')
 
 
     # Market Data ......
@@ -876,6 +876,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     if market == 'tw':
         ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin, 
                                               end_date=None, 
+                                              symbol=symbol,
                                               trade=True)
         
         ewtinst1c = main_data_frame \
@@ -1161,9 +1162,9 @@ def sam_od_us_get_snp_data(begin_date):
 
 def sam_tej_get_ewsale(begin_date):
 
-    global main_data_frame
+    global main_data_frame, symbol
     loc_df = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
-                                symbol=symbols, fill=True, host=host)
+                                symbol=symbol, fill=True, host=host)
     
     
     # Merge will cause NA, so it must to execute df_fillna
@@ -1242,9 +1243,15 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     # v2.10
+    # - Rename symbols as symbol - Done
+    # - Add symbol params to ewifinq - Done
+    # - Update cbml for df_scaler
+    
+    
+    # Update
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
-    # - Update ewifinq, add symbol params
+    # - Test price as Y
 
 
     # Note
@@ -1314,7 +1321,7 @@ def master(param_holder, predict_begin, export_model=True,
     
     global bt_last_begin, data_period, predict_period, long
     global debug, dev
-    global symbols, ma_values, volume_thld, market
+    global symbol, ma_values, volume_thld, market
 
 
     holder = param_holder.params
@@ -1328,7 +1335,7 @@ def master(param_holder, predict_begin, export_model=True,
     compete_mode = holder['compete_mode'][0]   
     train_mode = holder['train_mode'][0]       
     dev = holder['dev'][0]   
-    symbols = holder['symbols'][0]   
+    symbol = holder['symbol'][0]   
     ma_values = holder['ma_values'][0]   
     
     # Modeling
@@ -1372,11 +1379,11 @@ def master(param_holder, predict_begin, export_model=True,
     global norm_orig
         
     
-    # var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-    #          'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+    var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+              'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
 
-    var_y = ['OPEN', 'HIGH',
-             'LOW', 'CLOSE']    
+    # var_y = ['OPEN', 'HIGH',
+    #          'LOW', 'CLOSE']    
     
     id_keys = ['SYMBOL', 'WORK_DATE']    
     
@@ -1419,7 +1426,7 @@ def master(param_holder, predict_begin, export_model=True,
     from sklearn.linear_model import LinearRegression
     from sklearn.linear_model import SGDRegressor    
     
-    if len(symbols) > 0 and len(symbols) < 10:
+    if len(symbol) > 0 and len(symbol) < 10:
         model_params = [{'model': LinearRegression(),
                          'params': {
                              'normalize': [True, False],
@@ -2003,14 +2010,14 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
     
     
     result_raw = pd.DataFrame()
-    symbols = loc_df['SYMBOL'].unique().tolist()
+    symbol = loc_df['SYMBOL'].unique().tolist()
     value_cols = []
     
     
     # Calculate ......
-    for j in range(len(symbols)):
+    for j in range(len(symbol)):
         
-        symbol = symbols[j]
+        symbol = symbol[j]
         temp_df = loc_df[loc_df['SYMBOL']==symbol].reset_index(drop=True)
     
         for i in range(len(cols)):
@@ -2052,7 +2059,7 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
         
         if j % 100 == 0:
             print('add_support_resistance - ' + str(j) + '/' \
-                  + str(len(symbols)-1))
+                  + str(len(symbol)-1))
       
         
     result = result_raw \
@@ -2199,7 +2206,7 @@ def debug():
 
 if __name__ == '__main__':
     
-    symbols = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
     
     # predict_result, precision = \
     #     master(param_holder=param_holder,
@@ -2223,7 +2230,7 @@ if __name__ == '__main__':
             'fast':[True],  # 之後用train_mode代替
             'kbest':['all'],
             'dev':[True],
-            'symbols':[symbols],
+            'symbol':[symbol],
             'debug':[False]
             }
     
