@@ -32,8 +32,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220115',
-                 r'/home/jupyter/Arsenal/20220115',
+                 r'/home/jupyter/Codebase_YZ/20220118',
+                 r'/home/jupyter/Arsenal/20220118',
                  path + '/Function',
                  path_sam]
 
@@ -228,7 +228,6 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     global calendar, calendar_lite
     global symbol, _market, bt_info, _bt_times, _ma_values, _load_result
-    
 
     # New Global Vars
     global bt_results_raw, bt_result
@@ -270,7 +269,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Prepare For Backtest Records ......
-    print('backtest_predict - 這裡有bug，應該用global calendar')
+    print('backtest_predict - Update，應該用global calendar')
     bt_info_raw = cbyz.date_get_seq(begin_date=bt_last_begin,
                                     seq_length=_bt_times,
                                     unit='d', interval=-interval,
@@ -280,8 +279,8 @@ def backtest_predict(bt_last_begin, predict_period, interval,
             .reset_index() \
             .rename(columns={'index':'BACKTEST_ID'})
     
-    bt_info['DATA_PERIOD'] = data_period
-    bt_info['PREDICT_PERIOD'] = predict_period
+    bt_info.loc[:, 'DATA_PERIOD'] = data_period
+    bt_info.loc[:, 'PREDICT_PERIOD'] = predict_period
     bt_info = bt_info.drop('WORK_DATE', axis=1)
     
     bt_seq = bt_info_raw['WORK_DATE'].tolist()
@@ -1105,28 +1104,46 @@ def verify_prediction_results():
 
 
 
+
 # %% Execute ------
 if __name__ == '__main__':
     
     # cv 5-7會超級久
+    
+    # Bug -----
+    # 1. 有Bug，導致MSE到0.8，但已排除是Arsenal的問題
+    # 剩下可能有問題的三個部份，cbml、ut、sam
+    # > v2.071 import新的cbml和ut，結果是正常的，所以應該是samv2.09的問題
+    # > 如果確定不是scaler的問題，可以把df_scaler的group_by加回去
+    # 2. sam v2.07的r2可以到40，但後來的為什麼都只有37？
+    # 3.stock_analysis_manager_v2_10_dev的r2會是負的
 
-    # XGB Params ------
-    # eta: 0.1 / 0.01, 0.03, 0.08, 0.2
+    
+    # Change Ratio - XGB Params ------
+    # eta: 0.3 / 0.01, 0.03, 0.08, 0.1, 0.2
     # min_child_weight: 0.8 / 1
     # max_depth: 10 / 8, 12
     # subsample: 1 / 0.8    
     
+
+    # Price - XGB Params ------
+    # eta: 0.2 /
+    # min_child_weight: 0.8 / 
+    # max_depth: 10 / 8, 12
+    # subsample: 1 / 0.8        
+    
+    
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    master(bt_last_begin=20220111, predict_period=3, 
-            long=False, interval=4, bt_times=1, 
-            data_period=int(365 * 1), 
-            ma_values=[5,10,20], volume_thld=400,
-            compete_mode=0, cv=list(range(3, 4)),
-            market='tw', hold=hold,
-            load_result=False, dev=True)
+    # master(bt_last_begin=20220118, predict_period=3, 
+    #        long=False, interval=4, bt_times=1, 
+    #        data_period=int(365 * 1), 
+    #        ma_values=[5,10,20], volume_thld=400,
+    #        compete_mode=0, cv=list(range(3, 4)),
+    #        market='tw', hold=hold,
+    #        load_result=False, dev=True)
     
-    # master(bt_last_begin=20220110, predict_period=4, 
+    # master(bt_last_begin=20220117, predict_period=4, 
     #        long=False, interval=7, bt_times=1, 
     #        data_period=int(365 * 5), 
     #        ma_values=[10,20,60], volume_thld=300,
@@ -1134,13 +1151,15 @@ if __name__ == '__main__':
     #        market='tw', hold=hold,
     #        load_result=False, dev=False)
 
-    # master(bt_last_begin=20220105, predict_period=10, 
-    #        long=True, interval=7, bt_times=1, 
-    #        data_period=int(365 * 5), 
-    #        ma_values=[10,20,60], volume_thld=300,
-    #        compete_mode=1, cv=list(range(3, 4)),
-    #        market='tw', hold=hold,
-    #        load_result=False, dev=False)
+    master(bt_last_begin=20220118, predict_period=10, 
+           long=True, interval=7, bt_times=1, 
+           data_period=int(365 * 5), 
+           ma_values=[10,20,60], volume_thld=300,
+           compete_mode=1, cv=list(range(3, 4)),
+           market='tw', hold=hold,
+           load_result=False, dev=False)
+
+
 
 
 

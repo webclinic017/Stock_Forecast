@@ -47,8 +47,8 @@ elif host == 2:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220113',
-                 r'/home/jupyter/Arsenal/20220113',
+                 r'/home/jupyter/Codebase_YZ/20220118',
+                 r'/home/jupyter/Arsenal/20220118',
                  path + '/Function']
 
 
@@ -64,7 +64,7 @@ import arsenal_stock as stk
 # import ultra_tuner_v0_26 as ut
 # import ultra_tuner_v0_261 as ut
 # import ultra_tuner_v0_27_dev as ut
-import ultra_tuner_v0_28_dev as ut
+import ultra_tuner_v0_29_dev as ut
 
 ar.host = host
 
@@ -153,10 +153,10 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         
         # assert min_value >= -0.25, msg_min
         # assert max_value <= 0.25, msg_max
-        if  min_value >= -0.25:
+        if  min_value < -0.1:
             print(msg_min)
             
-        if  max_value <= 0.25:
+        if  max_value >= 0.1:
             print(msg_max)
         
 
@@ -213,15 +213,17 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                     .reset_index() \
                     .rename(columns={'index':'DATE_INDEX'})
     
-    calendar_proc, _, _ = \
+    calendar_proc, _, _, _ = \
         cbml.ml_data_process(
             df=calendar_proc, 
-            ma=False, normalize=True, lag=False, 
+            ma=False, scale=True, lag=False,
             group_by=[],
             cols=[], 
             except_cols=['WORK_DATE', 'TRADE_DATE'],
             cols_mode='equal',
             drop_except=[],
+            date_col='WORK_DATE',
+            scale_method=1,
             ma_values=ma_values, 
             lag_period=predict_period
             )
@@ -297,11 +299,11 @@ def sam_load_data(industry=True, trade_value=True):
 
     # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
     # - 這裡的method要用1，如果用2的話，mse會變成0.8
-    loc_main, norm_orig = \
+    global y_scaler
+    loc_main, norm_orig, y_scaler = \
         cbml.df_scaler(
             df=loc_main,
             cols=var_y,
-            groupby=[],
             show_progress=False,
             method=1
             )  
@@ -330,9 +332,9 @@ def sam_load_data(industry=True, trade_value=True):
         #  'VOLUME_CHANGE_ABS_RATIO',
         #  'SYMBOL_TRADE_VALUE_RATIO']       
     
-        loc_main, ratio_cols, _ = \
+        loc_main, ratio_cols, _, _ = \
             cbml.ml_data_process(df=loc_main,
-                                 ma=True, normalize=True, lag=True, 
+                                 ma=True, scale=True, lag=True, 
                                  group_by=[],
                                  cols=cols,
                                  except_cols=[],
@@ -355,9 +357,9 @@ def sam_load_data(industry=True, trade_value=True):
     except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
                     + ratio_cols
     
-    loc_main, _, _ = \
+    loc_main, _, _, _ = \
         cbml.ml_data_process(df=loc_main, 
-                              ma=True, normalize=True, lag=True,
+                              ma=True, scale=True, lag=True,
                               date_col='WORK_DATE',
                               group_by=['SYMBOL'],
                               cols=[], 
@@ -374,7 +376,7 @@ def sam_load_data(industry=True, trade_value=True):
     
     # loc_main, temp_cols, _ = \
     #     cbml.ml_data_process(df=loc_main, 
-    #                          ma=True, normalize=True, lag=True,
+    #                          ma=True, scale=True, lag=True,
     #                          date_col='WORK_DATE',
     #                          group_by=[],
     #                          cols=[], 
@@ -411,9 +413,9 @@ def sam_load_data(industry=True, trade_value=True):
         total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
                     .drop_duplicates(subset=['WORK_DATE'])
         
-        total_trade, _, _ = \
+        total_trade, _, _, _ = \
             cbml.ml_data_process(df=total_trade, 
-                                 ma=True, normalize=True, lag=True, 
+                                 ma=True, scale=True, lag=True, 
                                  date_col='WORK_DATE',
                                  cols_mode='equal',
                                  group_by=[],
@@ -432,9 +434,9 @@ def sam_load_data(industry=True, trade_value=True):
     # 'ESTABLISH_DAYS', 'LISTING_DAYS']
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
     
-    stock_info, _, _ = \
+    stock_info, _, _, _ = \
         cbml.ml_data_process(df=stock_info, 
-                             ma=False, normalize=True, lag=False,
+                             ma=False, scale=True, lag=False,
                              date_col='WORK_DATE',
                              cols_mode='equal',
                              group_by=[],
@@ -534,9 +536,9 @@ def sam_load_data(industry=True, trade_value=True):
         industry_data = industry_data.rename(columns=rename_dict)
                        
         
-        industry_data, _, _ = \
+        industry_data, _, _, _ = \
              cbml.ml_data_process(df=industry_data, 
-                                  ma=True, normalize=True, lag=True,
+                                  ma=True, scale=True, lag=True,
                                   group_by=['INDUSTRY_ONE_HOT'],
                                   cols=[], 
                                   except_cols=['WORK_DATE'],
@@ -700,7 +702,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global main_data
     
     
-    
     if load_file:
     
         main_data_file = path_temp + '/model_data.csv'
@@ -758,7 +759,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     main_data_raw, norm_orig = \
         sam_load_data(industry=industry, trade_value=trade_value) 
 
-        
     main_data = main_data_raw.copy()
     cbyz.df_chk_col_na(df=main_data_raw)
     
@@ -771,7 +771,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
-
     # Buffett Indicator ......
     if market == 'tw':
         
@@ -782,9 +781,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
             main_data_frame_calendar \
                 .merge(buffett_indicator, how='left', on='WORK_DATE')  
     
-        buffett_indicator, _, _ = \
+        buffett_indicator, _, _, _ = \
                cbml.ml_data_process(df=buffett_indicator, 
-                                    ma=False, normalize=True, lag=True, 
+                                    ma=False, scale=True, lag=True, 
                                     group_by=[], 
                                     cols=[],
                                     except_cols=['WORK_DATE'],
@@ -819,13 +818,18 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     daily_close = daily_close \
                 .drop('CLOSE', axis=1) \
                 .rename(columns={'CLOSE_LAG':'CLOSE'})
+      
+    daily_close = cbyz.df_fillna(df=daily_close, cols='CLOSE', 
+                                 sort_keys=['SYMBOL', 'WORK_DATE'],
+                                 method='both')
+                
     
     # 除權息 ...
     sale_mon_data1, sale_mon_data2 = get_sale_mon_data()
     
     # Data 1 - 除權息日期及價錢 ...
-    sale_mon_data1 = daily_close.merge(sale_mon_data1, how='left', 
-                                       on=['WORK_DATE', 'SYMBOL'])
+    sale_mon_data1 = daily_close \
+        .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'SYMBOL'])
     
     sale_mon_data1['EX_DIVIDENDS_PRICE'] = \
         sale_mon_data1['EX_DIVIDENDS_PRICE'] / sale_mon_data1['CLOSE']    
@@ -835,9 +839,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                                      cols=['EX_DIVIDENDS_PRICE', 
                                            'SALE_MON_DATE'])
     
-    sale_mon_data1, _, _ = \
+    sale_mon_data1, _, _, _ = \
              cbml.ml_data_process(df=sale_mon_data1, 
-                                  ma=False, normalize=True, lag=False, 
+                                  ma=False, scale=True, lag=False, 
                                   group_by=['SYMBOL'], 
                                   cols=['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE'],
                                   except_cols=[],
@@ -849,9 +853,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                                   ) 
     
     # Data 2 - 填息 ...
-    sale_mon_data2, _, _ = \
+    sale_mon_data2, _, _, _ = \
         cbml.ml_data_process(df=sale_mon_data2, 
-                             ma=False, normalize=True, lag=False, 
+                             ma=False, scale=True, lag=False, 
                              group_by=['SYMBOL'],
                              cols=[], 
                              except_cols=['EX_DIVIDENDS_DONE'],
@@ -892,13 +896,15 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                     
             
         # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
-        hroi_cols = cbyz.df_get_cols_contains(df=ewtinst1c, 
-                                             string=['_HROI', '_SELL', '_BUY'])
+        hroi_cols = cbyz.df_get_cols_contains(
+            df=ewtinst1c, 
+            string=['_HROI', '_SELL', '_BUY']
+            )
         
         # Keep Needed Symbols Only
-        ewtinst1c, cols_1, _ = \
+        ewtinst1c, cols_1, _, _ = \
             cbml.ml_data_process(df=ewtinst1c, 
-                                 ma=True, normalize=True, lag=True, 
+                                 ma=True, scale=True, lag=True, 
                                  group_by=[],
                                  cols=hroi_cols, 
                                  except_cols=[],
@@ -909,9 +915,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                                  lag_period=predict_period
                                  ) 
     
-        ewtinst1c, cols_2, _ = \
+        ewtinst1c, cols_2, _, _ = \
             cbml.ml_data_process(df=ewtinst1c, 
-                                 ma=True, normalize=True, lag=True, 
+                                 ma=True, scale=True, lag=True, 
                                  group_by=['SYMBOL'],
                                  cols=['_HAP'], 
                                  except_cols=[],
@@ -935,6 +941,12 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
     # 1. 主要邏輯就是顯示最新的營收資料
     if market == 'tw':
+        
+        msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
+        再跑就正常了
+        '''
+        print(msg)
+        
         ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
         main_data = main_data \
                     .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
@@ -960,7 +972,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # - Pytrends已經normalize過後才pivot，但後面又normalize一次
     # pytrends, pytrends_cols = get_google_treneds(begin_date=shift_begin, 
     #                                               end_date=data_end, 
-    #                                               normalize=True, 
+    #                                               scale=True, 
     #                                               stock_type=stock_type, 
     #                                               local=local)
     
@@ -985,9 +997,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         covid19 = main_data_frame_calendar \
                     .merge(covid19, how='left', on=['WORK_DATE'])
     
-        covid19, covid19_cols, _ = \
+        covid19, covid19_cols, _, _ = \
                     cbml.ml_data_process(df=covid19, 
-                                         ma=True, normalize=True, lag=True, 
+                                         ma=True, scale=True, lag=True, 
                                          group_by=[],
                                          cols=[], 
                                          except_cols=[],
@@ -1082,9 +1094,9 @@ def sam_od_tw_get_index(begin_date, end_date):
                 .merge(loc_df, how='left', on='WORK_DATE')    
     
     # Process
-    loc_df, cols, _ = \
+    loc_df, cols, _, _ = \
         cbml.ml_data_process(df=loc_df, 
-                             ma=True, normalize=True, lag=True, 
+                             ma=True, scale=True, lag=True, 
                              group_by=[],
                              cols=[], 
                              except_cols=['WORK_DATE'],
@@ -1134,9 +1146,9 @@ def sam_od_us_get_snp_data(begin_date):
                             group_by=[], method='ffill')
 
     # Process
-    loc_df, cols, _ = \
+    loc_df, cols, _, _ = \
         cbml.ml_data_process(df=loc_df, 
-                             ma=True, normalize=True, lag=True, 
+                             ma=True, scale=True, lag=True, 
                              group_by=[],
                              cols=[], 
                              except_cols=['WORK_DATE'],
@@ -1176,9 +1188,9 @@ def sam_tej_get_ewsale(begin_date):
                                sort_keys=['SYMBOL', 'WORK_DATE'], 
                                group_by=['SYMBOL'], method='ffill')                    
                     
-    loc_df, cols, _ = \
+    loc_df, cols, _, _ = \
         cbml.ml_data_process(df=loc_df, 
-                              ma=False, normalize=True, lag=False, 
+                              ma=False, scale=True, lag=False, 
                               group_by=['SYMBOL'],
                               cols=['D0001'], 
                               except_cols=[],
@@ -1249,6 +1261,8 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # Update
+    # Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
+    #       再跑就正常。end_date應該要改成data_begin, 這個問題應該是today比data_begin少一天    
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
     # - Test price as Y
@@ -1272,7 +1286,6 @@ def master(param_holder, predict_begin, export_model=True,
 
     global version
     version = 2.10
-
 
 
     # Tracking
@@ -1399,24 +1412,11 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     # 20210707 - industry可以提高提精準，trade_value會下降
-    model_data, model_x, norm_orig = \
+    global y_scaler
+    model_data, model_x, scale_orig = \
         get_model_data(industry=industry, 
                        trade_value=trade_value)
     
-    
-    # Check Correlation ......
-    # msg = 'Update - Will it cause saved models useless? '
-    # print(msg)
-    
-    # global corr, corr_drop_cols
-    # corr, corr_drop_cols, keep_cols = \
-    #     cbml.get_high_correlated_features(df=model_data, threshold=0.90,
-    #                                       except_cols=id_keys + var_y)
-        
-    # model_data = model_data.drop(corr_drop_cols, axis=1)
-    
-
-
     
     
     # Training Model ......
@@ -1475,13 +1475,13 @@ def master(param_holder, predict_begin, export_model=True,
                         {'model': xgb.XGBRegressor(),
                          'params': {
                             # 'n_estimators': [200],
-                            # 'eta': [0.08],
-                            'eta': [0.5, 0.7],
-                            'min_child_weight': [3, 10],
+                            'eta': [0.1],
+                            # 'eta': [0.5, 0.7],
+                            'min_child_weight': [0.8],
                              # 'min_child_weight': [0.5, 1],
-                            'max_depth':[4],
+                            'max_depth':[10],
                              # 'max_depth':[6, 8, 12],
-                            'subsample':[0.5, 0.7]
+                            'subsample':[1]
                           }
                         },
                         # {'model': SGDRegressor(),
@@ -1522,10 +1522,9 @@ def master(param_holder, predict_begin, export_model=True,
                 log_scores, log_params, log_features = \
                     tuner.fit(data=cur_model_data, model_params=model_params,
                               k=kbest, cv=cv, threshold=threshold, 
-                              norm_orig=norm_orig,
+                              scale_orig=[],
                               export_model=True, export_log=True)
-                    
-
+                 
         if i == 0:
             pred_result = return_result.copy()
             pred_scores = return_scores.copy()
@@ -1536,6 +1535,16 @@ def master(param_holder, predict_begin, export_model=True,
             pred_scores = pred_scores.append(return_scores)
             pred_params = pred_scores.append(return_params)
             pred_features = pred_scores.append(return_features)            
+
+
+    # Inverse Scale
+    pred_result = pred_result[id_keys + var_y]
+    y_inverse = pred_result[var_y]
+    y_inverse = y_scaler.inverse_transform(y_inverse)
+    y_inverse = pd.DataFrame(y_inverse, columns=var_y)
+    
+    pred_result_inverse = pd.concat([pred_result[id_keys], y_inverse],
+                                    axis=1)
         
         
     # Upload to Google Sheet
@@ -1546,7 +1555,7 @@ def master(param_holder, predict_begin, export_model=True,
     # 所以暫時先用這個方式調整
     pred_result = pred_result[id_keys + var_y]          
     
-    return pred_result, pred_scores, pred_params, pred_features
+    return pred_result_inverse, pred_scores, pred_params, pred_features
 
 
 
@@ -1782,7 +1791,7 @@ def check_price_limit():
 
 
 def get_google_treneds(begin_date=None, end_date=None, 
-                       normalize=True):
+                       scale=True):
     
     global market
     print('get_google_treneds - 增加和get_stock_info一樣的daily backup')
@@ -1871,8 +1880,7 @@ def get_google_treneds(begin_date=None, end_date=None,
     
     
     # ......
-    if normalize:
-        main_data, _, _, _ = cbml.df_scaler(df=main_data, cols='VALUE')
+    main_data, _, _ = cbml.df_scaler(df=main_data, cols='VALUE')
     
     
     # Pivot
@@ -2147,33 +2155,6 @@ def test_support_resistance():
                            rank_thld=10, prominence=4, 
                            days=True, threshold=0.9, plot_data=False)    
 
-
-def test_scaler():
-    
-    data = \
-        stk.get_data(
-            data_begin=20200101, 
-            data_end=20211231, 
-            market='tw', 
-            symbol=[],
-            adj=True,
-            price_change=False, 
-            price_limit=True, 
-            trade_value=False,
-            restore=True
-            )
-
-    cbml.df_normality_test(df=data, cols=[])
-
-
-    data_norm, norm_orig = cbml.df_scaler(df=data, cols=[], groupby=[],
-                   method=0, show_progress=False)
-
-
-    cbml.df_scaler_restore(df=data_norm, original=norm_orig)
-
-
-    cbml.temp_df
 
 
 # %% Debug ------
