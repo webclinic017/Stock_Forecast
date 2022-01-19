@@ -95,7 +95,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     global market_data_raw
     global predict_period
     global stock_info_raw
-    global log
+    global log, data_form
     
 
     stock_info_raw = \
@@ -212,22 +212,30 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                     .reset_index(drop=True) \
                     .reset_index() \
                     .rename(columns={'index':'DATE_INDEX'})
-    
-    calendar_proc, _, _, _ = \
-        cbml.ml_data_process(
-            df=calendar_proc, 
-            ma=False, scale=True, lag=False,
-            group_by=[],
-            cols=[], 
+
+    calendar_proc, _, _ = \
+        cbml.df_scaler(
+            df=calendar_proc,
             except_cols=['WORK_DATE', 'TRADE_DATE'],
-            cols_mode='equal',
-            drop_except=[],
-            date_col='WORK_DATE',
-            scale_method=1,
-            ma_values=ma_values, 
-            lag_period=predict_period
-            )
-        
+            show_progress=False,
+            method=1
+            )           
+
+    # calendar_proc, _, _, _ = \
+    #     cbml.ml_data_process(
+    #         df=calendar_proc, 
+    #         ma=False, scale=True, lag=False,
+    #         group_by=[],
+    #         cols=[], 
+    #         except_cols=['WORK_DATE', 'TRADE_DATE'],
+    #         cols_mode='equal',
+    #         drop_except=[],
+    #         date_col='WORK_DATE',
+    #         scale_method=1,
+    #         ma_values=ma_values, 
+    #         lag_period=predict_period
+    #         )
+            
     
     # Merge As Main Data ......
     global main_data_frame, main_data_frame_calendar
@@ -282,7 +290,7 @@ def sam_load_data(industry=True, trade_value=True):
     global predict_period
     global symbol_df
     global stock_info_raw
-    global debug
+    global debug, data_form
     
         
     # Process Market Data ......
@@ -309,41 +317,41 @@ def sam_load_data(industry=True, trade_value=True):
             )  
                 
     
-    ratio_cols = []
-    if 'CLOSE_CHANGE_RATIO' in loc_main.columns:
+    # ratio_cols = []
+    # if 'CLOSE_CHANGE_RATIO' in loc_main.columns:
         
-        # cols = []
-        # for i in range(len(var_y)):
-        #     col = var_y[i]
-        #     cols.append(col)
-            # loc_main[col + '_GLOB_NORM'] = loc_main[col]
+    #     # cols = []
+    #     # for i in range(len(var_y)):
+    #     #     col = var_y[i]
+    #     #     cols.append(col)
+    #         # loc_main[col + '_GLOB_NORM'] = loc_main[col]
     
-        cols = list(loc_main.columns)
-        cols = [c for c in cols if 'RATIO' in c]
-        # ['OPEN_CHANGE_RATIO',
-        #  'OPEN_CHANGE_ABS_RATIO',
-        #  'HIGH_CHANGE_RATIO',
-        #  'HIGH_CHANGE_ABS_RATIO',
-        #  'LOW_CHANGE_RATIO',
-        #  'LOW_CHANGE_ABS_RATIO',
-        #  'CLOSE_CHANGE_RATIO',
-        #  'CLOSE_CHANGE_ABS_RATIO',
-        #  'VOLUME_CHANGE_RATIO',
-        #  'VOLUME_CHANGE_ABS_RATIO',
-        #  'SYMBOL_TRADE_VALUE_RATIO']       
+    #     cols = list(loc_main.columns)
+    #     cols = [c for c in cols if 'RATIO' in c]
+    #     # ['OPEN_CHANGE_RATIO',
+    #     #  'OPEN_CHANGE_ABS_RATIO',
+    #     #  'HIGH_CHANGE_RATIO',
+    #     #  'HIGH_CHANGE_ABS_RATIO',
+    #     #  'LOW_CHANGE_RATIO',
+    #     #  'LOW_CHANGE_ABS_RATIO',
+    #     #  'CLOSE_CHANGE_RATIO',
+    #     #  'CLOSE_CHANGE_ABS_RATIO',
+    #     #  'VOLUME_CHANGE_RATIO',
+    #     #  'VOLUME_CHANGE_ABS_RATIO',
+    #     #  'SYMBOL_TRADE_VALUE_RATIO']       
     
-        loc_main, ratio_cols, _, _ = \
-            cbml.ml_data_process(df=loc_main,
-                                 ma=True, scale=True, lag=True, 
-                                 group_by=[],
-                                 cols=cols,
-                                 except_cols=[],
-                                 drop_except=var_y,
-                                 cols_mode='equal',
-                                 date_col='WORK_DATE',
-                                 ma_values=ma_values, 
-                                 lag_period=predict_period
-                                 )
+    #     loc_main, ratio_cols, _, _ = \
+    #         cbml.ml_data_process(df=loc_main,
+    #                              ma=True, scale=True, lag=True, 
+    #                              group_by=[],
+    #                              cols=cols,
+    #                              except_cols=[],
+    #                              drop_except=var_y,
+    #                              cols_mode='equal',
+    #                              date_col='WORK_DATE',
+    #                              ma_values=ma_values, 
+    #                              lag_period=predict_period
+    #                              )
 
 
     # Check again after deleting 
@@ -354,21 +362,66 @@ def sam_load_data(industry=True, trade_value=True):
     
     
     # Normalize By Stock ......
-    except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
-                    + ratio_cols
     
-    loc_main, _, _, _ = \
-        cbml.ml_data_process(df=loc_main, 
-                              ma=True, scale=True, lag=True,
-                              date_col='WORK_DATE',
-                              group_by=['SYMBOL'],
-                              cols=[], 
-                              except_cols=except_cols,
-                              drop_except=var_y,
-                              cols_mode='equal',
-                              ma_values=ma_values, 
-                              lag_period=predict_period
-                              )
+    # 20220119 ...
+    # except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
+    #                 + ratio_cols
+    
+    # loc_main, _, _, _ = \
+    #     cbml.ml_data_process(df=loc_main, 
+    #                           ma=True, scale=True, lag=True,
+    #                           date_col='WORK_DATE',
+    #                           group_by=['SYMBOL'],
+    #                           cols=[], 
+    #                           except_cols=except_cols,
+    #                           drop_except=var_y,
+    #                           cols_mode='equal',
+    #                           ma_values=ma_values, 
+    #                           lag_period=predict_period
+    #                           )
+    
+    
+    if data_form == 1:
+        except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
+                       'WEEKDAY', 'WEEK_NUM']
+        
+        loc_main, _, _, _ = \
+            cbml.ml_data_process(df=loc_main, 
+                                  ma=True, scale=True, lag=True,
+                                  date_col='WORK_DATE',
+                                  group_by=['SYMBOL'],
+                                  cols=[], 
+                                  except_cols=except_cols,
+                                  drop_except=var_y,
+                                  cols_mode='equal',
+                                  ma_values=ma_values, 
+                                  lag_period=predict_period
+                                  )
+    elif data_form == 2:
+        
+        print('還沒處理欄位lag的問題，這樣在chk_na的時候會出錯')
+        
+        except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
+                       'WEEKDAY', 'WEEK_NUM'] + id_keys  
+        
+        loc_main, _, _ = \
+            cbml.df_scaler(
+                df=loc_main,
+                except_cols=except_cols,
+                show_progress=False,
+                method=0
+                )  
+
+        loc_main, _ = \
+            cbml.ml_df_to_time_series(
+                df=loc_main, 
+                cols=[], 
+                except_cols=except_cols, 
+                group_by=[],
+                sort_keys=id_keys, 
+                window=predict_period, drop=True)        
+    
+    
         
     # except_cols = ['SYMBOL', 'WORK_DATE', 'YEAR', 
     #                'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
@@ -394,7 +447,7 @@ def sam_load_data(industry=True, trade_value=True):
 
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
-    if 'CLOSE' in var_y:
+    if 'CLOSE' in var_y and data_form == 1:
         global ohlc
         ohlc_str = '|'.join(ohlc)
         drop_cols = cbyz.df_chk_col_na(df=loc_main, positive_only=True)
@@ -1256,8 +1309,8 @@ def master(param_holder, predict_begin, export_model=True,
     # - Update cbml for df_scaler - Done
 
 
-    # v2.11
-    # - Rename symbols as symbol - Done
+    # v2.11 - 20220119
+    # - Add form and ml_df_to_time_series
     
     
     # Update
@@ -1285,7 +1338,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 2.10
+    version = 2.11
 
 
     # Tracking
@@ -1334,7 +1387,7 @@ def master(param_holder, predict_begin, export_model=True,
     
     global bt_last_begin, data_period, predict_period, long
     global debug, dev
-    global symbol, ma_values, volume_thld, market
+    global symbol, ma_values, volume_thld, market, data_form
 
 
     holder = param_holder.params
@@ -1350,6 +1403,7 @@ def master(param_holder, predict_begin, export_model=True,
     dev = holder['dev'][0]   
     symbol = holder['symbol'][0]   
     ma_values = holder['ma_values'][0]   
+    data_form = holder['data_form'][0]   
     
     # Modeling
     predict_period = holder['predict_period'][0]
@@ -1436,7 +1490,36 @@ def master(param_holder, predict_begin, export_model=True,
         
         # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
         
-        # # Change Ratio
+        # Change Ratio
+        model_params = [
+                        {'model': LinearRegression(),
+                          'params': {
+                              'normalize': [True, False],
+                              }
+                          },
+                        {'model': xgb.XGBRegressor(),
+                          'params': {
+                            # 'n_estimators': [200],
+                            'eta': [0.1],
+                            # 'eta': [0.08, 0.1],
+                            'min_child_weight': [1],
+                              # 'min_child_weight': [0.5, 1],
+                            'max_depth':[8],
+                              # 'max_depth':[6, 8, 12],
+                            'subsample':[1]
+                          }
+                        },
+                        # {'model': SGDRegressor(),
+                        #   'params': {
+                        #       # 'max_iter': [1000],
+                        #       # 'tol': [1e-3],
+                        #       # 'penalty': ['l2', 'l1'],
+                        #       }                     
+                        #   }
+                        ] 
+
+        
+        # # Price
         # model_params = [
         #                 {'model': LinearRegression(),
         #                   'params': {
@@ -1447,10 +1530,10 @@ def master(param_holder, predict_begin, export_model=True,
         #                  'params': {
         #                     # 'n_estimators': [200],
         #                     'eta': [0.1],
-        #                     # 'eta': [0.08, 0.1],
-        #                     'min_child_weight': [1],
+        #                     # 'eta': [0.5, 0.7],
+        #                     'min_child_weight': [0.8],
         #                      # 'min_child_weight': [0.5, 1],
-        #                     'max_depth':[8],
+        #                     'max_depth':[10],
         #                      # 'max_depth':[6, 8, 12],
         #                     'subsample':[1]
         #                   }
@@ -1462,36 +1545,7 @@ def master(param_holder, predict_begin, export_model=True,
         #                 #       # 'penalty': ['l2', 'l1'],
         #                 #       }                     
         #                 #   }
-        #                ] 
-
-        
-        # Price
-        model_params = [
-                        {'model': LinearRegression(),
-                          'params': {
-                              'normalize': [True, False],
-                              }
-                          },
-                        {'model': xgb.XGBRegressor(),
-                         'params': {
-                            # 'n_estimators': [200],
-                            'eta': [0.1],
-                            # 'eta': [0.5, 0.7],
-                            'min_child_weight': [0.8],
-                             # 'min_child_weight': [0.5, 1],
-                            'max_depth':[10],
-                             # 'max_depth':[6, 8, 12],
-                            'subsample':[1]
-                          }
-                        },
-                        # {'model': SGDRegressor(),
-                        #   'params': {
-                        #       # 'max_iter': [1000],
-                        #       # 'tol': [1e-3],
-                        #       # 'penalty': ['l2', 'l1'],
-                        #       }                     
-                        #   }
-                       ]         
+        #                ]         
         
         
         

@@ -284,6 +284,8 @@ def sam_load_data(industry=True, trade_value=True):
     global stock_info_raw
     global debug
     
+    
+    global loc_main
         
     # Process Market Data ......
     loc_main = market_data_raw.drop('TOTAL_TRADE_VALUE', axis=1)
@@ -357,11 +359,13 @@ def sam_load_data(industry=True, trade_value=True):
     except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
                     + ratio_cols
     
+    
+    # group_by=['SYMBOL'],
     loc_main, _, _, _ = \
         cbml.ml_data_process(df=loc_main, 
                               ma=True, scale=True, lag=True,
                               date_col='WORK_DATE',
-                              group_by=['SYMBOL'],
+                              group_by=[],
                               cols=[], 
                               except_cols=except_cols,
                               drop_except=var_y,

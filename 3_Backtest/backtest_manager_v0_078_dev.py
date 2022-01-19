@@ -53,7 +53,8 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_081 as sam
 
 # import stock_analysis_manager_v2_09_dev as sam
-import stock_analysis_manager_v2_10_dev as sam
+# import stock_analysis_manager_v2_10_dev as sam
+import stock_analysis_manager_v2_11_dev as sam
 
 
 
@@ -764,6 +765,9 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # - 權殖股，依照產業列出rank
     # - view_yesterday and view_industry is the same
     
+    # v0.078 - 20220119
+    # - Add form and ml_df_to_time_series in sam
+    
 
 
     # Bug
@@ -840,7 +844,11 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # bt_times = 1
     # interval = 4
     # market = 'tw'
-    # dev = True    
+    # dev = True 
+    
+    # 0 for original, 1 for MA, 2 for shifted time series
+    data_form = 1
+    
     
     # # Collected Parameters ......
     # bt_last_begin = 20210913
@@ -897,6 +905,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     args = {'bt_last_begin':[bt_last_begin],
             'predict_period': [predict_period], 
             'data_period':[data_period],
+            'data_form':[data_form],
             'ma_values':[ma_values],
             'volume_thld':[volume_thld],
             'industry':[True],
@@ -1161,7 +1170,6 @@ if __name__ == '__main__':
 
 
 
-    sam.loc_main
 
 
 
