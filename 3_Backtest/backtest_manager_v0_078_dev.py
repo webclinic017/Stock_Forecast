@@ -847,7 +847,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # dev = True 
     
     # 0 for original, 1 for MA, 2 for shifted time series
-    data_form = 1
+    data_form = 2
     
     
     # # Collected Parameters ......

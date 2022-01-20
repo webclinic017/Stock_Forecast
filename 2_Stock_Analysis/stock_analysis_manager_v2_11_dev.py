@@ -307,6 +307,7 @@ def sam_load_data(industry=True, trade_value=True):
 
     # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
     # - 這裡的method要用1，如果用2的話，mse會變成0.8
+    # - 因為method是1，其他大部份都是0，所以這一段要獨立出來
     global y_scaler
     loc_main, norm_orig, y_scaler = \
         cbml.df_scaler(
@@ -316,70 +317,6 @@ def sam_load_data(industry=True, trade_value=True):
             method=1
             )  
                 
-    
-    # ratio_cols = []
-    # if 'CLOSE_CHANGE_RATIO' in loc_main.columns:
-        
-    #     # cols = []
-    #     # for i in range(len(var_y)):
-    #     #     col = var_y[i]
-    #     #     cols.append(col)
-    #         # loc_main[col + '_GLOB_NORM'] = loc_main[col]
-    
-    #     cols = list(loc_main.columns)
-    #     cols = [c for c in cols if 'RATIO' in c]
-    #     # ['OPEN_CHANGE_RATIO',
-    #     #  'OPEN_CHANGE_ABS_RATIO',
-    #     #  'HIGH_CHANGE_RATIO',
-    #     #  'HIGH_CHANGE_ABS_RATIO',
-    #     #  'LOW_CHANGE_RATIO',
-    #     #  'LOW_CHANGE_ABS_RATIO',
-    #     #  'CLOSE_CHANGE_RATIO',
-    #     #  'CLOSE_CHANGE_ABS_RATIO',
-    #     #  'VOLUME_CHANGE_RATIO',
-    #     #  'VOLUME_CHANGE_ABS_RATIO',
-    #     #  'SYMBOL_TRADE_VALUE_RATIO']       
-    
-    #     loc_main, ratio_cols, _, _ = \
-    #         cbml.ml_data_process(df=loc_main,
-    #                              ma=True, scale=True, lag=True, 
-    #                              group_by=[],
-    #                              cols=cols,
-    #                              except_cols=[],
-    #                              drop_except=var_y,
-    #                              cols_mode='equal',
-    #                              date_col='WORK_DATE',
-    #                              ma_values=ma_values, 
-    #                              lag_period=predict_period
-    #                              )
-
-
-    # Check again after deleting 
-    # na_cols = cbyz.df_chk_col_na(df=loc_main)
-    # max_value = na_cols['NA_COUNT'].max()
-    # min_value = na_cols['NA_COUNT'].min()
-    # assert max_value == min_value, 'max and min should be the same'
-    
-    
-    # Normalize By Stock ......
-    
-    # 20220119 ...
-    # except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
-    #                 + ratio_cols
-    
-    # loc_main, _, _, _ = \
-    #     cbml.ml_data_process(df=loc_main, 
-    #                           ma=True, scale=True, lag=True,
-    #                           date_col='WORK_DATE',
-    #                           group_by=['SYMBOL'],
-    #                           cols=[], 
-    #                           except_cols=except_cols,
-    #                           drop_except=var_y,
-    #                           cols_mode='equal',
-    #                           ma_values=ma_values, 
-    #                           lag_period=predict_period
-    #                           )
-    
     
     if data_form == 1:
         except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
@@ -398,8 +335,6 @@ def sam_load_data(industry=True, trade_value=True):
                                   lag_period=predict_period
                                   )
     elif data_form == 2:
-        
-        print('還沒處理欄位lag的問題，這樣在chk_na的時候會出錯')
         
         except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
                        'WEEKDAY', 'WEEK_NUM'] + id_keys  
@@ -423,27 +358,7 @@ def sam_load_data(industry=True, trade_value=True):
     
     
         
-    # except_cols = ['SYMBOL', 'WORK_DATE', 'YEAR', 
-    #                'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
-    #                 + ratio_cols
-    
-    # loc_main, temp_cols, _ = \
-    #     cbml.ml_data_process(df=loc_main, 
-    #                          ma=True, scale=True, lag=True,
-    #                          date_col='WORK_DATE',
-    #                          group_by=[],
-    #                          cols=[], 
-    #                          except_cols=except_cols,
-    #                          drop_except=var_y,
-    #                          cols_mode='equal',
-    #                          ma_values=ma_values, 
-    #                          lag_period=predict_period
-    #                          )        
-        
-        
-
-    # assert 2 < 1, '這裡的na數量不一致'    
-    # na_cols = cbyz.df_chk_col_na(df=loc_main)
+    na_cols = cbyz.df_chk_col_na(df=loc_main)
 
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
@@ -463,21 +378,43 @@ def sam_load_data(industry=True, trade_value=True):
     
     # Total Market Trade
     if trade_value:
-        total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
-                    .drop_duplicates(subset=['WORK_DATE'])
         
-        total_trade, _, _, _ = \
-            cbml.ml_data_process(df=total_trade, 
-                                 ma=True, scale=True, lag=True, 
-                                 date_col='WORK_DATE',
-                                 cols_mode='equal',
-                                 group_by=[],
-                                 cols=['TOTAL_TRADE_VALUE'], 
-                                 except_cols=[],
-                                 drop_except=['WORK_DATE'],
-                                 ma_values=ma_values, 
-                                 lag_period=predict_period
-                                 )
+        total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
+                        .drop_duplicates(subset=['WORK_DATE'])
+
+
+        if data_form == 1:        
+            total_trade, _, _, _ = \
+                cbml.ml_data_process(df=total_trade, 
+                                     ma=True, scale=True, lag=True, 
+                                     date_col='WORK_DATE',
+                                     cols_mode='equal',
+                                     group_by=[],
+                                     cols=['TOTAL_TRADE_VALUE'], 
+                                     except_cols=[],
+                                     drop_except=['WORK_DATE'],
+                                     ma_values=ma_values, 
+                                     lag_period=predict_period
+                                     )
+        elif data_form == 2:
+                
+            total_trade, _, _ = \
+                cbml.df_scaler(
+                    df=total_trade,
+                    except_cols=['WORK_DATE'],
+                    show_progress=False,
+                    method=0
+                    )  
+        
+            total_trade, _ = \
+                cbml.ml_df_to_time_series(
+                    df=total_trade, 
+                    cols=[], 
+                    except_cols='WORK_DATE',
+                    group_by=[],
+                    sort_keys='WORK_DATE', 
+                    window=predict_period,
+                    drop=True)    
         
         loc_main = loc_main.merge(total_trade, how='left', on=['WORK_DATE'])  
 
@@ -824,247 +761,247 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
-    # Buffett Indicator ......
-    if market == 'tw':
+    # # Buffett Indicator ......
+    # if market == 'tw':
         
-        buffett_indicator = \
-            stk.cal_buffett_indicator(end_date=predict_date[0])
+    #     buffett_indicator = \
+    #         stk.cal_buffett_indicator(end_date=predict_date[0])
             
-        buffett_indicator = \
-            main_data_frame_calendar \
-                .merge(buffett_indicator, how='left', on='WORK_DATE')  
+    #     buffett_indicator = \
+    #         main_data_frame_calendar \
+    #             .merge(buffett_indicator, how='left', on='WORK_DATE')  
     
-        buffett_indicator, _, _, _ = \
-               cbml.ml_data_process(df=buffett_indicator, 
-                                    ma=False, scale=True, lag=True, 
-                                    group_by=[], 
-                                    cols=[],
-                                    except_cols=['WORK_DATE'],
-                                    drop_except=[],
-                                    cols_mode='equal',
-                                    date_col='WORK_DATE',
-                                    ma_values=[], 
-                                    lag_period=predict_period
-                                    ) 
+    #     buffett_indicator, _, _, _ = \
+    #            cbml.ml_data_process(df=buffett_indicator, 
+    #                                 ma=False, scale=True, lag=True, 
+    #                                 group_by=[], 
+    #                                 cols=[],
+    #                                 except_cols=['WORK_DATE'],
+    #                                 drop_except=[],
+    #                                 cols_mode='equal',
+    #                                 date_col='WORK_DATE',
+    #                                 ma_values=[], 
+    #                                 lag_period=predict_period
+    #                                 ) 
       
-        cols = cbyz.df_get_cols_except(df=buffett_indicator,
-                                       except_cols=['WORK_DATE'])
-        main_data = main_data \
-                    .merge(buffett_indicator, how='left', on=['WORK_DATE'])
+    #     cols = cbyz.df_get_cols_except(df=buffett_indicator,
+    #                                    except_cols=['WORK_DATE'])
+    #     main_data = main_data \
+    #                 .merge(buffett_indicator, how='left', on=['WORK_DATE'])
                 
 
 
-    # Government Invest ......
-    gov_invest = stk.od_tw_get_gov_invest(path=path_resource)
-    main_data = main_data.merge(gov_invest, how='left', on=['SYMBOL'])
-    main_data = cbyz.df_conv_na(df=main_data, cols=['GOV_INVEST'])
+    # # Government Invest ......
+    # gov_invest = stk.od_tw_get_gov_invest(path=path_resource)
+    # main_data = main_data.merge(gov_invest, how='left', on=['SYMBOL'])
+    # main_data = cbyz.df_conv_na(df=main_data, cols=['GOV_INVEST'])
 
 
-    # 除權息資料 ......
-    # Close Lag ...
-    daily_close = market_data_raw[['WORK_DATE', 'SYMBOL', 'CLOSE']]
-    daily_close, _ = cbyz.df_add_shift(df=daily_close, 
-                                    cols='CLOSE', shift=1,
-                                    group_by=['SYMBOL'],
-                                    suffix='_LAG', 
-                                    remove_na=False)
-    daily_close = daily_close \
-                .drop('CLOSE', axis=1) \
-                .rename(columns={'CLOSE_LAG':'CLOSE'})
+    # # 除權息資料 ......
+    # # Close Lag ...
+    # daily_close = market_data_raw[['WORK_DATE', 'SYMBOL', 'CLOSE']]
+    # daily_close, _ = cbyz.df_add_shift(df=daily_close, 
+    #                                 cols='CLOSE', shift=1,
+    #                                 group_by=['SYMBOL'],
+    #                                 suffix='_LAG', 
+    #                                 remove_na=False)
+    # daily_close = daily_close \
+    #             .drop('CLOSE', axis=1) \
+    #             .rename(columns={'CLOSE_LAG':'CLOSE'})
       
-    daily_close = cbyz.df_fillna(df=daily_close, cols='CLOSE', 
-                                 sort_keys=['SYMBOL', 'WORK_DATE'],
-                                 method='both')
+    # daily_close = cbyz.df_fillna(df=daily_close, cols='CLOSE', 
+    #                              sort_keys=['SYMBOL', 'WORK_DATE'],
+    #                              method='both')
                 
     
-    # 除權息 ...
-    sale_mon_data1, sale_mon_data2 = get_sale_mon_data()
+    # # 除權息 ...
+    # sale_mon_data1, sale_mon_data2 = get_sale_mon_data()
     
-    # Data 1 - 除權息日期及價錢 ...
-    sale_mon_data1 = daily_close \
-        .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'SYMBOL'])
+    # # Data 1 - 除權息日期及價錢 ...
+    # sale_mon_data1 = daily_close \
+    #     .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'SYMBOL'])
     
-    sale_mon_data1['EX_DIVIDENDS_PRICE'] = \
-        sale_mon_data1['EX_DIVIDENDS_PRICE'] / sale_mon_data1['CLOSE']    
+    # sale_mon_data1['EX_DIVIDENDS_PRICE'] = \
+    #     sale_mon_data1['EX_DIVIDENDS_PRICE'] / sale_mon_data1['CLOSE']    
         
-    sale_mon_data1 = sale_mon_data1.drop('CLOSE', axis=1)
-    sale_mon_data1 = cbyz.df_conv_na(df=sale_mon_data1, 
-                                     cols=['EX_DIVIDENDS_PRICE', 
-                                           'SALE_MON_DATE'])
+    # sale_mon_data1 = sale_mon_data1.drop('CLOSE', axis=1)
+    # sale_mon_data1 = cbyz.df_conv_na(df=sale_mon_data1, 
+    #                                  cols=['EX_DIVIDENDS_PRICE', 
+    #                                        'SALE_MON_DATE'])
     
-    sale_mon_data1, _, _, _ = \
-             cbml.ml_data_process(df=sale_mon_data1, 
-                                  ma=False, scale=True, lag=False, 
-                                  group_by=['SYMBOL'], 
-                                  cols=['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE'],
-                                  except_cols=[],
-                                  drop_except=[],
-                                  cols_mode='equal',
-                                  date_col='WORK_DATE',
-                                  ma_values=ma_values, 
-                                  lag_period=predict_period
-                                  ) 
+    # sale_mon_data1, _, _, _ = \
+    #          cbml.ml_data_process(df=sale_mon_data1, 
+    #                               ma=False, scale=True, lag=False, 
+    #                               group_by=['SYMBOL'], 
+    #                               cols=['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE'],
+    #                               except_cols=[],
+    #                               drop_except=[],
+    #                               cols_mode='equal',
+    #                               date_col='WORK_DATE',
+    #                               ma_values=ma_values, 
+    #                               lag_period=predict_period
+    #                               ) 
     
-    # Data 2 - 填息 ...
-    sale_mon_data2, _, _, _ = \
-        cbml.ml_data_process(df=sale_mon_data2, 
-                             ma=False, scale=True, lag=False, 
-                             group_by=['SYMBOL'],
-                             cols=[], 
-                             except_cols=['EX_DIVIDENDS_DONE'],
-                             drop_except=[],
-                             cols_mode='equal',
-                             date_col='WORK_DATE',
-                             ma_values=ma_values, 
-                             lag_period=predict_period
-                             )
+    # # Data 2 - 填息 ...
+    # sale_mon_data2, _, _, _ = \
+    #     cbml.ml_data_process(df=sale_mon_data2, 
+    #                          ma=False, scale=True, lag=False, 
+    #                          group_by=['SYMBOL'],
+    #                          cols=[], 
+    #                          except_cols=['EX_DIVIDENDS_DONE'],
+    #                          drop_except=[],
+    #                          cols_mode='equal',
+    #                          date_col='WORK_DATE',
+    #                          ma_values=ma_values, 
+    #                          lag_period=predict_period
+    #                          )
         
-    main_data = main_data \
-        .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'SYMBOL']) \
-        .merge(sale_mon_data2, how='left', on=['WORK_DATE', 'SYMBOL'])
+    # main_data = main_data \
+    #     .merge(sale_mon_data1, how='left', on=['WORK_DATE', 'SYMBOL']) \
+    #     .merge(sale_mon_data2, how='left', on=['WORK_DATE', 'SYMBOL'])
     
-    # Convert NA
-    temp_cols = ['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE', 'EX_DIVIDENDS_DONE']    
-    main_data = cbyz.df_conv_na(df=main_data, cols=temp_cols)
+    # # Convert NA
+    # temp_cols = ['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE', 'EX_DIVIDENDS_DONE']    
+    # main_data = cbyz.df_conv_na(df=main_data, cols=temp_cols)
 
 
     
-    # TEJ 三大法人持股成本 ......
-    if market == 'tw':
-        ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin, 
-                                              end_date=None, 
-                                              symbol=symbol,
-                                              trade=True)
+    # # TEJ 三大法人持股成本 ......
+    # if market == 'tw':
+    #     ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin, 
+    #                                           end_date=None, 
+    #                                           symbol=symbol,
+    #                                           trade=True)
         
-        ewtinst1c = main_data_frame \
-                    .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
-                    .merge(symbol_df, on=['SYMBOL'])
+    #     ewtinst1c = main_data_frame \
+    #                 .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
+    #                 .merge(symbol_df, on=['SYMBOL'])
     
-        cols = cbyz.df_get_cols_except(df=ewtinst1c,
-                                       except_cols=['WORK_DATE', 'SYMBOL']) 
+    #     cols = cbyz.df_get_cols_except(df=ewtinst1c,
+    #                                    except_cols=['WORK_DATE', 'SYMBOL']) 
         
-        ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
-                                   sort_keys=['SYMBOL', 'WORK_DATE'], 
-                                   group_by=[], method='ffill')                    
+    #     ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
+    #                                sort_keys=['SYMBOL', 'WORK_DATE'], 
+    #                                group_by=[], method='ffill')                    
                     
             
-        # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
-        hroi_cols = cbyz.df_get_cols_contains(
-            df=ewtinst1c, 
-            string=['_HROI', '_SELL', '_BUY']
-            )
+    #     # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
+    #     hroi_cols = cbyz.df_get_cols_contains(
+    #         df=ewtinst1c, 
+    #         string=['_HROI', '_SELL', '_BUY']
+    #         )
         
-        # Keep Needed Symbols Only
-        ewtinst1c, cols_1, _, _ = \
-            cbml.ml_data_process(df=ewtinst1c, 
-                                 ma=True, scale=True, lag=True, 
-                                 group_by=[],
-                                 cols=hroi_cols, 
-                                 except_cols=[],
-                                 drop_except=[],
-                                 cols_mode='contains',
-                                 date_col='WORK_DATE',
-                                 ma_values=ma_values, 
-                                 lag_period=predict_period
-                                 ) 
+    #     # Keep Needed Symbols Only
+    #     ewtinst1c, cols_1, _, _ = \
+    #         cbml.ml_data_process(df=ewtinst1c, 
+    #                              ma=True, scale=True, lag=True, 
+    #                              group_by=[],
+    #                              cols=hroi_cols, 
+    #                              except_cols=[],
+    #                              drop_except=[],
+    #                              cols_mode='contains',
+    #                              date_col='WORK_DATE',
+    #                              ma_values=ma_values, 
+    #                              lag_period=predict_period
+    #                              ) 
     
-        ewtinst1c, cols_2, _, _ = \
-            cbml.ml_data_process(df=ewtinst1c, 
-                                 ma=True, scale=True, lag=True, 
-                                 group_by=['SYMBOL'],
-                                 cols=['_HAP'], 
-                                 except_cols=[],
-                                 drop_except=[],
-                                 cols_mode='contains',
-                                 date_col='WORK_DATE',
-                                 ma_values=ma_values, 
-                                 lag_period=predict_period
-                                 )
+    #     ewtinst1c, cols_2, _, _ = \
+    #         cbml.ml_data_process(df=ewtinst1c, 
+    #                              ma=True, scale=True, lag=True, 
+    #                              group_by=['SYMBOL'],
+    #                              cols=['_HAP'], 
+    #                              except_cols=[],
+    #                              drop_except=[],
+    #                              cols_mode='contains',
+    #                              date_col='WORK_DATE',
+    #                              ma_values=ma_values, 
+    #                              lag_period=predict_period
+    #                              )
             
-        main_data = main_data \
-            .merge(ewtinst1c, how='left', on=['SYMBOL', 'WORK_DATE'])  
+    #     main_data = main_data \
+    #         .merge(ewtinst1c, how='left', on=['SYMBOL', 'WORK_DATE'])  
         
-        print('ewtinst1c Check')
-        print('Check - 全部填NA是否合理？')
-        main_data = cbyz.df_conv_na(df=main_data, cols=cols_1 + cols_2)
-        cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
+    #     print('ewtinst1c Check')
+    #     print('Check - 全部填NA是否合理？')
+    #     main_data = cbyz.df_conv_na(df=main_data, cols=cols_1 + cols_2)
+    #     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
 
 
-    # 月營收資料表 ......
-    # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
-    # 1. 主要邏輯就是顯示最新的營收資料
-    if market == 'tw':
+    # # 月營收資料表 ......
+    # # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
+    # # 1. 主要邏輯就是顯示最新的營收資料
+    # if market == 'tw':
         
-        msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
-        再跑就正常了
-        '''
-        print(msg)
+    #     msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
+    #     再跑就正常了
+    #     '''
+    #     print(msg)
         
-        ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
-        main_data = main_data \
-                    .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
+    #     ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
+    #     main_data = main_data \
+    #                 .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
     
-        cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
-    
-    
-    # 財務報表
-    # - 現在只用單季，需確認是否有缺漏
-    print('財務報表現在只用單季，需確認是否有缺漏')
-    # financial_statement = sam_tej_get_ewifinq()
+    #     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
     
     
+    # # 財務報表
+    # # - 現在只用單季，需確認是否有缺漏
+    # print('財務報表現在只用單季，需確認是否有缺漏')
+    # # financial_statement = sam_tej_get_ewifinq()
     
-    # 指數日成本 ......
-    # - Increase prediction time a lot, but not increase mape obviously.
-    # ewiprcd = stk.tej_get_ewiprcd()
-    # main_data = main_data.merge(ewiprcd, how='left', on=['WORK_DATE'])  
+    
+    
+    # # 指數日成本 ......
+    # # - Increase prediction time a lot, but not increase mape obviously.
+    # # ewiprcd = stk.tej_get_ewiprcd()
+    # # main_data = main_data.merge(ewiprcd, how='left', on=['WORK_DATE'])  
 
 
-    # Pytrends Data ......
-    # - Increase prediction time a lot, and made mape decrease.
-    # - Pytrends已經normalize過後才pivot，但後面又normalize一次
-    # pytrends, pytrends_cols = get_google_treneds(begin_date=shift_begin, 
-    #                                               end_date=data_end, 
-    #                                               scale=True, 
-    #                                               stock_type=stock_type, 
-    #                                               local=local)
+    # # Pytrends Data ......
+    # # - Increase prediction time a lot, and made mape decrease.
+    # # - Pytrends已經normalize過後才pivot，但後面又normalize一次
+    # # pytrends, pytrends_cols = get_google_treneds(begin_date=shift_begin, 
+    # #                                               end_date=data_end, 
+    # #                                               scale=True, 
+    # #                                               stock_type=stock_type, 
+    # #                                               local=local)
     
-    # main_data = main_data.merge(pytrends, how='left', on=['WORK_DATE'])      
+    # # main_data = main_data.merge(pytrends, how='left', on=['WORK_DATE'])      
 
 
-    # 台股加權指數 TW Index
-    tw_index = sam_od_tw_get_index(begin_date=shift_begin, 
-                                   end_date=predict_date[-1])
+    # # 台股加權指數 TW Index
+    # tw_index = sam_od_tw_get_index(begin_date=shift_begin, 
+    #                                end_date=predict_date[-1])
     
-    main_data = main_data.merge(tw_index, how='left', on=['WORK_DATE'])
-    
-    
-    # S&P 500 ......
-    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
-    main_data = main_data.merge(snp, how='left', on=['WORK_DATE'])
+    # main_data = main_data.merge(tw_index, how='left', on=['WORK_DATE'])
     
     
-    # COVID-19 ......
-    if market == 'tw':
-        covid19, _ = cbyz.get_covid19_data()
-        covid19 = main_data_frame_calendar \
-                    .merge(covid19, how='left', on=['WORK_DATE'])
+    # # S&P 500 ......
+    # snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
+    # main_data = main_data.merge(snp, how='left', on=['WORK_DATE'])
     
-        covid19, covid19_cols, _, _ = \
-                    cbml.ml_data_process(df=covid19, 
-                                         ma=True, scale=True, lag=True, 
-                                         group_by=[],
-                                         cols=[], 
-                                         except_cols=[],
-                                         drop_except=[],
-                                         cols_mode='equal',
-                                         date_col='WORK_DATE',
-                                         ma_values=ma_values, 
-                                         lag_period=predict_period
-                                         )
+    
+    # # COVID-19 ......
+    # if market == 'tw':
+    #     covid19, _ = cbyz.get_covid19_data()
+    #     covid19 = main_data_frame_calendar \
+    #                 .merge(covid19, how='left', on=['WORK_DATE'])
+    
+    #     covid19, covid19_cols, _, _ = \
+    #                 cbml.ml_data_process(df=covid19, 
+    #                                      ma=True, scale=True, lag=True, 
+    #                                      group_by=[],
+    #                                      cols=[], 
+    #                                      except_cols=[],
+    #                                      drop_except=[],
+    #                                      cols_mode='equal',
+    #                                      date_col='WORK_DATE',
+    #                                      ma_values=ma_values, 
+    #                                      lag_period=predict_period
+    #                                      )
             
-        main_data = main_data.merge(covid19, how='left', on='WORK_DATE')
-        main_data = cbyz.df_conv_na(df=main_data, cols=covid19_cols)
+    #     main_data = main_data.merge(covid19, how='left', on='WORK_DATE')
+    #     main_data = cbyz.df_conv_na(df=main_data, cols=covid19_cols)
 
 
     # Variables ......
@@ -1445,6 +1382,7 @@ def master(param_holder, predict_begin, export_model=True,
     global model_x, var_y, id_keys
     global norm_orig
         
+    id_keys = ['SYMBOL', 'WORK_DATE']    
     
     var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
               'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
@@ -1452,7 +1390,6 @@ def master(param_holder, predict_begin, export_model=True,
     # var_y = ['OPEN', 'HIGH',
     #          'LOW', 'CLOSE']    
     
-    id_keys = ['SYMBOL', 'WORK_DATE']    
     
     
     if load_data:
