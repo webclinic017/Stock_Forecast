@@ -96,9 +96,11 @@ def set_calendar():
     
     # df_add_shift will cause NA, it's essential to drop to convert to int
     calendar, _ = \
-        cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
+        cbyz.df_add_shift(df=calendar, 
+                          cols='WORK_DATE',
                           shift=1, 
-                          group_by=[], 
+                          group_by=[],
+                          sort_by=['WORK_DATE'],
                           suffix='_LAST', remove_na=True
                           )
 
@@ -836,22 +838,33 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
     _hold = [str(i) for i in hold]
     serial = cbyz.get_time_serial(with_time=True)
-    _load_result = load_result
+
 
     # Parameters
     
+    # 0 for original, 1 for MA, 2 for shifted time series
+    data_form = 2
+
+    # Data Forme Issues
+    # - 沒辦法像machinlearningmastery的範例，把全部的資料當成
+    #   time series處理，因為我用了很多的資料集，像是三大法人持股成本和COVID-19，代表這些
+    #   欄位全用都需要用time series的方式處理，才有辦法預測第2-N天    
+    #   https://machinelearningmastery.com/xgboost-for-time-series-forecasting/
+    # - 可以把predict_period全部設為1，但調整time_unit
+    if data_form == 2:
+        predict_period = 1
+
+
     # # Not Collected Parameters ......
     # bt_times = 1
+    # bt_index = 0
     # interval = 4
     # market = 'tw'
     # dev = True 
     
-    # 0 for original, 1 for MA, 2 for shifted time series
-    data_form = 2
-    
     
     # # Collected Parameters ......
-    # bt_last_begin = 20210913
+    # bt_last_begin = 20220124
     # predict_period = 6
     # data_period = int(365 * 3.5)
     # ma_values = [6,10,20,60]
@@ -860,6 +873,9 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # long = False
     # compete_mode = 0
     # cv = list(range(2, 3))
+    # load_result = False
+    # dev = True
+    # predict_begin = bt_last_begin
 
 
     # Wait for update
@@ -895,6 +911,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     _market = market    
     _compete_mode = compete_mode
+    _load_result = load_result    
 
 
     # Arguments

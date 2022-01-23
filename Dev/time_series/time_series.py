@@ -128,7 +128,7 @@ values = series.values
 # transform the time series data into supervised learning
 data = series_to_supervised(values, n_in=6)
 # evaluate
-mae, y, yhat = walk_forward_validation(data, 12)
+mae, y, yhat = walk_forward_validation(data, n_test=12)
 print('MAE: %.3f' % mae)
 # plot expected vs preducted
 pyplot.plot(y, label='Expected')
