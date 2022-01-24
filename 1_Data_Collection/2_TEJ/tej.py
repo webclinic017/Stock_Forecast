@@ -13,6 +13,7 @@ import numpy as np
 import sys, time, os, gc
 
 
+host = 3
 host = 2
 host = 0
 
@@ -23,7 +24,9 @@ market = 'tw'
 if host == 0:
     path = '/Users/Aron/Documents/GitHub/Stock_Forecast/1_Data_Collection/2_TEJ'
 elif host == 2:
-    path = '/home/jupyter/1_Data_Collection/2_TEJ'
+    path = '/home/jupyter/Production/1_Data_Collection/2_TEJ'
+elif host == 3:
+    path = '/home/jupyter/Develop/1_Data_Collection/2_TEJ'    
 
 
 # Codebase ......

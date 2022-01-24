@@ -15,6 +15,7 @@ import numpy as np
 import sys, time, os, gc
 import random
 
+host = 3
 host = 2
 host = 0
 market = 'tw'
@@ -25,8 +26,12 @@ if host == 0:
     path_sam = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
 
 elif host == 2:
-    path = '/home/jupyter/3_Backtest'
-    path_sam = '/home/jupyter/2_Stock_Analysis'    
+    path = '/home/jupyter/Production/3_Backtest'
+    path_sam = '/home/jupyter/Production/2_Stock_Analysis'    
+    
+elif host == 3:
+    path = '/home/jupyter/Develop/3_Backtest'
+    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'        
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',

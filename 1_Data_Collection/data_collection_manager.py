@@ -14,6 +14,7 @@ import sys, time, os, gc
 import yfinance as yf
 
 
+host = 3
 host = 2
 host = 0
 
@@ -25,8 +26,9 @@ elif host == 1:
     path = '/home/aronhack/stock_forecast/dashboard'
     # path = '/home/aronhack/stock_analysis_us/dashboard'
 elif host == 2:
-    path = '/home/jupyter//1_Data_Collection'
-
+    path = '/home/jupyter//Production/1_Data_Collection'
+elif host == 3:
+    path = '/home/jupyter//Develop/1_Data_Collection'
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
