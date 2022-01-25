@@ -15,10 +15,11 @@ import numpy as np
 import sys, time, os, gc
 import random
 
-host = 3
+# host = 3
 host = 2
-host = 0
+# host = 0
 market = 'tw'
+
 
 # Path .....
 if host == 0:
@@ -31,17 +32,17 @@ elif host == 2:
     
 elif host == 3:
     path = '/home/jupyter/Develop/3_Backtest'
-    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'        
+    path_sam = '/home/jupyter/Develop/2_Stock_Analysis' 
+    
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220124',
-                 r'/home/jupyter/Arsenal/20220124',
+                 r'/home/jupyter/Codebase_YZ/20220118',
+                 r'/home/jupyter/Arsenal/20220118',
                  path + '/Function',
                  path_sam]
-
 
 
 for i in path_codebase:    
@@ -58,8 +59,7 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_081 as sam
 
 # import stock_analysis_manager_v2_09_dev as sam
-# import stock_analysis_manager_v2_10_dev as sam
-import stock_analysis_manager_v2_11_dev as sam
+import stock_analysis_manager_v2_10_dev as sam
 
 
 
@@ -101,11 +101,9 @@ def set_calendar():
     
     # df_add_shift will cause NA, it's essential to drop to convert to int
     calendar, _ = \
-        cbyz.df_add_shift(df=calendar, 
-                          cols='WORK_DATE',
+        cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
                           shift=1, 
-                          group_by=[],
-                          sort_by=['WORK_DATE'],
+                          group_by=[], 
                           suffix='_LAST', remove_na=True
                           )
 
@@ -772,10 +770,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # - 權殖股，依照產業列出rank
     # - view_yesterday and view_industry is the same
     
-    # v0.078 - 20220119
-    # - Add form and ml_df_to_time_series in sam
-    
-    
+
 
     # Bug
     # 1. Fix UT, execution correlation before split data, but not drop columns
@@ -843,33 +838,18 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
     _hold = [str(i) for i in hold]
     serial = cbyz.get_time_serial(with_time=True)
-
+    _load_result = load_result
 
     # Parameters
     
-    # 0 for original, 1 for MA, 2 for shifted time series
-    data_form = 2
-
-    # Data Forme Issues
-    # - 沒辦法像machinlearningmastery的範例，把全部的資料當成
-    #   time series處理，因為我用了很多的資料集，像是三大法人持股成本和COVID-19，代表這些
-    #   欄位全用都需要用time series的方式處理，才有辦法預測第2-N天    
-    #   https://machinelearningmastery.com/xgboost-for-time-series-forecasting/
-    # - 可以把predict_period全部設為1，但調整time_unit
-    if data_form == 2:
-        predict_period = 1
-
-
     # # Not Collected Parameters ......
     # bt_times = 1
-    # bt_index = 0
     # interval = 4
     # market = 'tw'
-    # dev = True 
-    
+    # dev = True    
     
     # # Collected Parameters ......
-    # bt_last_begin = 20220124
+    # bt_last_begin = 20210913
     # predict_period = 6
     # data_period = int(365 * 3.5)
     # ma_values = [6,10,20,60]
@@ -878,9 +858,6 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # long = False
     # compete_mode = 0
     # cv = list(range(2, 3))
-    # load_result = False
-    # dev = True
-    # predict_begin = bt_last_begin
 
 
     # Wait for update
@@ -916,7 +893,6 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     _market = market    
     _compete_mode = compete_mode
-    _load_result = load_result    
 
 
     # Arguments
@@ -927,7 +903,6 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     args = {'bt_last_begin':[bt_last_begin],
             'predict_period': [predict_period], 
             'data_period':[data_period],
-            'data_form':[data_form],
             'ma_values':[ma_values],
             'volume_thld':[volume_thld],
             'industry':[True],
@@ -1192,6 +1167,7 @@ if __name__ == '__main__':
 
 
 
+    sam.loc_main
 
 
 

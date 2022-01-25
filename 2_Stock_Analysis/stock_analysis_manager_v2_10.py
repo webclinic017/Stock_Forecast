@@ -29,6 +29,7 @@ from sklearn.metrics import mean_squared_error
 import pickle
 
 
+host = 3
 host = 2
 host = 0
 
@@ -39,8 +40,12 @@ if host == 0:
     path_dcm = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection'
     
 elif host == 2:
-    path = '/home/jupyter//2_Stock_Analysis'
-    path_dcm = '/home/jupyter//1_Data_Collection'
+    path = '/home/jupyter/Production/3_Backtest'
+    path_sam = '/home/jupyter/Production/2_Stock_Analysis'    
+    
+elif host == 3:
+    path = '/home/jupyter/Develop/3_Backtest'
+    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'        
 
 
 # Codebase ......
@@ -50,6 +55,7 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/jupyter/Codebase_YZ/20220118',
                  r'/home/jupyter/Arsenal/20220118',
                  path + '/Function']
+
 
 
 for i in path_codebase:    

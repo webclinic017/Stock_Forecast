@@ -40,20 +40,20 @@ if host == 0:
     path_dcm = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection'
     
 elif host == 2:
-    path = '/home/jupyter/Production/3_Backtest'
-    path_sam = '/home/jupyter/Production/2_Stock_Analysis'    
+    path = '/home/jupyter/Production/2_Stock_Analysis'
+    path_dcm = '/home/jupyter/Production/1_Data_Collection'    
     
 elif host == 3:
-    path = '/home/jupyter/Develop/3_Backtest'
-    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'        
+    path = '/home/jupyter/Develop/2_Stock_Analysis'
+    path_dcm = '/home/jupyter/Develop/1_Data_Collection'        
 
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220118',
-                 r'/home/jupyter/Arsenal/20220118',
+                 r'/home/jupyter/Codebase_YZ/20220124',
+                 r'/home/jupyter/Arsenal/20220124',
                  path + '/Function']
 
 
@@ -96,9 +96,9 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
-    global symbol, market, var_y
+    global id_keys, symbol, market, var_y
     global market_data_raw
-    global predict_period
+    global predict_period, time_unit
     global stock_info_raw
     global log, data_form
     
@@ -143,6 +143,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                 trade_value=trade_value,
                 restore=True
                 )
+
 
     # Check        
     global ohlc
@@ -235,6 +236,30 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         market_data_raw = ar.df_simplify_dtypes(df=market_data_raw)
 
 
+
+
+
+
+    print('Update - 不確定time_unit為w的情況該不該寫進funciton中')
+    if time_unit == 'w':
+        
+        loc_calendar = calendar[['YEAR', 'WEEK_NUM', 'WORK_DATE']]
+        
+        
+        market_data_raw2 = market_data_raw \
+            .merge(loc_calendar, how='left', on='WORK_DATE')
+        
+        market_data_raw2 = market_data_raw2.drop('WORK_DATE', axis=1)
+        cols = cbyz.df_get_cols_except(df=market_data_raw2,
+                                       except_cols=id_keys)
+        
+        market_data_raw2 = \
+            cbyz.df_summary(df=market_data_raw2, cols=cols, group_by=id_keys, 
+                            add_mean=True, add_min=True, 
+                            add_max=True, add_median=False, add_std=True, 
+                            add_skew=True, add_count=False, quantile=[])
+
+
     # Check ......
     
     # # 執行到這裡，因為加入了預測區間，所以會有NA，但所有NA的數量應該要一樣多
@@ -264,7 +289,7 @@ def sam_load_data(industry=True, trade_value=True):
     
     global symbol
     global market_data_raw
-    global predict_period
+    global predict_period, data_end
     global symbol_df
     global stock_info_raw
     global debug, data_form
@@ -318,6 +343,21 @@ def sam_load_data(industry=True, trade_value=True):
         
         except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
                        'WEEKDAY', 'WEEK_NUM'] + id_keys  
+
+        # 新股會有NA，但直接drop的話會刪到pred preiod
+        loc_main.loc[:, 'REMOVE'] = \
+            np.where((loc_main['WORK_DATE']<data_end) \
+                     & (loc_main[var_y[-1]].isna()), 1, 0)
+                
+        loc_main = loc_main[loc_main['REMOVE']==0] \
+                    .drop('REMOVE', axis=1)                
+        
+        # 新股上市的第一天，OPEN_CHANGE會是inf
+        print('Check - 為什麼OPEN_CHANGE_RATIO不是inf，但OPEN_CHANGE_ABS_RATIO是')
+        loc_main.loc[:, 'OPEN_CHANGE_ABS_RATIO'] = \
+            np.where(loc_main['OPEN_CHANGE_ABS_RATIO']==np.inf, 
+                     0, loc_main['OPEN_CHANGE_ABS_RATIO'])
+
         
         loc_main, _, _ = \
             cbml.df_scaler(
@@ -414,8 +454,6 @@ def sam_load_data(industry=True, trade_value=True):
     
     loc_main = loc_main.merge(stock_info, how='left', on=['SYMBOL'])      
 
-    global debug3
-    debug3 = loc_main.copy()
     
 
     # Merge Other Data ......        
@@ -1087,7 +1125,14 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
            "只有一筆資料有問題，暫時直接drop")
     print(msg)
     # hist_df.to_csv(path_temp + '/debug_hist_df.csv', index=False)
-    cbyz.df_chk_col_na(df=hist_df, mode='stop')
+    
+    
+    # 當symbols=[]時，這裡會有18筆NA，都是var_y的欄位，應該是新股，因此直接排除
+    chk_na = cbyz.df_chk_col_na(df=hist_df)
+    assert len(chk_na) < 100, 'get_model_data - Check hist_df NA'
+    
+    na_cols = chk_na['COLUMN'].tolist()
+    main_data = main_data.dropna(subset=na_cols, axis=0)
     
     
     # Predict有NA是正常的，但NA_COUNT必須全部都一樣
@@ -1096,6 +1141,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     chk_predict_na = cbyz.df_chk_col_na(df=predict_df, mode='alert')
     
     
+    print('data_form=2時會出錯')
     min_value = chk_predict_na['NA_COUNT'].min()
     max_value = chk_predict_na['NA_COUNT'].max()    
     assert min_value == max_value, 'All the NA_COUNT should be the same. '
@@ -1332,7 +1378,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 2.11
+    version = 2.112
 
 
     # Tracking
@@ -1379,7 +1425,7 @@ def master(param_holder, predict_begin, export_model=True,
     # Update - 20211220，暫時在get_tw_index中呼叫update_tw_index，但這個方式可能會漏資料
     
     
-    global bt_last_begin, data_period, predict_period, long
+    global bt_last_begin, data_period, predict_period, long, time_unit
     global debug, dev
     global symbol, ma_values, volume_thld, market, data_form
 
@@ -1398,6 +1444,7 @@ def master(param_holder, predict_begin, export_model=True,
     symbol = holder['symbol'][0]   
     ma_values = holder['ma_values'][0]   
     data_form = holder['data_form'][0]   
+    time_unit = holder['time_unit'][0]
     
     # Modeling
     predict_period = holder['predict_period'][0]
@@ -1439,7 +1486,11 @@ def master(param_holder, predict_begin, export_model=True,
     global model_x, var_y, id_keys
     global norm_orig
         
-    id_keys = ['SYMBOL', 'WORK_DATE']    
+    if time_unit == 'w':
+        id_keys = ['SYMBOL', 'YEAR', 'WEEK_NUM']
+        
+    elif time_unit == 'd':
+        id_keys = ['SYMBOL', 'WORK_DATE']    
     
     # var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
     #           'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
@@ -1486,33 +1537,33 @@ def master(param_holder, predict_begin, export_model=True,
         
         # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
         
-        # Change Ratio
-        model_params = [
-                        {'model': LinearRegression(),
-                          'params': {
-                              'normalize': [True, False],
-                              }
-                          },
-                        {'model': xgb.XGBRegressor(),
-                          'params': {
-                            # 'n_estimators': [200],
-                            'eta': [0.1],
-                            # 'eta': [0.08, 0.1],
-                            'min_child_weight': [1],
-                              # 'min_child_weight': [0.5, 1],
-                            'max_depth':[8],
-                              # 'max_depth':[6, 8, 12],
-                            'subsample':[1]
-                          }
-                        },
-                        # {'model': SGDRegressor(),
-                        #   'params': {
-                        #       # 'max_iter': [1000],
-                        #       # 'tol': [1e-3],
-                        #       # 'penalty': ['l2', 'l1'],
-                        #       }                     
-                        #   }
-                        ] 
+        # data_form1 - Change Ratio
+        # model_params = [
+        #                 {'model': LinearRegression(),
+        #                   'params': {
+        #                       'normalize': [True, False],
+        #                       }
+        #                   },
+        #                 {'model': xgb.XGBRegressor(),
+        #                   'params': {
+        #                     # 'n_estimators': [200],
+        #                     'eta': [0.1],
+        #                     # 'eta': [0.08, 0.1],
+        #                     'min_child_weight': [1],
+        #                       # 'min_child_weight': [0.5, 1],
+        #                     'max_depth':[8],
+        #                       # 'max_depth':[6, 8, 12],
+        #                     'subsample':[1]
+        #                   }
+        #                 },
+        #                 # {'model': SGDRegressor(),
+        #                 #   'params': {
+        #                 #       # 'max_iter': [1000],
+        #                 #       # 'tol': [1e-3],
+        #                 #       # 'penalty': ['l2', 'l1'],
+        #                 #       }                     
+        #                 #   }
+        #                 ] 
 
         
         # # Price
@@ -1543,7 +1594,34 @@ def master(param_holder, predict_begin, export_model=True,
         #                 #   }
         #                ]         
         
-        
+
+        # data_form2 - Price
+        model_params = [
+                        {'model': LinearRegression(),
+                          'params': {
+                              'normalize': [True, False],
+                              }
+                          },
+                        {'model': xgb.XGBRegressor(),
+                          'params': {
+                            # 'n_estimators': [200],
+                            'eta': [0.2, 0.4],
+                            # 'eta': [0.08, 0.1],
+                            # 'min_child_weight': [1],
+                          'min_child_weight': [0.5, 1],
+                            'max_depth':[6, 8],
+                              # 'max_depth':[6, 8, 12],
+                            'subsample':[1]
+                          }
+                        },
+                        # {'model': SGDRegressor(),
+                        #   'params': {
+                        #       # 'max_iter': [1000],
+                        #       # 'tol': [1e-3],
+                        #       # 'penalty': ['l2', 'l1'],
+                        #       }                     
+                        #   }
+                        ]         
         
         
     # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業

@@ -15,6 +15,7 @@ import numpy as np
 import sys, time, os, gc
 import random
 
+host = 3
 host = 2
 host = 0
 market = 'tw'
@@ -25,15 +26,19 @@ if host == 0:
     path_sam = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
 
 elif host == 2:
-    path = '/home/jupyter/3_Backtest'
-    path_sam = '/home/jupyter/2_Stock_Analysis'    
+    path = '/home/jupyter/Production/3_Backtest'
+    path_sam = '/home/jupyter/Production/2_Stock_Analysis'    
+    
+elif host == 3:
+    path = '/home/jupyter/Develop/3_Backtest'
+    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'        
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220118',
-                 r'/home/jupyter/Arsenal/20220118',
+                 r'/home/jupyter/Codebase_YZ/20220124',
+                 r'/home/jupyter/Arsenal/20220124',
                  path + '/Function',
                  path_sam]
 
@@ -53,7 +58,9 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_081 as sam
 
 # import stock_analysis_manager_v2_09_dev as sam
-import stock_analysis_manager_v2_10_dev as sam
+# import stock_analysis_manager_v2_10_dev as sam
+# import stock_analysis_manager_v2_11_dev as sam
+import stock_analysis_manager_v2_112_dev as sam
 
 
 
@@ -95,9 +102,11 @@ def set_calendar():
     
     # df_add_shift will cause NA, it's essential to drop to convert to int
     calendar, _ = \
-        cbyz.df_add_shift(df=calendar, cols='WORK_DATE',
+        cbyz.df_add_shift(df=calendar, 
+                          cols='WORK_DATE',
                           shift=1, 
-                          group_by=[], 
+                          group_by=[],
+                          sort_by=['WORK_DATE'],
                           suffix='_LAST', remove_na=True
                           )
 
@@ -108,12 +117,10 @@ def set_calendar():
     
     # Get the last date
     # - Error may be raised here if database not updated
-    try:
-        index = calendar[calendar['WORK_DATE']==_bt_last_begin].index[0]
-    except:
-        print('Check the database was updated or not')
-        
-        
+    index = calendar[calendar['WORK_DATE']==_bt_last_begin]
+    assert len(index) > 0, 'Check database updated or not'
+    
+    index = index.index[0]
     index = index + _predict_period - 1
     _bt_last_end = calendar.loc[index, 'WORK_DATE']
     
@@ -706,7 +713,7 @@ def view_yesterday():
 # %% Master ------
 
 
-def master(bt_last_begin, predict_period=14, long=False, interval=360, 
+def master(bt_last_begin, predict_period=14, time_unit='d', long=False, interval=360, 
            bt_times=2, data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
            cv=2, compete_mode=1, market='tw', hold=[], load_result=False,
            dev=False):
@@ -753,18 +760,21 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # - Update eval_metrics and rebuild forecast_records
     # v0.075
     # - Fix bug
-
     # v0.076
     # - Add capability to read saved bt_result.csv > Done
     # - Add date to result of view_yesterday > Done
-    
     # v0.077 - 20220118
     # - Rename symbols as symbol
     # - 是不是還是必須把bt mape和score合併
     # - 權殖股，依照產業列出rank
     # - view_yesterday and view_industry is the same
-    
+    # v0.078 - 20220119
+    # - Add form and ml_df_to_time_series in sam
 
+
+    # v0.0781 - 20220124
+    # - Add Time Unit    
+    
 
     # Bug
     # 1. Fix UT, execution correlation before split data, but not drop columns
@@ -832,18 +842,33 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
 
     _hold = [str(i) for i in hold]
     serial = cbyz.get_time_serial(with_time=True)
-    _load_result = load_result
+
 
     # Parameters
     
+    # 0 for original, 1 for MA, 2 for shifted time series
+    data_form = 2
+
+    # Data Forme Issues
+    # - 沒辦法像machinlearningmastery的範例，把全部的資料當成
+    #   time series處理，因為我用了很多的資料集，像是三大法人持股成本和COVID-19，代表這些
+    #   欄位全用都需要用time series的方式處理，才有辦法預測第2-N天    
+    #   https://machinelearningmastery.com/xgboost-for-time-series-forecasting/
+    # - 可以把predict_period全部設為1，但調整time_unit
+    if data_form == 2:
+        predict_period = 1
+
+
     # # Not Collected Parameters ......
     # bt_times = 1
+    # bt_index = 0
     # interval = 4
     # market = 'tw'
-    # dev = True    
+    # dev = True 
+    
     
     # # Collected Parameters ......
-    # bt_last_begin = 20210913
+    # bt_last_begin = 20220124
     # predict_period = 6
     # data_period = int(365 * 3.5)
     # ma_values = [6,10,20,60]
@@ -852,6 +877,9 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     # long = False
     # compete_mode = 0
     # cv = list(range(2, 3))
+    # load_result = False
+    # dev = True
+    # predict_begin = bt_last_begin
 
 
     # Wait for update
@@ -887,6 +915,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     _market = market    
     _compete_mode = compete_mode
+    _load_result = load_result    
 
 
     # Arguments
@@ -895,8 +924,10 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     #    Param_Holder的參數會影響到model_data，沒辦法同一份model_data持續使用，因此，
     #    把完整的Param_Holder傳入sam再extract沒有任何效益
     args = {'bt_last_begin':[bt_last_begin],
+            'time_unit':[time_unit],
             'predict_period': [predict_period], 
             'data_period':[data_period],
+            'data_form':[data_form],
             'ma_values':[ma_values],
             'volume_thld':[volume_thld],
             'industry':[True],
@@ -1135,21 +1166,21 @@ if __name__ == '__main__':
     
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    master(bt_last_begin=20220118, predict_period=3, 
-            long=False, interval=4, bt_times=1, 
-            data_period=int(365 * 1), 
-            ma_values=[5,10,20], volume_thld=400,
-            compete_mode=0, cv=list(range(3, 4)),
-            market='tw', hold=hold,
-            load_result=False, dev=True)
+    # master(bt_last_begin=20220118, predict_period=3, 
+    #         long=False, interval=4, bt_times=1, 
+    #         data_period=int(365 * 1), 
+    #         ma_values=[5,10,20], volume_thld=400,
+    #         compete_mode=0, cv=list(range(3, 4)),
+    #         market='tw', hold=hold,
+    #         load_result=False, dev=True)
     
-    # master(bt_last_begin=20220117, predict_period=4, 
-    #        long=False, interval=7, bt_times=1, 
-    #        data_period=int(365 * 5), 
-    #        ma_values=[10,20,60], volume_thld=300,
-    #        compete_mode=1, cv=list(range(3, 4)),
-    #        market='tw', hold=hold,
-    #        load_result=False, dev=False)
+    master(bt_last_begin=20220118, predict_period=4, 
+            long=False, interval=7, bt_times=1, 
+            data_period=int(365 * 5), 
+            ma_values=[10,20,60], volume_thld=300,
+            compete_mode=1, cv=list(range(3, 4)),
+            market='tw', hold=hold,
+            load_result=False, dev=False)
 
     # master(bt_last_begin=20220118, predict_period=10, 
     #        long=True, interval=7, bt_times=1, 
@@ -1161,7 +1192,6 @@ if __name__ == '__main__':
 
 
 
-    sam.loc_main
 
 
 
