@@ -40,12 +40,12 @@ if host == 0:
     path_dcm = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection'
     
 elif host == 2:
-    path = '/home/jupyter/Production/3_Backtest'
-    path_sam = '/home/jupyter/Production/2_Stock_Analysis'    
+    path = '/home/jupyter/Production/2_Stock_Analysis'
+    path_dcm = '/home/jupyter/Production/1_Data_Collection'    
     
 elif host == 3:
-    path = '/home/jupyter/Develop/3_Backtest'
-    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'        
+    path = '/home/jupyter/Develop/2_Stock_Analysis'
+    path_dcm = '/home/jupyter/Develop/1_Data_Collection'        
 
 
 # Codebase ......
@@ -1545,6 +1545,11 @@ def master(param_holder, predict_begin, export_model=True,
             pred_scores = pred_scores.append(return_scores)
             pred_params = pred_scores.append(return_params)
             pred_features = pred_scores.append(return_features)            
+
+
+        # Prvent memory insufficient for saved data in ut
+        del tuner
+        gc.collect()
 
 
     # Inverse Scale

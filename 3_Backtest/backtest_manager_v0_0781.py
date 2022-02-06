@@ -342,7 +342,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
 
     if len(bt_result) > 800:
-        bt_result.to_csv(path_temp + '/bt_result_file.csv', 
+        bt_result.to_csv(path_temp + '/bt_result.csv', 
                          index=False)
         
         precision.to_csv(path_temp + '/precision.csv', 
@@ -713,8 +713,9 @@ def view_yesterday():
 # %% Master ------
 
 
-def master(bt_last_begin, predict_period=14, time_unit='d', long=False, interval=360, 
-           bt_times=2, data_period=5, ma_values=[5,10,20,60], volume_thld=400, 
+def master(bt_last_begin, predict_period=14, time_unit='w', long=False, 
+           interval=360, bt_times=2, data_period=5, ma_values=[5,10,20,60], 
+           volume_thld=400, 
            cv=2, compete_mode=1, market='tw', hold=[], load_result=False,
            dev=False):
     '''
@@ -793,10 +794,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False, interval
     # 2. remove group by from normalization
 
 
-    # Note
-    # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
-
-
 
     # Worklist
     # 0. Remove Open
@@ -832,6 +829,33 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False, interval
     # 28. 當bt_times為2，且load_file=false時，重新訓練一次模型就好
 
 
+  # # Not Collected Parameters ......
+    # bt_times = 1
+    # bt_index = 0
+    # interval = 4
+    # market = 'tw'
+    # dev = True 
+    # time_unit = 'w'
+    # hold = []
+    
+    # # Collected Parameters ......
+    # bt_last_begin = 20220207
+    # predict_period = 6
+    # data_period = int(365 * 3.5)
+    # ma_values = [6,10,20,60]
+    # volume_thld = 500
+    # hold = [8105, 2610, 3051, 1904, 2611]
+    # long = False
+    # compete_mode = 0
+    # cv = list(range(2, 3))
+    # load_result = False
+    # dev = True
+    # predict_begin = bt_last_begin
+
+
+
+    要dump y_scaler，這樣MLP才有辦法還原
+
     
     # Worklist
     # 1.Add price increse but model didn't catch
@@ -857,29 +881,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False, interval
     # - 可以把predict_period全部設為1，但調整time_unit
     if data_form == 2:
         predict_period = 1
-
-
-    # # Not Collected Parameters ......
-    # bt_times = 1
-    # bt_index = 0
-    # interval = 4
-    # market = 'tw'
-    # dev = True 
-    
-    
-    # # Collected Parameters ......
-    # bt_last_begin = 20220124
-    # predict_period = 6
-    # data_period = int(365 * 3.5)
-    # ma_values = [6,10,20,60]
-    # volume_thld = 500
-    # hold = [8105, 2610, 3051, 1904, 2611]
-    # long = False
-    # compete_mode = 0
-    # cv = list(range(2, 3))
-    # load_result = False
-    # dev = True
-    # predict_begin = bt_last_begin
 
 
     # Wait for update
@@ -1049,8 +1050,13 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False, interval
         # View And Log .....
         view_yesterday()
 
+        
+        # Error when load_result = True
         global pred_features
-        stk.write_sheet(data=pred_features, sheet='Features')
+        try:
+            stk.write_sheet(data=pred_features, sheet='Features')
+        except Exception as e:
+            print(e)
     
     
     gc.collect()
@@ -1149,6 +1155,22 @@ if __name__ == '__main__':
     # 2. sam v2.07的r2可以到40，但後來的為什麼都只有37？
     # 3.stock_analysis_manager_v2_10_dev的r2會是負的
 
+
+    # SAM Note ------
+    # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己
+    #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
+    #   改成[]。經測試過後，R2差不多，所以保留新的版本，應該可以提高計算速度。
+    # 2. y為price時會一直overfitting
+
+    # BTM Note
+    # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
+    # 2. 當price為y時，industry的importance超高，可能是造成overfitting的主因
+    # 3. 以industry作為target_type時，一定要用change_ratio當Y
+    # 4. data_form為1，y為change_ratio時
+    # - MA為[5,10,20,60,120]，open和low較佳；MA為[5,10,20,60]，high和close較佳，
+    #   但兩者MSE差異只在0.01等級
+
+
     
     # Change Ratio - XGB Params ------
     # eta: 0.3 / 0.01, 0.03, 0.08, 0.1, 0.2
@@ -1166,21 +1188,21 @@ if __name__ == '__main__':
     
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    # master(bt_last_begin=20220118, predict_period=3, 
-    #         long=False, interval=4, bt_times=1, 
-    #         data_period=int(365 * 1), 
-    #         ma_values=[5,10,20], volume_thld=400,
-    #         compete_mode=0, cv=list(range(3, 4)),
-    #         market='tw', hold=hold,
-    #         load_result=False, dev=True)
-    
-    master(bt_last_begin=20220118, predict_period=4, 
-            long=False, interval=7, bt_times=1, 
-            data_period=int(365 * 5), 
-            ma_values=[10,20,60], volume_thld=300,
-            compete_mode=1, cv=list(range(3, 4)),
+    master(bt_last_begin=20220207, predict_period=3, 
+            long=False, interval=4, bt_times=1, 
+            data_period=int(365 * 1), 
+            ma_values=[5,10,20], volume_thld=400,
+            compete_mode=0, cv=list(range(3, 4)),
             market='tw', hold=hold,
-            load_result=False, dev=False)
+            load_result=False, dev=True)
+    
+    # master(bt_last_begin=20220118, predict_period=4, 
+    #         long=False, interval=7, bt_times=1, 
+    #         data_period=int(365 * 5), 
+    #         ma_values=[10,20,60], volume_thld=300,
+    #         compete_mode=1, cv=list(range(3, 4)),
+    #         market='tw', hold=hold,
+    #         load_result=False, dev=False)
 
     # master(bt_last_begin=20220118, predict_period=10, 
     #        long=True, interval=7, bt_times=1, 

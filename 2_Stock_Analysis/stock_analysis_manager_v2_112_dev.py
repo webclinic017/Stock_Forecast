@@ -171,6 +171,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
 
     # main_data_frame
+    # - market_data_raw will merge calendar in this function
     set_frame()
 
     
@@ -212,52 +213,43 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # 因為X與y之間需要做shift，原始的版本都是移動X，但是X的欄位很多，因此改成移動y，提升
     # 計算效率
     msg = '這一段目前只用於data_form=2，但應該連1都需要'
-    assert data_form == 2, msg
+    print(msg)
     
-    if data_form == 2:
 
-        for y in var_y:
-            market_data_raw.loc[:, y + '_ORIG'] = market_data_raw[y]
+    for y in var_y:
+        market_data_raw.loc[:, y + '_ORIG'] = market_data_raw[y]
 
-        market_data_raw, new_cols = \
-            cbyz.df_add_shift(
-                df=market_data_raw, 
-                cols=['WORK_DATE']+ var_y, 
-                shift=-1, 
-                group_by=['SYMBOL'], 
-                sort_by=['SYMBOL', 'WORK_DATE'],
-                suffix='', 
-                remove_na=False
-                )
-            
-        market_data_raw = market_data_raw \
-            .dropna(subset=['WORK_DATE'], axis=0)
+    market_data_raw, new_cols = \
+        cbyz.df_add_shift(
+            df=market_data_raw, 
+            cols=['WORK_DATE']+ var_y, 
+            shift=-1, 
+            group_by=['SYMBOL'], 
+            sort_by=['SYMBOL', 'WORK_DATE'],
+            suffix='', 
+            remove_na=False
+            )
+        
+    market_data_raw = market_data_raw \
+        .dropna(subset=['WORK_DATE'], axis=0)
 
-        market_data_raw = ar.df_simplify_dtypes(df=market_data_raw)
-
+    market_data_raw = ar.df_simplify_dtypes(df=market_data_raw)
 
 
-
-
-
+    # Aggregate by week ......
     print('Update - 不確定time_unit為w的情況該不該寫進funciton中')
     if time_unit == 'w':
         
-        loc_calendar = calendar[['YEAR', 'WEEK_NUM', 'WORK_DATE']]
-        
-        
-        market_data_raw2 = market_data_raw \
-            .merge(loc_calendar, how='left', on='WORK_DATE')
-        
-        market_data_raw2 = market_data_raw2.drop('WORK_DATE', axis=1)
-        cols = cbyz.df_get_cols_except(df=market_data_raw2,
+        market_data_raw = market_data_raw.drop('WORK_DATE', axis=1)
+        cols = cbyz.df_get_cols_except(df=market_data_raw,
                                        except_cols=id_keys)
         
-        market_data_raw2 = \
-            cbyz.df_summary(df=market_data_raw2, cols=cols, group_by=id_keys, 
+        market_data_raw, _ = \
+            cbyz.df_summary(df=market_data_raw, cols=cols, group_by=id_keys, 
                             add_mean=True, add_min=True, 
                             add_max=True, add_median=False, add_std=True, 
                             add_skew=True, add_count=False, quantile=[])
+
 
 
     # Check ......
@@ -287,7 +279,7 @@ def sam_load_data(industry=True, trade_value=True):
     讀取資料及重新整理
     '''
     
-    global symbol
+    global id_keys, symbol
     global market_data_raw
     global predict_period, data_end
     global symbol_df
@@ -694,8 +686,9 @@ def select_symbols():
 def set_frame():
     
     # Merge As Main Data ......
-    global symbol_df
-    global market_data_raw, calendar_proc
+    global symbol_df, id_keys, time_unit
+    global market_data_raw, calendar, calendar_proc
+    global predict_week, predict_date
     global main_data_frame, main_data_frame_calendar
 
 
@@ -708,45 +701,53 @@ def set_frame():
     
     
     # Calendar
-    global calendar, calendar_proc
     calendar_proc = calendar[calendar['TRADE_DATE']>0] \
                     .reset_index(drop=True) \
                     .reset_index() \
                     .rename(columns={'index':'DATE_INDEX'})
+        
+    # Duplicate year and week_num, then these two columns can be variables 
+    # of the model
+    if time_unit == 'w':
+        
+        calendar_proc = calendar_proc[['YEAR', 'MONTH', 
+                                       'WEEK_NUM', 'TRADE_DATE']]
+        
+        calendar_proc = calendar_proc \
+            .drop_duplicates() \
+            .reset_index(drop=True) \
+            .reset_index() \
+            .rename(columns={'index':'DATE_INDEX'}) 
+        
+        calendar_proc.loc[:, 'YEAR_DUP'] = calendar_proc['YEAR']
+        calendar_proc.loc[:, 'WEEK_NUM_DUP'] = calendar_proc['WEEK_NUM']
+        
 
     calendar_proc, _, _ = \
         cbml.df_scaler(
             df=calendar_proc,
-            except_cols=['WORK_DATE', 'TRADE_DATE'],
+            except_cols=id_keys + ['TRADE_DATE'],
             show_progress=False,
             method=1
             )           
-
-    # calendar_proc, _, _, _ = \
-    #     cbml.ml_data_process(
-    #         df=calendar_proc, 
-    #         ma=False, scale=True, lag=False,
-    #         group_by=[],
-    #         cols=[], 
-    #         except_cols=['WORK_DATE', 'TRADE_DATE'],
-    #         cols_mode='equal',
-    #         drop_except=[],
-    #         date_col='WORK_DATE',
-    #         scale_method=1,
-    #         ma_values=ma_values, 
-    #         lag_period=predict_period
-    #         )
-
-
     
+    
+    # main_data_frame ......
     main_data_frame = cbyz.df_cross_join(symbol_df, calendar_proc)
     
     # Remove Untrading Day
-    main_data_frame = \
-        main_data_frame[
-            (main_data_frame['TRADE_DATE']>=1) \
-            & (main_data_frame['WORK_DATE']<=predict_date[-1])] \
-        .drop('TRADE_DATE', axis=1)
+    main_data_frame = main_data_frame[main_data_frame['TRADE_DATE']>=1] \
+                        .drop('TRADE_DATE', axis=1)
+    
+    if time_unit == 'd':
+        main_data_frame = main_data_frame \
+            .merge(predict_date, on='WORK_DATE')
+            
+    elif time_unit == 'w':
+        main_data_frame = main_data_frame \
+            .merge(predict_week, on=['YEAR', 'WEEK_NUM'])    
+    
+        
 
     market_data_raw = main_data_frame \
         .merge(market_data_raw, how='left', on=['SYMBOL', 'WORK_DATE'])
@@ -829,7 +830,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # market_data_raw
     get_market_data_raw(trade_value=trade_value)
     gc.collect()
-    
     
     
     # Load Historical Data ......
@@ -955,57 +955,92 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     
-    # # TEJ 三大法人持股成本 ......
-    # if market == 'tw':
-    #     ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin, 
-    #                                           end_date=None, 
-    #                                           symbol=symbol,
-    #                                           trade=True)
+    # TEJ 三大法人持股成本 ......
+    if market == 'tw':
         
-    #     ewtinst1c = main_data_frame \
-    #                 .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
-    #                 .merge(symbol_df, on=['SYMBOL'])
+        ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin,
+                                              end_date=None, 
+                                              symbol=symbol,
+                                              trade=True)
+        
+        ewtinst1c = main_data_frame \
+                    .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
+                    .merge(symbol_df, on=['SYMBOL'])
     
-    #     cols = cbyz.df_get_cols_except(df=ewtinst1c,
-    #                                    except_cols=['WORK_DATE', 'SYMBOL']) 
+        cols = cbyz.df_get_cols_except(df=ewtinst1c,
+                                        except_cols=['WORK_DATE', 'SYMBOL']) 
         
-    #     ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
-    #                                sort_keys=['SYMBOL', 'WORK_DATE'], 
-    #                                group_by=[], method='ffill')                    
-                    
+        ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
+                                    sort_keys=['SYMBOL', 'WORK_DATE'], 
+                                    group_by=[], method='ffill')    
+
+        # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
+        hroi_cols = cbyz.df_get_cols_contains(
+            df=ewtinst1c, 
+            string=['_HROI', '_SELL', '_BUY']
+            )
+                
+        if data_form == 1:
             
-    #     # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
-    #     hroi_cols = cbyz.df_get_cols_contains(
-    #         df=ewtinst1c, 
-    #         string=['_HROI', '_SELL', '_BUY']
-    #         )
+            #     ewtinst1c, cols_1, _, _ = \
+            #         cbml.ml_data_process(df=ewtinst1c, 
+            #                              ma=True, scale=True, lag=True, 
+            #                              group_by=[],
+            #                              cols=hroi_cols, 
+            #                              except_cols=[],
+            #                              drop_except=[],
+            #                              cols_mode='contains',
+            #                              date_col='WORK_DATE',
+            #                              ma_values=ma_values, 
+            #                              lag_period=predict_period
+            #                              ) 
+            
+            #     ewtinst1c, cols_2, _, _ = \
+            #         cbml.ml_data_process(df=ewtinst1c, 
+            #                              ma=True, scale=True, lag=True, 
+            #                              group_by=['SYMBOL'],
+            #                              cols=['_HAP'], 
+            #                              except_cols=[],
+            #                              drop_except=[],
+            #                              cols_mode='contains',
+            #                              date_col='WORK_DATE',
+            #                              ma_values=ma_values, 
+            #                              lag_period=predict_period
+            #                              )
+            
+            ewtinst1c, cols_1, _, _ = \
+                cbml.ml_data_process(df=ewtinst1c, 
+                                      ma=True, scale=True, lag=True, 
+                                      group_by=[],
+                                      cols=hroi_cols, 
+                                      except_cols=[],
+                                      drop_except=[],
+                                      cols_mode='contains',
+                                      date_col='WORK_DATE',
+                                      ma_values=ma_values, 
+                                      lag_period=predict_period
+                                      ) 
         
-    #     # Keep Needed Symbols Only
-    #     ewtinst1c, cols_1, _, _ = \
-    #         cbml.ml_data_process(df=ewtinst1c, 
-    #                              ma=True, scale=True, lag=True, 
-    #                              group_by=[],
-    #                              cols=hroi_cols, 
-    #                              except_cols=[],
-    #                              drop_except=[],
-    #                              cols_mode='contains',
-    #                              date_col='WORK_DATE',
-    #                              ma_values=ma_values, 
-    #                              lag_period=predict_period
-    #                              ) 
-    
-    #     ewtinst1c, cols_2, _, _ = \
-    #         cbml.ml_data_process(df=ewtinst1c, 
-    #                              ma=True, scale=True, lag=True, 
-    #                              group_by=['SYMBOL'],
-    #                              cols=['_HAP'], 
-    #                              except_cols=[],
-    #                              drop_except=[],
-    #                              cols_mode='contains',
-    #                              date_col='WORK_DATE',
-    #                              ma_values=ma_values, 
-    #                              lag_period=predict_period
-    #                              )
+            ewtinst1c, cols_2, _, _ = \
+                cbml.ml_data_process(df=ewtinst1c, 
+                                      ma=True, scale=True, lag=True, 
+                                      group_by=['SYMBOL'],
+                                      cols=['_HAP'], 
+                                      except_cols=[],
+                                      drop_except=[],
+                                      cols_mode='contains',
+                                      date_col='WORK_DATE',
+                                      ma_values=ma_values, 
+                                      lag_period=predict_period
+                                      )            
+            
+        elif data_form == 2:
+        
+            pass
+            
+
+        
+
             
     #     main_data = main_data \
     #         .merge(ewtinst1c, how='left', on=['SYMBOL', 'WORK_DATE'])  
@@ -1349,7 +1384,6 @@ def master(param_holder, predict_begin, export_model=True,
     # v2.112 - 20220123
     
     
-    
     # Update
     # Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
     #       再跑就正常。end_date應該要改成data_begin, 這個問題應該是today比data_begin少一天    
@@ -1360,13 +1394,6 @@ def master(param_holder, predict_begin, export_model=True,
     # - Test price as Y
 
 
-    # Note
-    # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己
-    #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
-    #   改成[]。經測試過後，R2差不多，所以保留新的版本，應該可以提高計算速度。
-
-    
-    
     # - 確認TEJ財務報表的資料會不會自動更新
     # - Fix Support and resistant
     
@@ -1474,11 +1501,12 @@ def master(param_holder, predict_begin, export_model=True,
     global shift_begin, shift_end, data_begin, data_end
     global predict_date, calendar
     
-    shift_begin, shift_end, \
-            data_begin, data_end, predict_date, calendar = \
+    shift_begin, shift_end, data_begin, data_end, \
+        predict_date, predict_week, calendar = \
                 stk.get_period(predict_begin=predict_begin,
                                predict_period=predict_period,
                                data_period=data_period,
+                               unit=time_unit,
                                shift=-(max(ma_values) * 2))
                 
     # ......
@@ -1492,11 +1520,11 @@ def master(param_holder, predict_begin, export_model=True,
     elif time_unit == 'd':
         id_keys = ['SYMBOL', 'WORK_DATE']    
     
-    # var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
-    #           'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
+    var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
+              'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
 
-    var_y = ['OPEN', 'HIGH',
-              'LOW', 'CLOSE']    
+    # var_y = ['OPEN', 'HIGH',
+    #           'LOW', 'CLOSE']    
     
     
     
@@ -1664,6 +1692,11 @@ def master(param_holder, predict_begin, export_model=True,
             pred_scores = pred_scores.append(return_scores)
             pred_params = pred_scores.append(return_params)
             pred_features = pred_scores.append(return_features)            
+
+
+        # Prvent memory insufficient for saved data in ut
+        del tuner
+        gc.collect()
 
 
     # Inverse Scale

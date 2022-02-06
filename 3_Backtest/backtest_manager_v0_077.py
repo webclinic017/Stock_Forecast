@@ -1114,6 +1114,7 @@ def verify_prediction_results():
 # %% Execute ------
 if __name__ == '__main__':
     
+    
     # cv 5-7會超級久
     
     # Bug -----
@@ -1123,6 +1124,19 @@ if __name__ == '__main__':
     # > 如果確定不是scaler的問題，可以把df_scaler的group_by加回去
     # 2. sam v2.07的r2可以到40，但後來的為什麼都只有37？
     # 3.stock_analysis_manager_v2_10_dev的r2會是負的
+
+
+    # SAM Note
+    # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己
+    #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
+    #   改成[]。經測試過後，R2差不多，所以保留新的版本，應該可以提高計算速度。
+
+    # BTM Note
+    # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
+    # 2. 當price為y時，industry的importance超高，可能是造成overfitting的主因
+    # 3. 以industry作為target_type時，一定要用change_ratio當Y
+    # 4. data_form為1，y為change_ratio時
+    # - MA為[5,10,20,60,120]，open和low較佳；MA為[5,10,20,60]，high和close較佳
 
     
     # Change Ratio - XGB Params ------
