@@ -33,8 +33,8 @@ import pickle
 
 host = 3
 host = 2
-host = 0
 host = 4
+host = 0
 
 
 # Path .....
@@ -114,6 +114,8 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     global main_data_frame
     global calendar_key
     
+    
+    
     stock_info_raw = \
         stk.tw_get_stock_info(daily_backup=True, 
                               path=path_temp)
@@ -174,7 +176,9 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
             
         if  max_value >= 0.1:
             print(msg_max)
-        
+
+
+
 
     # Exclude Low Volume symbol ......
     market_data_raw = select_symbols()
@@ -186,6 +190,20 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     #   先df_summary，因此這一段必須放在最後面
     set_frame()
 
+
+    # Total Trade
+    # - 如果time_unit是w，欄位名稱會在df_summary後改變，所以要先刪除
+    # - 需要merge calendar_key，所以要寫在set_frame()後面
+    # - total_trade會在sam_load_data中用到
+    # - 
+    # print('Update, total_trade_ratio應該加到get_data中')
+    # if trade_value:
+    #     total_trade = market_data_raw[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
+    #                     .drop_duplicates()
+                        
+    #     total_trade = total_trade.merge(calendar_key, on='WORK_DATE')         
+    #     market_data_raw = market_data_raw.drop('TOTAL_TRADE_VALUE', axis=1)
+        
 
 
     # First Trading Day ......
@@ -223,24 +241,6 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     #                                    prominence=4, days=False)
 
 
-    # Shift Y ......
-    # 1. 因為X與y之間需要做shift，原始的版本都是移動X，但是X的欄位很多，因此改成
-    #    移動y，提升計算效率
-    # 2. {Y}_ORIG的欄位是用來計算MA
-    for y in var_y:
-        market_data_raw.loc[:, y + '_ORIG'] = market_data_raw[y]
-
-    market_data_raw, new_cols = \
-        cbyz.df_add_shift(
-            df=market_data_raw, 
-            cols=['WORK_DATE'] + var_y, 
-            shift=-1, 
-            group_by=['SYMBOL'], 
-            sort_by=['SYMBOL', 'WORK_DATE'],
-            suffix='', 
-            remove_na=False
-            )
-        
     market_data_raw = market_data_raw \
         .dropna(subset=['WORK_DATE'], axis=0)
 
@@ -254,23 +254,21 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     market_data_raw = main_data_frame \
         .merge(market_data_raw, how='left', on=id_keys)
         
-    if time_unit == 'w':
-        market_data_raw = market_data_raw.drop('WORK_DATE', axis=1) 
-
 
     # Aggregate by week ......
-    print('Update - 不確定time_unit為w的情況該不該寫進funciton中')
-    if time_unit == 'w':
+    # >> 已移到sam_load_data最下面
+    # print('Update - 不確定time_unit為w的情況該不該寫進funciton中')
+    # if time_unit == 'w':
         
-        market_data_raw = market_data_raw.drop('WORK_DATE', axis=1)
-        cols = cbyz.df_get_cols_except(df=market_data_raw,
-                                       except_cols=id_keys)
+    #     market_data_raw = market_data_raw.drop('WORK_DATE', axis=1)
+    #     cols = cbyz.df_get_cols_except(df=market_data_raw,
+    #                                    except_cols=id_keys)
         
-        market_data_raw, _ = \
-            cbyz.df_summary(df=market_data_raw, cols=cols, group_by=id_keys, 
-                            add_mean=True, add_min=True, 
-                            add_max=True, add_median=False, add_std=True, 
-                            add_skew=True, add_count=False, quantile=[])
+    #     market_data_raw, _ = \
+    #         cbyz.df_summary(df=market_data_raw, cols=cols, group_by=id_keys, 
+    #                         add_mean=True, add_min=True, 
+    #                         add_max=True, add_median=False, add_std=True, 
+    #                         add_skew=True, add_count=False, quantile=[])
 
 
     # Test ......
@@ -312,10 +310,7 @@ def sam_load_data(industry=True, trade_value=True):
     loc_main = market_data_raw.copy()
     
     # Process Market Data ......
-    if trade_value:
-        loc_main = loc_main.drop('TOTAL_TRADE_VALUE', axis=1)
-    
-    
+
     # Normalize Ratio Columns Globally ......
     # 1. 如果y是OHLC Change Ratio的話，by WORK_DATE或SYMBOL的意義不大，反而讓運算
     #    速度變慢，唯一有影響的是一些從來沒有漲跌或跌停的Symbol
@@ -327,8 +322,6 @@ def sam_load_data(industry=True, trade_value=True):
     # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
     # - 這裡的method要用1，如果用2的話，mse會變成0.8
     # - 因為method是1，其他大部份都是0，所以這一段要獨立出來
-    # - var_y_orig也需要用同樣的方式scale，但由於var_y會inverse_scaler，
-    #   var_y_orig會刪除，所以兩個必須分開處理
     global y_scaler
     loc_main, norm_orig, y_scaler = cbml.df_scaler(
                                         df=loc_main,
@@ -337,16 +330,12 @@ def sam_load_data(industry=True, trade_value=True):
                                         method=1
                                         )
     
-    # 儲存scaler，這樣手動讀取model_data，並跑其他模型時才可以還原
-    pickle.dump(y_scaler, open(path_temp + '/y_scaler.sav', 'wb'))    
+    # {Y}_ORIG的欄位是用來計算MA
+    for y in var_y:
+        loc_main.loc[:, y + '_ORIG'] = loc_main[y]
 
-    loc_main, _, _ = cbml.df_scaler(
-                        df=loc_main,
-                        cols=var_y_orig,
-                        show_progress=False,
-                        method=1
-                        )  
-                
+    
+    
     
     # Process Data
     if data_form == 1:
@@ -368,8 +357,8 @@ def sam_load_data(industry=True, trade_value=True):
                                   )
             
         # 上面的drop_except會讓var_y_orig沒被刪除，導致df_chk_col_na時出錯
-        loc_main = loc_main.drop(var_y_orig, axis=1)
-            
+        loc_main = loc_main.drop(var_y_orig, axis=1)        
+        
         
     elif data_form == 2:
         
@@ -486,7 +475,11 @@ def sam_load_data(industry=True, trade_value=True):
 
     
 
-    # Merge Other Data ......        
+    # Merge Other Data ......       
+    
+    # - 因為industry_data中會用到TOTAL_TRADE_VALUE，所以TOTAL_TRADE_VALUE沒辦法
+    #   先獨立處理
+    
     if industry:        
         stock_industry = stock_info_raw[['SYMBOL', 'INDUSTRY_ONE_HOT']]
         
@@ -591,14 +584,51 @@ def sam_load_data(industry=True, trade_value=True):
         
 
 
+    if time_unit == 'w':
+        
+        loc_main = loc_main.drop('WORK_DATE', axis=1)
+        cols = cbyz.df_get_cols_except(df=loc_main, 
+                                       except_cols=id_keys + var_y)
+        
+        loc_main, _ = \
+            cbyz.df_summary(df=loc_main, cols=cols, group_by=id_keys, 
+                            add_mean=True, add_min=True, 
+                            add_max=True, add_median=False, add_std=True, 
+                            add_skew=True, add_count=False, quantile=[])
+
+
+    # Shift Y ......
+    # 1. 因為X與y之間需要做shift，原始的版本都是移動X，但是X的欄位很多，因此改成
+    #    移動y，提升計算效率
+    loc_main, new_cols = \
+        cbyz.df_add_shift(
+            df=loc_main, 
+            cols=time_key + var_y, 
+            shift=-predict_period, 
+            group_by=['SYMBOL'], 
+            sort_by=id_keys,
+            suffix='', 
+            remove_na=False
+            )
+
+
     # Check NA ......
     # 有些新股因為上市時間較晚，在MA_LAG中會有較多的NA，所以只處理MA的欄位
     na_cols = cbyz.df_chk_col_na(df=loc_main, except_cols=var_y)
-    assert na_cols['NA_COUNT'].min() == na_cols['NA_COUNT'].max(), \
-        'All the NA_COUNT should be the same.'
+    
+    
+    # df_summary可能造成每一欄的NA數不一樣
+    
+    if time_unit == 'd':
+        global debug_df
+        debug_df = na_cols.copy()
+    
+        assert na_cols['NA_COUNT'].min() == na_cols['NA_COUNT'].max(), \
+            'All the NA_COUNT should be the same.'
+    
+        na_cols = na_cols['COLUMN'].tolist()
+        loc_main = loc_main.dropna(subset=na_cols, axis=0)
 
-    na_cols = na_cols['COLUMN'].tolist()
-    loc_main = loc_main.dropna(subset=na_cols, axis=0)
 
         
     # Check for min max
@@ -610,7 +640,7 @@ def sam_load_data(industry=True, trade_value=True):
         
     # assert len(chk_min_max) == 0, 'chk_min_max failed'
     
-        
+    
     return loc_main, norm_orig
 
 
@@ -732,7 +762,7 @@ def set_frame():
     global main_data_frame, main_data_frame_calendar
 
     # New Global Variables
-    global symbol_df, calendar_lite, calendar_proc 
+    global symbol_df, calendar_lite, calendar_proc, calendar_key
 
 
     # Predict Symbols ......
@@ -893,6 +923,12 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global main_data_raw
     main_data_raw, norm_orig = \
         sam_load_data(industry=industry, trade_value=trade_value) 
+        
+
+    debug_df
+    
+    
+    debug_df[debug_df['COLUMN']=='CLOSE_CHANGE_RATIO']
 
     main_data = main_data_raw.copy()
     cbyz.df_chk_col_na(df=main_data_raw)
@@ -1596,12 +1632,10 @@ def master(param_holder, predict_begin, export_model=True,
     var_y_orig = [y + '_ORIG' for y in var_y]
     
     
-    # Dev，先把inducstry和trade_value都設為False
-    # - industry=industry, trade_value=trade_value
     global y_scaler
     model_data, model_x, scale_orig = \
-        get_model_data(industry=False, 
-                       trade_value=False)
+        get_model_data(industry=industry, 
+                       trade_value=trade_value)
     
     
     

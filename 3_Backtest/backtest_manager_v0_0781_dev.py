@@ -17,8 +17,8 @@ import random
 
 host = 3
 host = 2
-host = 0
 host = 4
+host = 0
 market = 'tw'
 
 
@@ -803,6 +803,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 5. Google Sheet Add Manual Tick
     # 6. Think how to optimize stop loss
     # 7. Backtest也可以用parameter做A/B        
+    # Add signal type: 接下來全部漲，或是先跌再漲
 
 
 
@@ -1208,12 +1209,12 @@ if __name__ == '__main__':
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
     master(bt_last_begin=20220207, predict_period=3, 
-            long=False, interval=4, bt_times=1, 
-            data_period=int(365 * 1), 
-            ma_values=[5,10,20], volume_thld=400,
-            compete_mode=0, cv=list(range(3, 4)),
-            market='tw', hold=hold,
-            load_result=False, dev=True)
+           time_unit='w',long=False, interval=4, bt_times=1, 
+           data_period=int(365 * 1), 
+           ma_values=[5,10,20], volume_thld=400,
+           compete_mode=0, cv=list(range(3, 4)),
+           market='tw', hold=hold,
+           load_result=False, dev=True)
     
     # master(bt_last_begin=20220118, predict_period=4, 
     #         long=False, interval=7, bt_times=1, 
@@ -1230,9 +1231,6 @@ if __name__ == '__main__':
     #        compete_mode=1, cv=list(range(3, 4)),
     #        market='tw', hold=hold,
     #        load_result=False, dev=False)
-
-
-
 
 
 
