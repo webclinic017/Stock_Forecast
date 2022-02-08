@@ -29,9 +29,9 @@ from sklearn.metrics import mean_squared_error
 import pickle
 
 
-host = 3
+# host = 3
 host = 2
-host = 0
+# host = 0
 
 
 # Path .....
@@ -55,7 +55,6 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/jupyter/Codebase_YZ/20220118',
                  r'/home/jupyter/Arsenal/20220118',
                  path + '/Function']
-
 
 
 for i in path_codebase:    
@@ -290,8 +289,6 @@ def sam_load_data(industry=True, trade_value=True):
     global stock_info_raw
     global debug
     
-    
-    global loc_main
         
     # Process Market Data ......
     loc_main = market_data_raw.drop('TOTAL_TRADE_VALUE', axis=1)
@@ -362,11 +359,11 @@ def sam_load_data(industry=True, trade_value=True):
     
     
     # Normalize By Stock ......
-    except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
+    except_cols = ['WORK_DATE', 'YEAR', 'MONTH', 'WEEKDAY', 'WEEK_NUM', 'SYMBOL'] \
                     + ratio_cols
     
-    
     # group_by=['SYMBOL'],
+    
     loc_main, _, _, _ = \
         cbml.ml_data_process(df=loc_main, 
                               ma=True, scale=True, lag=True,
@@ -380,22 +377,22 @@ def sam_load_data(industry=True, trade_value=True):
                               lag_period=predict_period
                               )
         
-    # except_cols = ['SYMBOL', 'WORK_DATE', 'YEAR', 
-    #                'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
-    #                 + ratio_cols
+#     except_cols = ['SYMBOL', 'WORK_DATE', 'YEAR', 
+#                    'MONTH', 'WEEKDAY', 'WEEK_NUM'] \
+#                     + ratio_cols
     
-    # loc_main, temp_cols, _ = \
-    #     cbml.ml_data_process(df=loc_main, 
-    #                          ma=True, scale=True, lag=True,
-    #                          date_col='WORK_DATE',
-    #                          group_by=[],
-    #                          cols=[], 
-    #                          except_cols=except_cols,
-    #                          drop_except=var_y,
-    #                          cols_mode='equal',
-    #                          ma_values=ma_values, 
-    #                          lag_period=predict_period
-    #                          )        
+#     loc_main, temp_cols, _, _ = \
+#         cbml.ml_data_process(df=loc_main, 
+#                              ma=True, scale=True, lag=True,
+#                              date_col='WORK_DATE',
+#                              group_by=['SYMBOL'],
+#                              cols=[], 
+#                              except_cols=except_cols,
+#                              drop_except=var_y,
+#                              cols_mode='equal',
+#                              ma_values=ma_values, 
+#                              lag_period=predict_period
+#                              )        
         
         
 
@@ -906,10 +903,8 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                     
             
         # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
-        hroi_cols = cbyz.df_get_cols_contains(
-            df=ewtinst1c, 
-            string=['_HROI', '_SELL', '_BUY']
-            )
+        hroi_cols = cbyz.df_get_cols_contains(df=ewtinst1c, 
+                                             string=['_HROI', '_SELL', '_BUY'])
         
         # Keep Needed Symbols Only
         ewtinst1c, cols_1, _, _ = \
@@ -950,18 +945,12 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # 月營收資料表 ......
     # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
     # 1. 主要邏輯就是顯示最新的營收資料
-    if market == 'tw':
-        
-        msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
-        再跑就正常了
-        '''
-        print(msg)
-        
-        ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
-        main_data = main_data \
-                    .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
+#     if market == 'tw':
+#         ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
+#         main_data = main_data \
+#                     .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
     
-        cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
+#         cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
     
     
     # 財務報表
@@ -1055,7 +1044,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     msg = ("get_model_data - 把normalize的group_by拿掉後，這個地方會出錯，但"
            "只有一筆資料有問題，暫時直接drop")
     print(msg)
-    # hist_df.to_csv(path_temp + '/debug_hist_df.csv', index=False)
     cbyz.df_chk_col_na(df=hist_df, mode='stop')
     
     
@@ -1271,8 +1259,6 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # Update
-    # Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
-    #       再跑就正常。end_date應該要改成data_begin, 這個問題應該是today比data_begin少一天    
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
     # - Test price as Y
@@ -1389,12 +1375,14 @@ def master(param_holder, predict_begin, export_model=True,
     global shift_begin, shift_end, data_begin, data_end
     global predict_date, calendar
     
+    # shift多往前推一個月 ......
+    # - max_values max可能為120或更大，因此往前推20天，而不是用倍數，如max(ma_values) * 1.2
     shift_begin, shift_end, \
             data_begin, data_end, predict_date, calendar = \
                 stk.get_period(predict_begin=predict_begin,
                                predict_period=predict_period,
                                data_period=data_period,
-                               shift=-(max(ma_values) * 2))
+                               shift=-int((max(ma_values) + 20)))
                 
     # ......
     global model_data
@@ -1428,6 +1416,8 @@ def master(param_holder, predict_begin, export_model=True,
                        trade_value=trade_value)
     
     
+    assert 1 > 2, '改用MLP，所以不繼續執行後面的code'
+    
     
     # Training Model ......
     import xgboost as xgb
@@ -1444,38 +1434,7 @@ def master(param_holder, predict_begin, export_model=True,
                          }]         
     else:
         
-        # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
-        
-        # # Change Ratio
-        # model_params = [
-        #                 {'model': LinearRegression(),
-        #                   'params': {
-        #                       'normalize': [True, False],
-        #                       }
-        #                   },
-        #                 {'model': xgb.XGBRegressor(),
-        #                  'params': {
-        #                     # 'n_estimators': [200],
-        #                     'eta': [0.1],
-        #                     # 'eta': [0.08, 0.1],
-        #                     'min_child_weight': [1],
-        #                      # 'min_child_weight': [0.5, 1],
-        #                     'max_depth':[8],
-        #                      # 'max_depth':[6, 8, 12],
-        #                     'subsample':[1]
-        #                   }
-        #                 },
-        #                 # {'model': SGDRegressor(),
-        #                 #   'params': {
-        #                 #       # 'max_iter': [1000],
-        #                 #       # 'tol': [1e-3],
-        #                 #       # 'penalty': ['l2', 'l1'],
-        #                 #       }                     
-        #                 #   }
-        #                ] 
-
-        
-        # Price
+        # Change Ratio
         model_params = [
                         {'model': LinearRegression(),
                           'params': {
@@ -1485,8 +1444,8 @@ def master(param_holder, predict_begin, export_model=True,
                         {'model': xgb.XGBRegressor(),
                          'params': {
                             # 'n_estimators': [200],
-                            'eta': [0.1],
-                            # 'eta': [0.5, 0.7],
+                            # 'eta': [0.1],
+                            'eta': [0.1, 0.3],
                             'min_child_weight': [0.8],
                              # 'min_child_weight': [0.5, 1],
                             'max_depth':[10],
@@ -1501,7 +1460,45 @@ def master(param_holder, predict_begin, export_model=True,
                         #       # 'penalty': ['l2', 'l1'],
                         #       }                     
                         #   }
-                       ]         
+                       ] 
+
+        
+        
+
+        # Price - XGB Params ------
+        # eta:  / 0.2
+        # min_child_weight: 0.8 / 
+        # max_depth:  / 8, 10, 12
+        # subsample: 1 / 0.8  
+        
+        
+        # # Price
+        # model_params = [
+        #                 {'model': LinearRegression(),
+        #                   'params': {
+        #                       'normalize': [True, False],
+        #                       }
+        #                   },
+        #                 {'model': xgb.XGBRegressor(),
+        #                  'params': {
+        #                     # 'n_estimators': [200],
+        #                     # 'eta': [0.2],
+        #                     'eta': [0.3, 0.5],
+        #                     'min_child_weight': [0.8],
+        #                      # 'min_child_weight': [0.5, 1],
+        #                     'max_depth':[5, 8],
+        #                      # 'max_depth':[6, 8, 12],
+        #                     'subsample':[1]
+        #                   }
+        #                 },
+        #                 # {'model': SGDRegressor(),
+        #                 #   'params': {
+        #                 #       # 'max_iter': [1000],
+        #                 #       # 'tol': [1e-3],
+        #                 #       # 'penalty': ['l2', 'l1'],
+        #                 #       }                     
+        #                 #   }
+        #                ]         
         
         
         
@@ -1546,12 +1543,12 @@ def master(param_holder, predict_begin, export_model=True,
             pred_params = pred_scores.append(return_params)
             pred_features = pred_scores.append(return_features)            
 
-
+            
         # Prvent memory insufficient for saved data in ut
         del tuner
         gc.collect()
-
-
+            
+            
     # Inverse Scale
     pred_result = pred_result[id_keys + var_y]
     y_inverse = pred_result[var_y]

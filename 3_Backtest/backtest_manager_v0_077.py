@@ -45,6 +45,7 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  path_sam]
 
 
+
 for i in path_codebase:    
     if i not in sys.path:
         sys.path = [i] + sys.path
@@ -58,8 +59,8 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_071 as sam
 # import stock_analysis_manager_v2_081 as sam
 
-# import stock_analysis_manager_v2_09_dev as sam
-import stock_analysis_manager_v2_10_dev as sam
+# import stock_analysis_manager_v2_09 as sam
+import stock_analysis_manager_v2_10 as sam
 
 
 
@@ -161,10 +162,11 @@ def set_frame():
     # - predict_period * 2 to ensure to get the complete data
     # - No matter your y is the price or the change ratio, it is essential to
     #   keep both information in the actions_main
-
+    # - 額外往前推14天，是為了避免農曆年後計算時出錯
+        
     bt_first_begin = \
         cbyz.date_cal(_bt_last_begin, 
-                      -_interval * _bt_times - _predict_period * 2, 
+                      -_interval * _bt_times - _predict_period * 2 - 14, 
                       'd')    
     
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
@@ -173,6 +175,29 @@ def set_frame():
                                  symbol=symbol, 
                                  price_change=True,
                                  restore=False)
+    
+#     assert bt_first_begin == 20220107, 'remove debug code'
+    
+#     hist_data_raw = stk.get_data(data_begin=20220107, 
+#                                  data_end=20220207, 
+#                                  market=market, 
+#                                  symbol=symbol, 
+#                                  price_change=True,
+#                                  restore=False)    
+
+    print(bt_first_begin)
+    print(type(bt_first_begin))
+    
+    print(_bt_last_end)
+    print(type(_bt_last_end))
+    print(hist_data_raw)
+    
+    global debug_bt_first_begin
+    debug_bt_first_begin = bt_first_begin
+    
+    global debug_df
+    debug_df = hist_data_raw.copy()    
+    
     
     if 'CLOSE' in var_y:
         hist_data_raw = hist_data_raw[['WORK_DATE', 'SYMBOL'] + ohlc]
@@ -341,7 +366,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
 
     if len(bt_result) > 800:
-        bt_result.to_csv(path_temp + '/bt_result_file.csv', 
+        bt_result.to_csv(path_temp + '/bt_result.csv', 
                          index=False)
         
         precision.to_csv(path_temp + '/precision.csv', 
@@ -905,7 +930,7 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
             'data_period':[data_period],
             'ma_values':[ma_values],
             'volume_thld':[volume_thld],
-            'industry':[True],
+            'industry':[False],
             'trade_value':[True],
             'market':['tw'],
             'compete_mode':[_compete_mode],
@@ -1015,7 +1040,8 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
     
     
     # Write Google Sheets ...... 
-    if len(actions) > 800:
+    # 當predict_date為1時，
+    if len(actions) > 350:
         
         # Action Workbook
         stk.write_sheet(data=actions, sheet='TW', long=long,
@@ -1024,9 +1050,12 @@ def master(bt_last_begin, predict_period=14, long=False, interval=360,
         # View And Log .....
         view_yesterday()
 
+        # Error when load_result = True
         global pred_features
-        stk.write_sheet(data=pred_features, sheet='Features')
-    
+        try:
+            stk.write_sheet(data=pred_features, sheet='Features')
+        except Exception as e:
+            print(e)
     
     gc.collect()
 
@@ -1106,7 +1135,6 @@ def verify_prediction_results():
     
 
 # %% Dev -----
-
 
 
 
