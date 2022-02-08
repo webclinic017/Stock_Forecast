@@ -18,24 +18,37 @@ import random
 host = 3
 host = 2
 host = 0
+host = 4
 market = 'tw'
+
 
 # Path .....
 if host == 0:
+    # Home
     path = '/Users/aron/Documents/GitHub/Stock_Forecast/3_Backtest'
     path_sam = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
 
 elif host == 2:
+    # PythonAnyWhere
     path = '/home/jupyter/Production/3_Backtest'
     path_sam = '/home/jupyter/Production/2_Stock_Analysis'    
     
 elif host == 3:
+    # GCP
     path = '/home/jupyter/Develop/3_Backtest'
-    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'        
+    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'      
+
+elif host == 4:    
+    # RT
+    path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\3_Backtest'
+    path_sam = r'D:\Data_Mining\GitHub共用\Stock_Forecast\2_Stock_Analysis'    
+
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
+                 r'D:\Data_Mining\GitHub共用\Arsenal',
+                 r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
                  r'/home/jupyter/Codebase_YZ/20220124',
                  r'/home/jupyter/Arsenal/20220124',
@@ -713,7 +726,7 @@ def view_yesterday():
 # %% Master ------
 
 
-def master(bt_last_begin, predict_period=14, time_unit='w', long=False, 
+def master(bt_last_begin, predict_period=14, time_unit='d', long=False, 
            interval=360, bt_times=2, data_period=5, ma_values=[5,10,20,60], 
            volume_thld=400, 
            cv=2, compete_mode=1, market='tw', hold=[], load_result=False,
@@ -783,15 +796,13 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
     # 5. print predict date in sam to fix missing date issues    
     # 6. 如果local沒有forecast_records時，cal_profit中的get_forecast_records會出錯：
     #    AttributeError: 'list' object has no attribute 'rename'
-    # 7. precision列出來的，好像都不是score最佳的log
+
     
     # Optimization
     # 4. Calculate IRR, remove outliers
     # 5. Google Sheet Add Manual Tick
     # 6. Think how to optimize stop loss
     # 7. Backtest也可以用parameter做A/B        
-    # 1. 再試著把y改回price看看
-    # 2. remove group by from normalization
 
 
 
@@ -829,14 +840,16 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
     # 28. 當bt_times為2，且load_file=false時，重新訓練一次模型就好
 
 
-  # # Not Collected Parameters ......
+    # # Not Collected Parameters ......
     # bt_times = 1
     # bt_index = 0
     # interval = 4
     # market = 'tw'
     # dev = True 
+    # time_unit = 'd'
     # time_unit = 'w'
     # hold = []
+    
     
     # # Collected Parameters ......
     # bt_last_begin = 20220207
@@ -853,8 +866,7 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
     # predict_begin = bt_last_begin
 
 
-
-    要dump y_scaler，這樣MLP才有辦法還原
+    print('要dump y_scaler，這樣MLP才有辦法還原')
 
     
     # Worklist
@@ -871,7 +883,7 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
     # Parameters
     
     # 0 for original, 1 for MA, 2 for shifted time series
-    data_form = 2
+    data_form = 1
 
     # Data Forme Issues
     # - 沒辦法像machinlearningmastery的範例，把全部的資料當成
@@ -912,8 +924,8 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
     else:
         symbol = []
         
+        
     global _compete_mode
-    
     _market = market    
     _compete_mode = compete_mode
     _load_result = load_result    
@@ -924,6 +936,10 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
     #    在btm中extract，再把single parameter的Param_Holder傳入sam，因為
     #    Param_Holder的參數會影響到model_data，沒辦法同一份model_data持續使用，因此，
     #    把完整的Param_Holder傳入sam再extract沒有任何效益
+    
+    # 因為sam的industry還沒修好，所以先設為Fales
+    # SAM還沒調整industry為True的情況
+    
     args = {'bt_last_begin':[bt_last_begin],
             'time_unit':[time_unit],
             'predict_period': [predict_period], 
@@ -940,8 +956,7 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
             'kbest':['all'],
             'dev':[dev],
             'symbol':[symbol],
-            'long':[long],
-            'debug':[False]
+            'long':[long]
             }
     
     global param_holder
@@ -987,9 +1002,6 @@ def master(bt_last_begin, predict_period=14, time_unit='w', long=False,
 
 
     # Predict ------
-    msg = ('Bug - y為price的時候，predict_values全部都會是NA')
-    print(msg)
-    
     global bt_result, precision, features
     backtest_predict(bt_last_begin=bt_last_begin, 
                      predict_period=_predict_period, 
@@ -1138,6 +1150,13 @@ def verify_prediction_results():
 
 # %% Dev -----
 
+
+def test_public_ip():
+    
+    calendar = stk.get_market_calendar(begin_date=20140101, 
+                                       end_date=20220207,
+                                       market='tw')
+        
 
 
 

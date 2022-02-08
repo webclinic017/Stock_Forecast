@@ -22,6 +22,8 @@ Created on Sat Nov 14 17:23:08 2020
 import pandas as pd
 import numpy as np
 import sys, time, os, gc
+import pickle
+
 from sklearn.model_selection import train_test_split    
 from sklearn.metrics import mean_squared_error
 
@@ -32,12 +34,15 @@ import pickle
 host = 3
 host = 2
 host = 0
+host = 4
 
 
 # Path .....
 if host == 0:
+    # Home
     path = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
     path_dcm = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection'
+    
     
 elif host == 2:
     path = '/home/jupyter/Production/2_Stock_Analysis'
@@ -47,6 +52,11 @@ elif host == 3:
     path = '/home/jupyter/Develop/2_Stock_Analysis'
     path_dcm = '/home/jupyter/Develop/1_Data_Collection'        
 
+elif host == 4:
+    # RT
+    path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\2_Stock_Analysis'
+    path_sam = r'D:\Data_Mining\GitHub共用\Stock_Forecast\1_Data_Collection'
+
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
@@ -55,7 +65,6 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/jupyter/Codebase_YZ/20220124',
                  r'/home/jupyter/Arsenal/20220124',
                  path + '/Function']
-
 
 for i in path_codebase:    
     if i not in sys.path:
@@ -96,13 +105,15 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
-    global id_keys, symbol, market, var_y
+    global id_keys, time_key
+    global symbol, market, var_y, var_y_orig
     global market_data_raw
     global predict_period, time_unit
     global stock_info_raw
     global log, data_form
+    global main_data_frame
+    global calendar_key
     
-
     stock_info_raw = \
         stk.tw_get_stock_info(daily_backup=True, 
                               path=path_temp)
@@ -111,7 +122,6 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         stock_info_raw[['SYMBOL', 'CAPITAL', 
                         'CAPITAL_LEVEL', 'ESTABLISH_DAYS', 
                         'LISTING_DAYS', 'INDUSTRY_ONE_HOT']]    
-
 
     # Market Data ...
     # Shift one day forward to get complete PRICE_CHANGE_RATIO
@@ -168,14 +178,16 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
 
     # Exclude Low Volume symbol ......
     market_data_raw = select_symbols()
-    
 
-    # main_data_frame
+
+    # main_data_frame ......
     # - market_data_raw will merge calendar in this function
+    # - market_data_raw會在這裡merge calendar，所以market_data_raw必須
+    #   先df_summary，因此這一段必須放在最後面
     set_frame()
 
-    
-    
+
+
     # First Trading Day ......
     # - This object will be used at the end of get_model_data
     global first_trading_day
@@ -197,6 +209,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
             cols=['K_LINE_COLOR', 'K_LINE_TYPE']
         )
     
+    
     # Add Support Resistance ......
     
     # if support_resist:
@@ -210,19 +223,17 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     #                                    prominence=4, days=False)
 
 
-    # 因為X與y之間需要做shift，原始的版本都是移動X，但是X的欄位很多，因此改成移動y，提升
-    # 計算效率
-    msg = '這一段目前只用於data_form=2，但應該連1都需要'
-    print(msg)
-    
-
+    # Shift Y ......
+    # 1. 因為X與y之間需要做shift，原始的版本都是移動X，但是X的欄位很多，因此改成
+    #    移動y，提升計算效率
+    # 2. {Y}_ORIG的欄位是用來計算MA
     for y in var_y:
         market_data_raw.loc[:, y + '_ORIG'] = market_data_raw[y]
 
     market_data_raw, new_cols = \
         cbyz.df_add_shift(
             df=market_data_raw, 
-            cols=['WORK_DATE']+ var_y, 
+            cols=['WORK_DATE'] + var_y, 
             shift=-1, 
             group_by=['SYMBOL'], 
             sort_by=['SYMBOL', 'WORK_DATE'],
@@ -234,6 +245,17 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
         .dropna(subset=['WORK_DATE'], axis=0)
 
     market_data_raw = ar.df_simplify_dtypes(df=market_data_raw)
+
+
+    # Merge Market Data And Calendar
+    market_data_raw = market_data_raw \
+        .merge(calendar_key, how='right', on=['WORK_DATE'])
+    
+    market_data_raw = main_data_frame \
+        .merge(market_data_raw, how='left', on=id_keys)
+        
+    if time_unit == 'w':
+        market_data_raw = market_data_raw.drop('WORK_DATE', axis=1) 
 
 
     # Aggregate by week ......
@@ -251,8 +273,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                             add_skew=True, add_count=False, quantile=[])
 
 
-
-    # Check ......
+    # Test ......
     
     # # 執行到這裡，因為加入了預測區間，所以會有NA，但所有NA的數量應該要一樣多
     # na_cols = cbyz.df_chk_col_na(df=market_data_raw)
@@ -266,9 +287,11 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     
     
     # Check Predict Period
-    chk = market_data_raw[market_data_raw['WORK_DATE'].isin(predict_date)]
-    chk = chk[['WORK_DATE']].drop_duplicates()
-    assert len(chk) == len(predict_date), 'predict_date error'
+    chk = market_data_raw.merge(predict_date, on=time_key)
+    chk = chk[time_key].drop_duplicates()
+    
+    predict_date_unique = predict_date[time_key].drop_duplicates()
+    assert len(chk) == len(predict_date_unique), 'predict_date error'
     
 
 # ...........
@@ -279,14 +302,13 @@ def sam_load_data(industry=True, trade_value=True):
     讀取資料及重新整理
     '''
     
-    global id_keys, symbol
+    global id_keys, var_y, var_y_orig, symbol
     global market_data_raw
     global predict_period, data_end
     global symbol_df
     global stock_info_raw
     global debug, data_form
     
-        
     loc_main = market_data_raw.copy()
     
     # Process Market Data ......
@@ -305,16 +327,28 @@ def sam_load_data(industry=True, trade_value=True):
     # 應要先獨立把y的欄位標準化，因為這一段不用MA，但後面都需要
     # - 這裡的method要用1，如果用2的話，mse會變成0.8
     # - 因為method是1，其他大部份都是0，所以這一段要獨立出來
+    # - var_y_orig也需要用同樣的方式scale，但由於var_y會inverse_scaler，
+    #   var_y_orig會刪除，所以兩個必須分開處理
     global y_scaler
-    loc_main, norm_orig, y_scaler = \
-        cbml.df_scaler(
-            df=loc_main,
-            cols=var_y,
-            show_progress=False,
-            method=1
-            )  
+    loc_main, norm_orig, y_scaler = cbml.df_scaler(
+                                        df=loc_main,
+                                        cols=var_y,
+                                        show_progress=False,
+                                        method=1
+                                        )
+    
+    # 儲存scaler，這樣手動讀取model_data，並跑其他模型時才可以還原
+    pickle.dump(y_scaler, open(path_temp + '/y_scaler.sav', 'wb'))    
+
+    loc_main, _, _ = cbml.df_scaler(
+                        df=loc_main,
+                        cols=var_y_orig,
+                        show_progress=False,
+                        method=1
+                        )  
                 
     
+    # Process Data
     if data_form == 1:
         except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
                        'WEEKDAY', 'WEEK_NUM']
@@ -324,6 +358,7 @@ def sam_load_data(industry=True, trade_value=True):
                                   ma=True, scale=True, lag=True,
                                   date_col='WORK_DATE',
                                   group_by=['SYMBOL'],
+                                  sort_by=['SYMBOL', 'WORK_DATE'],
                                   cols=[], 
                                   except_cols=except_cols,
                                   drop_except=var_y,
@@ -331,6 +366,11 @@ def sam_load_data(industry=True, trade_value=True):
                                   ma_values=ma_values, 
                                   lag_period=predict_period
                                   )
+            
+        # 上面的drop_except會讓var_y_orig沒被刪除，導致df_chk_col_na時出錯
+        loc_main = loc_main.drop(var_y_orig, axis=1)
+            
+        
     elif data_form == 2:
         
         except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
@@ -369,10 +409,7 @@ def sam_load_data(industry=True, trade_value=True):
         #         window=predict_period,
         #         drop=False)        
     
-    
         
-    na_cols = cbyz.df_chk_col_na(df=loc_main)
-
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
     if 'CLOSE' in var_y and data_form == 1:
@@ -403,6 +440,7 @@ def sam_load_data(industry=True, trade_value=True):
                                      date_col='WORK_DATE',
                                      cols_mode='equal',
                                      group_by=[],
+                                     sort_by=['WORK_DATE'],
                                      cols=['TOTAL_TRADE_VALUE'], 
                                      except_cols=[],
                                      drop_except=['WORK_DATE'],
@@ -434,7 +472,7 @@ def sam_load_data(industry=True, trade_value=True):
 
     # Stock Info ...
     # ['SYMBOL', 'CAPITAL', 'CAPITAL_LEVEL', 
-    # 'ESTABLISH_DAYS', 'LISTING_DAYS']
+    #  'ESTABLISH_DAYS', 'LISTING_DAYS']
     stock_info = stock_info_raw.drop(['INDUSTRY_ONE_HOT'], axis=1)
     stock_info, _, _ = \
         cbml.df_scaler(
@@ -535,6 +573,7 @@ def sam_load_data(industry=True, trade_value=True):
              cbml.ml_data_process(df=industry_data, 
                                   ma=True, scale=True, lag=True,
                                   group_by=['INDUSTRY_ONE_HOT'],
+                                  sort_by=['INDUSTRY_ONE_HOT', 'WORK_DATE'],
                                   cols=[], 
                                   except_cols=['WORK_DATE'],
                                   drop_except=[],
@@ -554,12 +593,12 @@ def sam_load_data(industry=True, trade_value=True):
 
     # Check NA ......
     # 有些新股因為上市時間較晚，在MA_LAG中會有較多的NA，所以只處理MA的欄位
-    na_cols = cbyz.df_chk_col_na(df=loc_main)
-    na_cols = na_cols[~na_cols['COLUMN'].isin(var_y)]
+    na_cols = cbyz.df_chk_col_na(df=loc_main, except_cols=var_y)
+    assert na_cols['NA_COUNT'].min() == na_cols['NA_COUNT'].max(), \
+        'All the NA_COUNT should be the same.'
+
     na_cols = na_cols['COLUMN'].tolist()
-    
-    # - Check, temporaily remove for data_from 2    
-    # loc_main = loc_main.dropna(subset=na_cols, axis=0)
+    loc_main = loc_main.dropna(subset=na_cols, axis=0)
 
         
     # Check for min max
@@ -685,27 +724,45 @@ def select_symbols():
 
 def set_frame():
     
+    
     # Merge As Main Data ......
-    global symbol_df, id_keys, time_unit
+    global symbol_df, id_keys, time_key, time_unit
     global market_data_raw, calendar, calendar_proc
     global predict_week, predict_date
     global main_data_frame, main_data_frame_calendar
 
+    # New Global Variables
+    global symbol_df, calendar_lite, calendar_proc 
+
 
     # Predict Symbols ......
-    # 1. Prevent some symbol excluded by select_symbols(), but still
-    #    exists.
-    global symbol_df    
+    # 1. Prevent symbols excluded by select_symbols(), but still exists.
     all_symbols = market_data_raw['SYMBOL'].unique().tolist()
     symbol_df = pd.DataFrame({'SYMBOL':all_symbols})
     
     
-    # Calendar
+    # Calendar ......
     calendar_proc = calendar[calendar['TRADE_DATE']>0] \
                     .reset_index(drop=True) \
                     .reset_index() \
                     .rename(columns={'index':'DATE_INDEX'})
+                   
+                    
+    calendar_lite = calendar[calendar['TRADE_DATE']>0]                     
+    calendar_lite = calendar_lite[time_key] \
+                    .drop_duplicates() \
+                    .reset_index(drop=True)
+                    
+               
+    # Remove untrading date
+    calendar_key = calendar[calendar['TRADE_DATE']>0].reset_index(drop=True)
+    if time_unit == 'd':
+        calendar_key = calendar_key[['WORK_DATE']]
         
+    elif time_unit == 'w':
+        calendar_key = calendar_key[['WORK_DATE', 'YEAR', 'WEEK_NUM']]
+    
+    
     # Duplicate year and week_num, then these two columns can be variables 
     # of the model
     if time_unit == 'w':
@@ -733,35 +790,34 @@ def set_frame():
     
     
     # main_data_frame ......
-    main_data_frame = cbyz.df_cross_join(symbol_df, calendar_proc)
+    main_data_frame = cbyz.df_cross_join(symbol_df, calendar_lite)
     
-    # Remove Untrading Day
-    main_data_frame = main_data_frame[main_data_frame['TRADE_DATE']>=1] \
-                        .drop('TRADE_DATE', axis=1)
     
     if time_unit == 'd':
-        main_data_frame = main_data_frame \
-            .merge(predict_date, on='WORK_DATE')
+        max_date = predict_date['WORK_DATE'].max()
+        main_data_frame = \
+            main_data_frame[main_data_frame['WORK_DATE']<=max_date]
             
     elif time_unit == 'w':
-        main_data_frame = main_data_frame \
-            .merge(predict_week, on=['YEAR', 'WEEK_NUM'])    
-    
-        
+        pass
+        print('chk - 這裡是否需要篩選日期')
 
-    market_data_raw = main_data_frame \
-        .merge(market_data_raw, how='left', on=['SYMBOL', 'WORK_DATE'])
+
+    # 20220208 - 移到sam_load_data    
+    # market_data_raw = main_data_frame \
+    #     .merge(market_data_raw, how='left', on=['SYMBOL', 'WORK_DATE'])
 
     
     # Organize
-    main_data_frame = main_data_frame[['WORK_DATE', 'SYMBOL']]
+    main_data_frame = main_data_frame[id_keys]
     main_data_frame = ar.df_simplify_dtypes(df=main_data_frame)
     
-    main_data_frame_calendar = main_data_frame[['WORK_DATE']] \
-                                .drop_duplicates() \
-                                .sort_values(by='WORK_DATE') \
-                                .reset_index(drop=True)
-        
+    print('Check - main_data_frame_calendar是否等同calendar_lite')
+    main_data_frame_calendar = calendar_lite.copy()
+    # main_data_frame_calendar = main_data_frame[time_key] \
+    #                             .drop_duplicates() \
+    #                             .sort_values(by='WORK_DATE') \
+    #                             .reset_index(drop=True)
 
 
 # %% Process ------
@@ -778,6 +834,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global params, error_msg
     global id_keys
     global main_data
+    global time_unit
     
     
     if load_file:
@@ -816,8 +873,8 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
 
     # Check ......
-    msg = 'get_model_data - predict_period is longer than ma values, ' \
-            + 'and it will cause na.'
+    msg = ('get_model_data - predict_period is longer than ma values, '
+            'and it will cause na.')
     assert predict_period <= min(ma_values), msg
 
 
@@ -833,13 +890,15 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     # Load Historical Data ......
-    assert industry == False, '還沒調整industry為True的情況'
     global main_data_raw
     main_data_raw, norm_orig = \
         sam_load_data(industry=industry, trade_value=trade_value) 
 
     main_data = main_data_raw.copy()
     cbyz.df_chk_col_na(df=main_data_raw)
+    
+    
+    print('calendar_proc還沒有join')
     
     
     # TODC Shareholdings Spread ......
@@ -955,88 +1014,91 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     
-    # TEJ 三大法人持股成本 ......
-    if market == 'tw':
+    # # TEJ 三大法人持股成本 ......
+    # if market == 'tw':
         
-        ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin,
-                                              end_date=None, 
-                                              symbol=symbol,
-                                              trade=True)
+    #     ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin,
+    #                                           end_date=None, 
+    #                                           symbol=symbol,
+    #                                           trade=True)
         
-        ewtinst1c = main_data_frame \
-                    .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
-                    .merge(symbol_df, on=['SYMBOL'])
+    #     ewtinst1c = main_data_frame \
+    #                 .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
+    #                 .merge(symbol_df, on=['SYMBOL'])
     
-        cols = cbyz.df_get_cols_except(df=ewtinst1c,
-                                        except_cols=['WORK_DATE', 'SYMBOL']) 
+    #     cols = cbyz.df_get_cols_except(df=ewtinst1c,
+    #                                     except_cols=['WORK_DATE', 'SYMBOL']) 
         
-        ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
-                                    sort_keys=['SYMBOL', 'WORK_DATE'], 
-                                    group_by=[], method='ffill')    
+    #     ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
+    #                                 sort_keys=['SYMBOL', 'WORK_DATE'], 
+    #                                 group_by=[], method='ffill')    
 
-        # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
-        hroi_cols = cbyz.df_get_cols_contains(
-            df=ewtinst1c, 
-            string=['_HROI', '_SELL', '_BUY']
-            )
+    #     # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
+    #     hroi_cols = cbyz.df_get_cols_contains(
+    #         df=ewtinst1c, 
+    #         string=['_HROI', '_SELL', '_BUY']
+    #         )
                 
-        if data_form == 1:
+    #     if data_form == 1:
             
-            #     ewtinst1c, cols_1, _, _ = \
-            #         cbml.ml_data_process(df=ewtinst1c, 
-            #                              ma=True, scale=True, lag=True, 
-            #                              group_by=[],
-            #                              cols=hroi_cols, 
-            #                              except_cols=[],
-            #                              drop_except=[],
-            #                              cols_mode='contains',
-            #                              date_col='WORK_DATE',
-            #                              ma_values=ma_values, 
-            #                              lag_period=predict_period
-            #                              ) 
+    #         #     ewtinst1c, cols_1, _, _ = \
+    #         #         cbml.ml_data_process(df=ewtinst1c, 
+    #         #                              ma=True, scale=True, lag=True, 
+    #         #                              group_by=[],
+    #         #                              cols=hroi_cols, 
+    #         #                              except_cols=[],
+    #         #                              drop_except=[],
+    #         #                              cols_mode='contains',
+    #         #                              date_col='WORK_DATE',
+    #         #                              ma_values=ma_values, 
+    #         #                              lag_period=predict_period
+    #         #                              ) 
             
-            #     ewtinst1c, cols_2, _, _ = \
-            #         cbml.ml_data_process(df=ewtinst1c, 
-            #                              ma=True, scale=True, lag=True, 
-            #                              group_by=['SYMBOL'],
-            #                              cols=['_HAP'], 
-            #                              except_cols=[],
-            #                              drop_except=[],
-            #                              cols_mode='contains',
-            #                              date_col='WORK_DATE',
-            #                              ma_values=ma_values, 
-            #                              lag_period=predict_period
-            #                              )
+    #         #     ewtinst1c, cols_2, _, _ = \
+    #         #         cbml.ml_data_process(df=ewtinst1c, 
+    #         #                              ma=True, scale=True, lag=True, 
+    #         #                              group_by=['SYMBOL'],
+    #         #                              cols=['_HAP'], 
+    #         #                              except_cols=[],
+    #         #                              drop_except=[],
+    #         #                              cols_mode='contains',
+    #         #                              date_col='WORK_DATE',
+    #         #                              ma_values=ma_values, 
+    #         #                              lag_period=predict_period
+    #         #                              )
             
-            ewtinst1c, cols_1, _, _ = \
-                cbml.ml_data_process(df=ewtinst1c, 
-                                      ma=True, scale=True, lag=True, 
-                                      group_by=[],
-                                      cols=hroi_cols, 
-                                      except_cols=[],
-                                      drop_except=[],
-                                      cols_mode='contains',
-                                      date_col='WORK_DATE',
-                                      ma_values=ma_values, 
-                                      lag_period=predict_period
-                                      ) 
+            
+    #         ewtinst1c, cols_1, _, _ = \
+    #             cbml.ml_data_process(df=ewtinst1c, 
+    #                                   ma=True, scale=True, lag=True, 
+    #                                   group_by=[],
+    #                                   sort_by=['SYMBOL', 'WORK_DATE'],
+    #                                   cols=hroi_cols, 
+    #                                   except_cols=[],
+    #                                   drop_except=[],
+    #                                   cols_mode='contains',
+    #                                   date_col='WORK_DATE',
+    #                                   ma_values=ma_values, 
+    #                                   lag_period=predict_period
+    #                                   ) 
         
-            ewtinst1c, cols_2, _, _ = \
-                cbml.ml_data_process(df=ewtinst1c, 
-                                      ma=True, scale=True, lag=True, 
-                                      group_by=['SYMBOL'],
-                                      cols=['_HAP'], 
-                                      except_cols=[],
-                                      drop_except=[],
-                                      cols_mode='contains',
-                                      date_col='WORK_DATE',
-                                      ma_values=ma_values, 
-                                      lag_period=predict_period
-                                      )            
+    #         ewtinst1c, cols_2, _, _ = \
+    #             cbml.ml_data_process(df=ewtinst1c, 
+    #                                   ma=True, scale=True, lag=True, 
+    #                                   group_by=['SYMBOL'],
+    #                                   sort_by=['SYMBOL', 'WORK_DATE'],
+    #                                   cols=['_HAP'], 
+    #                                   except_cols=[],
+    #                                   drop_except=[],
+    #                                   cols_mode='contains',
+    #                                   date_col='WORK_DATE',
+    #                                   ma_values=ma_values, 
+    #                                   lag_period=predict_period
+    #                                   )            
             
-        elif data_form == 2:
+    #     elif data_form == 2:
         
-            pass
+    #         pass
             
 
         
@@ -1151,35 +1213,40 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # Check NA ......
-    global hist_df, predict_df
-    hist_df = main_data[main_data['WORK_DATE']<predict_date[0]]
+    if time_unit == 'd':
+        hist_df = main_data[
+            main_data['WORK_DATE']<predict_date['WORK_DATE'].min()]
+        
+    elif time_unit == 'w':
+        assert 1 > 2, 'Not completed yet'
     
     
     # Debug ......
     msg = ("get_model_data - 把normalize的group_by拿掉後，這個地方會出錯，但"
            "只有一筆資料有問題，暫時直接drop")
     print(msg)
-    # hist_df.to_csv(path_temp + '/debug_hist_df.csv', index=False)
     
     
     # 當symbols=[]時，這裡會有18筆NA，都是var_y的欄位，應該是新股，因此直接排除
     chk_na = cbyz.df_chk_col_na(df=hist_df)
+
     assert len(chk_na) < 100, 'get_model_data - Check hist_df NA'
-    
     na_cols = chk_na['COLUMN'].tolist()
     main_data = main_data.dropna(subset=na_cols, axis=0)
     
     
     # Predict有NA是正常的，但NA_COUNT必須全部都一樣
     global chk_predict_na
-    predict_df = main_data[main_data['WORK_DATE']>=predict_date[0]]
+    predict_df = main_data[
+        main_data['WORK_DATE']>=predict_date['WORK_DATE'].min()]
+    
     chk_predict_na = cbyz.df_chk_col_na(df=predict_df, mode='alert')
     
     
     print('data_form=2時會出錯')
     min_value = chk_predict_na['NA_COUNT'].min()
     max_value = chk_predict_na['NA_COUNT'].max()    
-    assert min_value == max_value, 'All the NA_COUNT should be the same. '
+    assert min_value == max_value, 'All the NA_COUNT should be the same.'
     
 
     # Check min max ......
@@ -1391,14 +1458,10 @@ def master(param_holder, predict_begin, export_model=True,
     #   or industry or 大盤
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
-    # - Test price as Y
 
 
     # - 確認TEJ財務報表的資料會不會自動更新
     # - Fix Support and resistant
-    
-    
-    # - Add support_resist
     # - select_symbols用過去一周的總成交量檢查
     # - Short term model and long term model be overwirtted
     # 以close price normalize，評估高價股和低價股
@@ -1480,7 +1543,7 @@ def master(param_holder, predict_begin, export_model=True,
     cv = holder['cv'][0]
     
     # Program
-    debug = holder['debug'][0]
+    # debug = holder['debug'][0]
     
     
     # export_model = False
@@ -1507,18 +1570,22 @@ def master(param_holder, predict_begin, export_model=True,
                                predict_period=predict_period,
                                data_period=data_period,
                                unit=time_unit,
-                               shift=-(max(ma_values) * 2))
+                               shift=-int((max(ma_values) + 20)))
+                
                 
     # ......
     global model_data
-    global model_x, var_y, id_keys
+    global id_keys, time_key
+    global model_x, var_y, var_y_orig
     global norm_orig
         
     if time_unit == 'w':
         id_keys = ['SYMBOL', 'YEAR', 'WEEK_NUM']
+        time_key = ['YEAR', 'WEEK_NUM']
         
     elif time_unit == 'd':
         id_keys = ['SYMBOL', 'WORK_DATE']    
+        time_key = ['WORK_DATE']
     
     var_y = ['OPEN_CHANGE_RATIO', 'HIGH_CHANGE_RATIO',
               'LOW_CHANGE_RATIO', 'CLOSE_CHANGE_RATIO']
@@ -1526,19 +1593,9 @@ def master(param_holder, predict_begin, export_model=True,
     # var_y = ['OPEN', 'HIGH',
     #           'LOW', 'CLOSE']    
     
+    var_y_orig = [y + '_ORIG' for y in var_y]
     
     
-    if load_data:
-        try:
-            pass
-            # model_data = pd.read_csv(path_temp + '/model_data.csv')
-            # model_x.to_csv(path_temp + '/model_x.csv', index=False)
-            # norm_orig.to_csv(path_temp + '/norm_orig.csv', index=False)            
-        except Exception as e:
-            print(e)
-    
-
-    # 20210707 - industry可以提高提精準，trade_value會下降
     # Dev，先把inducstry和trade_value都設為False
     # - industry=industry, trade_value=trade_value
     global y_scaler
@@ -1550,10 +1607,8 @@ def master(param_holder, predict_begin, export_model=True,
     
     # Training Model ......
     import xgboost as xgb
-    # from sklearn.model_selection import GridSearchCV    
-    # from sklearn.ensemble import RandomForestRegressor
     from sklearn.linear_model import LinearRegression
-    from sklearn.linear_model import SGDRegressor    
+    # from sklearn.linear_model import SGDRegressor    
     
     if len(symbol) > 0 and len(symbol) < 10:
         model_params = [{'model': LinearRegression(),
@@ -1566,32 +1621,32 @@ def master(param_holder, predict_begin, export_model=True,
         # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
         
         # data_form1 - Change Ratio
-        # model_params = [
-        #                 {'model': LinearRegression(),
-        #                   'params': {
-        #                       'normalize': [True, False],
-        #                       }
-        #                   },
-        #                 {'model': xgb.XGBRegressor(),
-        #                   'params': {
-        #                     # 'n_estimators': [200],
-        #                     'eta': [0.1],
-        #                     # 'eta': [0.08, 0.1],
-        #                     'min_child_weight': [1],
-        #                       # 'min_child_weight': [0.5, 1],
-        #                     'max_depth':[8],
-        #                       # 'max_depth':[6, 8, 12],
-        #                     'subsample':[1]
-        #                   }
-        #                 },
-        #                 # {'model': SGDRegressor(),
-        #                 #   'params': {
-        #                 #       # 'max_iter': [1000],
-        #                 #       # 'tol': [1e-3],
-        #                 #       # 'penalty': ['l2', 'l1'],
-        #                 #       }                     
-        #                 #   }
-        #                 ] 
+        model_params = [
+                        {'model': LinearRegression(),
+                          'params': {
+                              'normalize': [True, False],
+                              }
+                          },
+                        {'model': xgb.XGBRegressor(),
+                          'params': {
+                            # 'n_estimators': [200],
+                            'eta': [0.1],
+                            # 'eta': [0.08, 0.1],
+                            'min_child_weight': [1],
+                              # 'min_child_weight': [0.5, 1],
+                            'max_depth':[8],
+                              # 'max_depth':[6, 8, 12],
+                            'subsample':[1]
+                          }
+                        },
+                        # {'model': SGDRegressor(),
+                        #   'params': {
+                        #       # 'max_iter': [1000],
+                        #       # 'tol': [1e-3],
+                        #       # 'penalty': ['l2', 'l1'],
+                        #       }                     
+                        #   }
+                        ] 
 
         
         # # Price
@@ -1624,36 +1679,36 @@ def master(param_holder, predict_begin, export_model=True,
         
 
         # data_form2 - Price
-        model_params = [
-                        {'model': LinearRegression(),
-                          'params': {
-                              'normalize': [True, False],
-                              }
-                          },
-                        {'model': xgb.XGBRegressor(),
-                          'params': {
-                            # 'n_estimators': [200],
-                            'eta': [0.2, 0.4],
-                            # 'eta': [0.08, 0.1],
-                            # 'min_child_weight': [1],
-                          'min_child_weight': [0.5, 1],
-                            'max_depth':[6, 8],
-                              # 'max_depth':[6, 8, 12],
-                            'subsample':[1]
-                          }
-                        },
-                        # {'model': SGDRegressor(),
-                        #   'params': {
-                        #       # 'max_iter': [1000],
-                        #       # 'tol': [1e-3],
-                        #       # 'penalty': ['l2', 'l1'],
-                        #       }                     
-                        #   }
-                        ]         
+        # model_params = [
+        #                 {'model': LinearRegression(),
+        #                   'params': {
+        #                       'normalize': [True, False],
+        #                       }
+        #                   },
+        #                 {'model': xgb.XGBRegressor(),
+        #                   'params': {
+        #                     # 'n_estimators': [200],
+        #                     'eta': [0.2, 0.4],
+        #                     # 'eta': [0.08, 0.1],
+        #                     # 'min_child_weight': [1],
+        #                   'min_child_weight': [0.5, 1],
+        #                     'max_depth':[6, 8],
+        #                       # 'max_depth':[6, 8, 12],
+        #                     'subsample':[1]
+        #                   }
+        #                 },
+        #                 # {'model': SGDRegressor(),
+        #                 #   'params': {
+        #                 #       # 'max_iter': [1000],
+        #                 #       # 'tol': [1e-3],
+        #                 #       # 'penalty': ['l2', 'l1'],
+        #                 #       }                     
+        #                 #   }
+        #                 ]         
         
         
-    # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同產業
-    #    的預測值完全相同
+    # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同
+    #    產業的預測值完全相同
     global pred_result, pred_scores, pred_params, pred_features
     
     long_suffix = 'long' if long else 'short'
@@ -1713,8 +1768,9 @@ def master(param_holder, predict_begin, export_model=True,
     if predict_begin == bt_last_begin:
         stk.write_sheet(data=pred_features, sheet='Features')
 
-    # Bug - 20220116 因為這裡的欄位會出現NORM_MEAN_x, NORM_STD_x, METHOD_x等df_scaler的欄位，
-    # 所以暫時先用這個方式調整
+    msg = ("Bug - 20220116 因為這裡的欄位會出現NORM_MEAN_x, NORM_STD_x, "
+           "METHOD_x等df_scaler的欄位，所以暫時先用這個方式調整")
+    print(msg)
     pred_result = pred_result[id_keys + var_y]          
     
     return pred_result_inverse, pred_scores, pred_params, pred_features
@@ -2373,8 +2429,7 @@ if __name__ == '__main__':
             'fast':[True],  # 之後用train_mode代替
             'kbest':['all'],
             'dev':[True],
-            'symbol':[symbol],
-            'debug':[False]
+            'symbol':[symbol]
             }
     
     param_holder = ar.Param_Holder(**args)

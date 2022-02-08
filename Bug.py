@@ -24,8 +24,8 @@ else:
 
 
 # Codebase ......
-path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ']
+path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
+                 r'/Users/aron/Documents/GitHub/Codebase_YZ']
 
 
 for i in path_codebase:    
@@ -53,10 +53,12 @@ pd.set_option('display.max_columns', 30)
  
 
 
-data = stk.get_data(data_begin=20220107, data_end=20220211, market='tw', restore=True,
+data = stk.get_data(data_begin=20220107, data_end=20220211, market='tw', 
+                    restore=True,
              unit='d', symbol=[], adj=True, price_change=False,
              price_limit=True, trade_value=False)
 
+data
 
 
 
