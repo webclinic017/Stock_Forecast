@@ -95,7 +95,7 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 # %% Inner Function ------
 
 
-def set_calendar():
+def set_calendar_old():
     
     # global symbol
     global calendar, calendar_lite
@@ -152,18 +152,64 @@ def set_calendar():
 
 
 
+def set_calendar():
+    
+    global sam_calendar, sam_predict_date, sam_predict_week
+    
+    # New Vars
+    global calendar, calendar_lite, _bt_last_end
+    
+    # Set Calendar Last ......
+    if _time_unit == 'd':
+        sam_calendar = sam_calendar[time_key]
+        sam_predict_date = sam_predict_date[time_key]
+        
+    elif _time_unit == 'w':
+        sam_calendar = sam_calendar[['WORK_DATE'] + time_key]
+        
+    calendar = sam_calendar.copy()
+    calendar = calendar[time_key] \
+                    .drop_duplicates() \
+                    .reset_index(drop=True)
+
+    # df_add_shift will cause NA, it's essential to drop to convert to int
+    calendar, _ = \
+        cbyz.df_add_shift(df=calendar, cols=time_key, shift=1, 
+                          group_by=[], sort_by=time_key, suffix='_LAST', 
+                          remove_na=True)
+
+    calendar = cbyz.df_conv_col_type(df=calendar, 
+                                     cols=calendar.columns,
+                                     to='int')
+    
+    if _time_unit == 'd':
+        calendar = calendar.merge(sam_predict_date, on=time_key)
+        calendar_lite = calendar[['WORK_DATE', 'WORK_DATE_LAST']]
+        
+    elif _time_unit == 'w':
+        calendar = calendar.merge(sam_predict_week, on=time_key)
+        calendar_lite = calendar[['YEAR', 'WEEK_NUM', 
+                                  'YEAR_LAST', 'WEEK_NUM_LAST']]
+
+    _bt_last_end = sam_calendar.loc[len(sam_calendar) - 1, 'WORK_DATE']
+
+
 
 def set_frame():
 
+    global id_keys, time_key_last
     global symbol
     global calendar, calendar_lite, frame
-    global _bt_last_begin, _bt_last_end, _predict_period
+    global _bt_last_begin, _bt_last_end, _predict_period, _time_unit
     global predict_date
-    global actions_main
+    global actions_main, bt_result
     
     global actions_main, hist_main
-    global ohlc, ohlc_ratio, ohlc_last
-    global var_y, var_y_last, var_y_hist
+    global ohlc, var_y
+    
+    # New Vars
+    global ohlc_ratio, ohlc_last
+    global var_y_last, var_y_hist
     
     
     # LAST用來參考，HIST用來算Precision
@@ -184,7 +230,7 @@ def set_frame():
     bt_first_begin = \
         cbyz.date_cal(_bt_last_begin, 
                       -_interval * _bt_times - _predict_period * 2, 
-                      'd')    
+                      _time_unit)    
     
     hist_data_raw = stk.get_data(data_begin=bt_first_begin, 
                                  data_end=_bt_last_end, 
@@ -193,74 +239,59 @@ def set_frame():
                                  price_change=True,
                                  restore=False)
     
-    if time_unit == 'w':
-        
+    if _time_unit == 'w':
         # The aggregate method should be the same with SAM
-        
-        
-        hist_data_raw
-        merge calendar
-        agggte
-        
-        y_data = y_data \
-                .groupby(id_keys) \
-                .mean() \
-                .reset_index()        
-    
-    
-    
-    
+        hist_data_raw = hist_data_raw \
+            .merge(sam_calendar, how='left', on='WORK_DATE') \
+            .drop('WORK_DATE', axis=1)
+            
+        hist_data_raw = hist_data_raw \
+                        .groupby(id_keys) \
+                        .mean() \
+                        .reset_index()
     
     if 'CLOSE' in var_y:
         hist_data_raw = hist_data_raw[['WORK_DATE', 'SYMBOL'] + ohlc]
     else:
         rename_dict = cbyz.li_to_dict(ohlc, ohlc_last)
-        
-        hist_data_raw = hist_data_raw[['WORK_DATE', 'SYMBOL'] \
-                                      + ohlc + ohlc_ratio] \
+        hist_data_raw = hist_data_raw[id_keys + ohlc + ohlc_ratio] \
                         .rename(columns=rename_dict)
             
     
-    # Check Symbols
+    # Unique Symbols
+    # - 應該用bt_result，不能用hist_data_raw，否則會出現低交易量，而被SAM排除
+    #   的個股
     if len(symbol) > 0:
         symbol_df = pd.DataFrame({'SYMBOL':symbol})
     else:
-        temp_symbol = hist_data_raw['SYMBOL'].unique().tolist()
+        temp_symbol = bt_result['SYMBOL'].unique().tolist()
         symbol_df = pd.DataFrame({'SYMBOL':temp_symbol})        
     
     
     # Set Frame ......
     frame = cbyz.df_cross_join(symbol_df, calendar_lite)
     frame = frame \
-            .sort_values(by=['SYMBOL', 'WORK_DATE']) \
+            .sort_values(by=id_keys) \
             .reset_index(drop=True)
 
     # 
-    rename_dict = cbyz.li_to_dict(var_y, var_y_last)        
-    
-    actions_main = hist_data_raw \
-            .rename(columns=rename_dict) \
-            .rename(columns={'WORK_DATE':'LAST_DATE'})
+    rename_dict = cbyz.li_to_dict(var_y + time_key, 
+                                  var_y_last + time_key_last) 
+    actions_main = hist_data_raw.rename(columns=rename_dict)
             
     actions_main = frame \
-        .merge(actions_main, how='left', on=['LAST_DATE', 'SYMBOL']) \
-        .merge(bt_result, how='left', on=['WORK_DATE', 'SYMBOL'])
+        .merge(actions_main, how='left', on=['SYMBOL'] + time_key_last) \
+        .merge(bt_result, how='left', on=id_keys)
     
-    actions_main = actions_main[(actions_main['WORK_DATE']>=_bt_last_begin) \
-                                & (actions_main['WORK_DATE']<=_bt_last_end)]
         
-        
-    # Hist Main    
+    # Hist Main
+    # - Real market data, used to inspect when backtesting
     rename_dict = cbyz.li_to_dict(var_y, var_y_hist)        
-    hist_main = hist_data_raw \
-        .rename(columns=rename_dict) 
+    hist_main = hist_data_raw.rename(columns=rename_dict) 
 
     hist_main = frame \
-        .merge(hist_main, how='left', on=['WORK_DATE', 'SYMBOL']) \
-        .drop('LAST_DATE', axis=1)
-
-    hist_main = hist_main[(hist_main['WORK_DATE']>=_bt_last_begin) \
-                                & (hist_main['WORK_DATE']<=_bt_last_end)]
+        .merge(hist_main, how='left', on=id_keys) \
+        .drop(time_key_last, axis=1)
         
 
 # ..........
@@ -269,12 +300,13 @@ def set_frame():
 def backtest_predict(bt_last_begin, predict_period, interval, 
                      data_period, dev=False):
     
-    global calendar, calendar_lite
     global symbol, _market, bt_info, _bt_times, _ma_values, _load_result
+    global _time_unit
 
     # New Global Vars
     global bt_results_raw, bt_result
     global precision, features, var_y, _volume_thld
+    global sam_calendar, sam_predict_date, sam_predict_week
     global pred_scores, pred_features, pred_params
     
     
@@ -333,6 +365,10 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     bt_results_raw = pd.DataFrame()
     precision = pd.DataFrame()
     
+    sam_calendar = None
+    sam_predict_date = None
+    sam_predict_week = None
+    
     # Predict ......
     for i in range(0, len(bt_seq)):
         
@@ -357,18 +393,16 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                 
             pred_params = sam_params.copy()                
             
+            # Get Calendar
+            sam_calendar = sam.calendar.copy()
+            sam_predict_date = sam.predict_date.copy()
+            sam_predict_week = sam.predict_week.copy()
+            
         bt_results_raw = bt_results_raw.append(sam_result)
         precision = precision.append(sam_scores)
 
 
     # Organize ......
-    
-    # ValueError: You are trying to merge on object and int64 columns. 
-    # If you wish to proceed you should use pd.concat
-    # bt_result = cbyz.df_conv_col_type(df=bt_results_raw, 
-    #                                    cols='WORK_DATE', 
-    #                                    to='int')    
-    
     bt_result = ar.df_simplify_dtypes(df=bt_results_raw)
     bt_result = bt_result.reset_index(drop=True)
     
@@ -388,7 +422,6 @@ def backtest_predict(bt_last_begin, predict_period, interval,
 # ............
 
 
-
 def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
                export_file=True, load_file=False, path=None, file_name=None):
     '''
@@ -405,18 +438,23 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     global calendar
     global ohlc, ohlc_ratio, ohlc_last
     global var_y, var_y_last, var_y_hist
+    global time_key, time_key_last
+    global _hold
 
         
     # Merge hist data ......
     global frame, actions_main
+    global precision
     
+    
+    # .......
     if 'CLOSE_CHANGE_RATIO' in var_y:
-        main_data = actions_main[['BACKTEST_ID', 'SYMBOL', 
-                                  'WORK_DATE', 'LAST_DATE'] \
+        main_data = actions_main[['BACKTEST_ID', 'SYMBOL'] \
+                                 + time_key + time_key_last \
                                  + var_y + var_y_last + ohlc_last]
     elif 'CLOSE' in var_y:
-        main_data = actions_main[['BACKTEST_ID', 'SYMBOL', 
-                                  'WORK_DATE', 'LAST_DATE'] \
+        main_data = actions_main[['BACKTEST_ID', 'SYMBOL'] \
+                                 + time_key + time_key_last \
                                  + var_y + var_y_last]
 
             
@@ -442,15 +480,14 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
         
 
     # Generate Actions ......
-    global precision
     bt_main, actions = \
         stk.gen_predict_action(df=main_data,
                                precision=precision,
-                               date='WORK_DATE', 
-                               last_date='LAST_DATE', 
+                               date=time_key, 
+                               last_date=time_key_last, 
                                y=var_y, 
                                y_last=var_y_last,
-                               y_thld=y_thld, 
+                               y_thld=y_thld,
                                time_thld=time_thld,
                                prec_thld=prec_thld)
         
@@ -490,10 +527,9 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     
     # Hold Symbols
-    global _hold
     actions['HOLD'] = np.where(actions['SYMBOL'].isin(_hold), 1, 0)
 
-
+    # Initialize Signal
     actions['BUY_SIGNAL'] = np.nan 
     
     
@@ -520,7 +556,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     actions['DAY_TRADING_SIGNAL'] = actions['HIGH'] - actions['LOW']
         
     
-    
     if 'CLOSE_CHANGE' not in action_cols:
         actions.loc[:, 'CLOSE_CHANGE'] = \
             actions['CLOSE'] - actions['CLOSE_LAST']
@@ -535,13 +570,12 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
         
     
     cols_1 = ['SYMBOL', 'STOCK_NAME', 'INDUSTRY',
-              'BUY_SIGNAL', 'DAY_TRADING_SIGNAL', 'HOLD', 
-              'WORK_DATE', 'LAST_DATE']
+              'BUY_SIGNAL', 'DAY_TRADING_SIGNAL', 'HOLD']
 
     cols_2 = ['PRECISION_'+ s for s in var_y]    
     
-    new_cols = cols_1 + profit_cols + ohlc + ohlc_last \
-                + cols_2
+    new_cols = cols_1 + time_key + time_key_last + profit_cols \
+                + ohlc + ohlc_last + cols_2
 
 
     # Merge Data ......
@@ -559,7 +593,6 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
         actions['RECORD_PRECISION_MEDIAN'] = np.nan
         actions['DIFF_MEDIAN'] = np.nan
         actions['DIFF_STD'] = np.nan
-        
     
     actions = actions[new_cols]
 
@@ -567,21 +600,21 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     # Buy Signal ......
     # 是不是可以移到gen_predict_action
     
-    # Decrease On First Day ...
-    cond1 = actions[(actions['WORK_DATE']==_bt_last_begin) \
-                   & (actions['CLOSE_CHANGE_RATIO']<0)]
-    cond1 = cond1['SYMBOL'].unique().tolist()
+    # # Decrease On First Day ...
+    # cond1 = actions[(actions['WORK_DATE']==_bt_last_begin) \
+    #                & (actions['CLOSE_CHANGE_RATIO']<0)]
+    # cond1 = cond1['SYMBOL'].unique().tolist()
     
-    # Estimated Profit ...
-    cond2 = actions[(actions['WORK_DATE']>_bt_last_begin) \
-                   & (actions['CLOSE_CHANGE_RATIO']>=y_thld)]
-    cond2 = cond2['SYMBOL'].unique().tolist()    
+    # # Estimated Profit ...
+    # cond2 = actions[(actions['WORK_DATE']>_bt_last_begin) \
+    #                & (actions['CLOSE_CHANGE_RATIO']>=y_thld)]
+    # cond2 = cond2['SYMBOL'].unique().tolist()    
     
-    # Max Error ...
-    cond3 = actions[actions['DIFF_MEDIAN']<prec_thld]
-    cond3 = cond3['SYMBOL'].unique().tolist()       
+    # # Max Error ...
+    # cond3 = actions[actions['DIFF_MEDIAN']<prec_thld]
+    # cond3 = cond3['SYMBOL'].unique().tolist()       
     
-    buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
+    # buy_signal_symbols = cbyz.li_intersect(cond1, cond2, cond3)
     
     
     print('Close裡面有NA，可能是已經下檔的Symbol？')
@@ -590,9 +623,7 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     global cal_profit_debug
     cal_profit_debug = actions[actions['CLOSE'].isna()]
     
-    actions = cbyz.df_conv_na(df=actions,
-                              cols='CLOSE' ,
-                              value=-1000)    
+    actions = cbyz.df_conv_na(df=actions, cols='CLOSE', value=-1000)    
     
     # Add Level
     actions['PERCENTAGE'] = actions['CLOSE_CHANGE_RATIO'] * 100
@@ -604,9 +635,13 @@ def cal_profit(y_thld=2, time_thld=10, prec_thld=0.15, execute_begin=None,
     
     actions['PERCENTAGE'] = actions['PERCENTAGE'].astype('int')
       
-    actions['BUY_SIGNAL'] = \
-        np.where(actions['SYMBOL'].isin(buy_signal_symbols), 
-                 99, actions['PERCENTAGE'])
+    # actions['BUY_SIGNAL'] = \
+    #     np.where(actions['SYMBOL'].isin(buy_signal_symbols), 
+    #              99, actions['PERCENTAGE'])
+
+    # 20220209 - 暫時移除BUY_SIGNAL for weekly forecast，先直接採用PERCENTAGE
+    actions['BUY_SIGNAL'] = actions['PERCENTAGE']
+
 
 
 # .................
@@ -634,9 +669,10 @@ def eval_metrics(export_file=False, threshold=800):
     global bt_main, bt_info, rmse
     global var_y, var_y_last, var_y_hist
     global serial, compete_mode
+    global id_keys
     
     
-    loc_main = bt_result.merge(hist_main, on=['SYMBOL', 'WORK_DATE'])
+    loc_main = bt_result.merge(hist_main, on=id_keys)
     loc_main = loc_main.dropna(axis=0)
 
     # All hist columns will be NA if not a backtest
@@ -660,33 +696,33 @@ def eval_metrics(export_file=False, threshold=800):
         loc_main['PRECISION'] = loc_main['PRECISION'].abs()     
 
 
-        new_result = loc_main[['SYMBOL', 'WORK_DATE', 'PRECISION']]
+        new_result = loc_main[id_keys + ['PRECISION']]
         new_result = new_result.assign(Y=y)
         result = result.append(new_result)
                             
     
     result = result.dropna(axis=0)
     result.loc[:, 'MARKET'] = _market
-    result.loc[:, 'PRECISION_METRIC'] = 'MAPE'
+    result.loc[:, 'PRECISION_METRIC'] = 'MSE'
     result.loc[:, 'SERIAL'] = serial
     
     # 如果讀取暫存檔的話，會抓不到version
     try:
         result.loc[:, 'VERSION'] = sam.version
     except:
-        pass
+        result.loc[:, 'VERSION'] = 0
     
     
     # Not Finished Yet
-    result = result.assign(SCORE_METRIC='R2')
-    result = result.assign(MODEL_SCORE=0)
+    result['SCORE_METRIC'] = 'R2'
+    result['MODEL_SCORE'] = 0
     result = result.assign(PARAMS='')
     
     
     # WORK_DATE means predict date.
-    result = result[['MARKET', 'VERSION', 'SYMBOL', 'SERIAL', 'Y', 
-                      'WORK_DATE',
-                      'SCORE_METRIC', 'MODEL_SCORE', 
+    result = result[['MARKET', 'VERSION', 'SYMBOL', 'SERIAL', 'Y'] \
+                    + time_key \
+                    + ['SCORE_METRIC', 'MODEL_SCORE', 
                       'PRECISION_METRIC', 'PRECISION', 'PARAMS']]
     
 
@@ -815,7 +851,8 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Before modifing for BTM calendar
     
     # v0.079
-    # - Fix calendar
+    # - Remove set_calendar, then get calendar from SAM whose BACKTEST_ID is 0
+    # 
     
 
     # Bug
@@ -895,7 +932,9 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # predict_begin = bt_last_begin
     
     
-    global id_keys, time_key
+    # Keys ------
+    global id_keys, time_key, time_key_last
+    
     if time_unit == 'w':
         id_keys = ['SYMBOL', 'YEAR', 'WEEK_NUM']
         time_key = ['YEAR', 'WEEK_NUM']
@@ -903,6 +942,8 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     elif time_unit == 'd':
         id_keys = ['SYMBOL', 'WORK_DATE']    
         time_key = ['WORK_DATE']    
+
+    time_key_last = [y + '_LAST' for y in time_key]
 
     
     # Worklist
@@ -961,10 +1002,11 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
         symbol = []
         
         
-    global _compete_mode
+    global _compete_mode, _time_unit
     _market = market    
     _compete_mode = compete_mode
     _load_result = load_result    
+    _time_unit = time_unit
 
 
     # Arguments
@@ -1032,8 +1074,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     _predict_period = predict_period
     _bt_last_begin = bt_last_begin
     
-    set_calendar()
-
 
     # Predict ------
     global bt_result, precision, features
@@ -1042,6 +1082,10 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
                      interval=interval,
                      data_period=data_period,
                      dev=dev)
+    
+    # Set Calendar ------
+    set_calendar()
+
 
     # Set Date ......
     set_frame()
@@ -1065,10 +1109,8 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     global bt_main, actions
     
     # Optimize, 這裡的precision_thld實際上是mape, 改成precision
-    # 算回測precision的時候，可以低估，但不可以高估
     global mape, mape_group, mape_extreme
     global stock_metrics_raw, stock_metrics    
-    
     
     today = cbyz.date_get_today()
     execute_begin = cbyz.date_cal(today, -14, 'd')
@@ -1076,7 +1118,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     
     
     # Evaluate Precision ......
-    
     print('Bug - get_forecast_records中的Action Score根本沒用到，但可以用signal替代')
     cal_profit(y_thld=0.02, time_thld=_predict_period, prec_thld=0.05,
                execute_begin=execute_begin, 
