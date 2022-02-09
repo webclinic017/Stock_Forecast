@@ -24,17 +24,15 @@ import numpy as np
 import sys, time, os, gc
 import pickle
 
-from sklearn.model_selection import train_test_split    
-from sklearn.metrics import mean_squared_error
-
-
+# from sklearn.model_selection import train_test_split    
+# from sklearn.metrics import mean_squared_error
 import pickle
 
 
 host = 3
 host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -324,6 +322,9 @@ def sam_load_data(industry=True, trade_value=True):
                                         show_progress=False,
                                         method=1
                                         )
+    
+    pickle.dump(y_scaler, open(path_temp + '/y_scaler.sav', 'wb'))
+    
     
     # {Y}_ORIG的欄位是用來計算MA
     for y in var_y:
@@ -812,7 +813,8 @@ def set_frame():
     global main_data_frame, main_data_frame_calendar
 
     # New Global Variables
-    global symbol_df, calendar_lite, calendar_proc, calendar_key
+    global symbol_df
+    global calendar_lite, calendar_proc, calendar_key
 
 
     # Predict Symbols ......
@@ -908,7 +910,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     global shift_begin, shift_end, data_begin, data_end, ma_values
-    global predict_date, predict_week, predict_period, calendar, calendar_lite
+    global predict_date, predict_week, predict_period
+    global calendar, calendar_lite, calendar_proc
+    global calendar_key, calendar_full_key
     global main_data_frame, main_data_frame_calendar, market_data
     global symbol
     global var_y
@@ -1218,12 +1222,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # # financial_statement = sam_tej_get_ewifinq()
     
     
-    
-    # # 指數日成本 ......
-    # # - Increase prediction time a lot, but not increase mape obviously.
-    # # ewiprcd = stk.tej_get_ewiprcd()
-    # # main_data = main_data.merge(ewiprcd, how='left', on=['WORK_DATE'])  
-
 
     # # Pytrends Data ......
     # # - Increase prediction time a lot, and made mape decrease.
@@ -1249,27 +1247,40 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # main_data = main_data.merge(snp, how='left', on=['WORK_DATE'])
     
     
-    # # COVID-19 ......
-    # if market == 'tw':
-    #     covid19, _ = cbyz.get_covid19_data()
-    #     covid19 = main_data_frame_calendar \
-    #                 .merge(covid19, how='left', on=['WORK_DATE'])
-    
-    #     covid19, covid19_cols, _, _ = \
-    #                 cbml.ml_data_process(df=covid19, 
-    #                                      ma=True, scale=True, lag=True, 
-    #                                      group_by=[],
-    #                                      cols=[], 
-    #                                      except_cols=[],
-    #                                      drop_except=[],
-    #                                      cols_mode='equal',
-    #                                      date_col='WORK_DATE',
-    #                                      ma_values=ma_values, 
-    #                                      lag_period=predict_period
-    #                                      )
+    # COVID-19 ......
+    if market == 'tw':
+        covid_19, _ = cbyz.get_covid19_data()
+        
+        if time_unit == 'w':
+            covid_19 = covid_19 \
+                .merge(calendar_full_key, how='left', on='WORK_DATE')
             
-    #     main_data = main_data.merge(covid19, how='left', on='WORK_DATE')
-    #     main_data = cbyz.df_conv_na(df=main_data, cols=covid19_cols)
+            covid_19, _ = cbyz.df_summary(
+                df=covid_19, cols='COVID19_TW', group_by=time_key, 
+                add_mean=True, add_min=True, 
+                add_max=True, add_median=True, add_std=True, 
+                add_skew=False, add_count=False, quantile=[]
+                )
+        
+        # Merge ......
+        covid_19 = main_data_frame_calendar \
+                    .merge(covid_19, how='left', on=time_key)
+    
+        covid_19, cols, _, _ = \
+                cbml.ml_data_process(df=covid_19, 
+                                      ma=True, scale=True, lag=False, 
+                                      group_by=[],
+                                      cols=[],
+                                      except_cols=[],
+                                      drop_except=[],
+                                      cols_mode='equal',
+                                      date_col=time_key,
+                                      ma_values=ma_values, 
+                                      lag_period=predict_period
+                                      )
+            
+        main_data = main_data.merge(covid_19, how='left', on=time_key)
+        main_data = cbyz.df_conv_na(df=main_data, cols=cols)
 
 
     # Variables ......
@@ -1593,13 +1604,10 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     # Optimization .....
-    # - Add week
-    # 建長期投資的基本面模型
+    # - 如果買TEJ的達人方案，那也不需要額外加購三大法人持股成本
     # 5. print('add_support_resistance - days == True時有bug，全部數值一樣，導致沒辦法標準化？')
     # 6. 加上PRICE_CHANGE_ABS / PRICE_CHANGE加上STD
     # 6. 技術分析型態學
-    # 8. Update CBYZ and auto-competing model
-    # 9. 上櫃的也要放
     # 10. buy_signal to int
     # Update - 20211220，暫時在get_tw_index中呼叫update_tw_index，但這個方式可能會漏資料
     
@@ -1650,23 +1658,10 @@ def master(param_holder, predict_begin, export_model=True,
     ohlc = stk.get_ohlc()
     
     
-    global shift_begin, shift_end, data_begin, data_end
-    global predict_date, predict_week, calendar
-    
-    shift_begin, shift_end, data_begin, data_end, \
-        predict_date, predict_week, calendar = \
-                stk.get_period(predict_begin=predict_begin,
-                               predict_period=predict_period,
-                               data_period=data_period,
-                               unit=time_unit,
-                               shift=-int((max(ma_values) + 20)))
-                
-    # ......
-    global model_data
+    # Keys ------
     global id_keys, time_key
-    global model_x, var_y, var_y_orig
-    global norm_orig
-        
+    global var_y, var_y_orig
+    
     if time_unit == 'w':
         id_keys = ['SYMBOL', 'YEAR', 'WEEK_NUM']
         time_key = ['YEAR', 'WEEK_NUM']
@@ -1681,7 +1676,30 @@ def master(param_holder, predict_begin, export_model=True,
     # var_y = ['OPEN', 'HIGH',
     #           'LOW', 'CLOSE']    
     
-    var_y_orig = [y + '_ORIG' for y in var_y]
+    var_y_orig = [y + '_ORIG' for y in var_y]    
+    
+    
+    # Calendar ------
+    global shift_begin, shift_end, data_begin, data_end
+    global predict_date, predict_week
+    global calendar, calendar_full, calendar_full_key
+    
+    shift_begin, shift_end, data_begin, data_end, \
+        predict_date, predict_week, calendar = \
+                stk.get_period(predict_begin=predict_begin,
+                               predict_period=predict_period,
+                               data_period=data_period,
+                               unit=time_unit,
+                               shift=-int((max(ma_values) + 20)))
+                
+    # 有些資料可能包含非交易日，像是COVID-19，所以需要一個額外的calendar作比對
+    calendar_full_key = calendar[['WORK_DATE', 'YEAR', 'WEEK_NUM']]
+                
+                
+    # ......
+    global model_data
+    global model_x
+    global norm_orig
     
     
     global y_scaler
