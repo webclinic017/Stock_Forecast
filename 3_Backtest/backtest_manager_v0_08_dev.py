@@ -18,7 +18,7 @@ import random
 host = 3
 host = 2
 host = 4
-# host = 0
+host = 0
 market = 'tw'
 
 
@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220124',
-                 r'/home/jupyter/Arsenal/20220124',
+                 r'/home/jupyter/Codebase_YZ/20220210',
+                 r'/home/jupyter/Arsenal/20220210',
                  path + '/Function',
                  path_sam]
 
@@ -66,15 +66,10 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 import codebase_ml as cbml
-# import stock_analysis_manager_v2_07 as sam
-# import stock_analysis_manager_v2_071 as sam
-# import stock_analysis_manager_v2_081 as sam
-
-# import stock_analysis_manager_v2_09_dev as sam
 # import stock_analysis_manager_v2_10_dev as sam
 # import stock_analysis_manager_v2_11_dev as sam
 # import stock_analysis_manager_v2_112_dev as sam
-import stock_analysis_manager_v2_2_dev as sam
+import stock_analysis_manager_v2_3_dev as sam
 
 
 
@@ -1127,50 +1122,26 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # Write Google Sheets ...... 
     if len(actions) > 800:
         
-        # Action Workbook
-        stk.write_sheet(data=actions, sheet='TW', long=long,
-                        predict_begin=_bt_last_begin)
+        # # Action Workbook
+        # stk.write_sheet(data=actions, sheet='TW', long=long,
+        #                 predict_begin=_bt_last_begin)
     
-        # View And Log .....
-        view_yesterday()
+        # # View And Log .....
+        # view_yesterday()
 
         
-        # Error when load_result = True
-        global pred_features
-        try:
-            stk.write_sheet(data=pred_features, sheet='Features')
-        except Exception as e:
-            print(e)
-    
+        # # Error when load_result = True
+        # global pred_features
+        # try:
+        #     stk.write_sheet(data=pred_features, sheet='Features')
+        # except Exception as e:
+        #     print(e)
+            
+        pass
     
     gc.collect()
 
-
-
-# %% Check ------
-
-
-def delete_records():
-    
-    # 很怪，只能刪除少量的幾筆資料
-    serial = 2107082010
-
-    sql = (" delete from forecast_records "
-           " where execute_serial < " + str(serial))
-    
-    ar.db_execute(sql, fetch=False)
-
-
-def debug():
-    
-    cbml.debug_temp_df
-
-    chk = stk.debug_df
-    chk.isna().sum()
-
-
-    chk[chk['D0001'].isna()]
-
+    return actions
 
 
 
@@ -1222,8 +1193,10 @@ def verify_prediction_results():
 
 # %% Dev -----
 
-
-
+def dev():
+    
+    weekly_actions
+    daily_actions
 
 # %% Execute ------
 
@@ -1247,7 +1220,6 @@ if __name__ == '__main__':
     #    低估振幅，但強制縮放成-0.1 - 0.1也不妥，如果整體盤勢向下，這個方法會
     #    高估走勢
 
-
     
     # Change Ratio - XGB Params ------
     # eta: 0.3 / 0.01, 0.03, 0.08, 0.1, 0.2
@@ -1263,36 +1235,49 @@ if __name__ == '__main__':
     # subsample: 1 / 0.8        
     
     
-    hold = [2009, 2605, 2633, 3062, 6120, 1611]
+    global weekly_actions, daily_actions
+    hold = [3596, 6698]
     
-    # # Dev - Week
-    # master(bt_last_begin=20220207, predict_period=1, 
-    #        time_unit='w',long=False, interval=4, bt_times=1, 
-    #        data_period=int(365 * 1), 
-    #        ma_values=[5,10,20], volume_thld=400,
-    #        compete_mode=0, cv=list(range(3, 4)),
-    #        market='tw', hold=hold,
-    #        load_result=False, dev=True)
+    
+    # Dev - Week
+    # weekly_actions = \
+    #     master(bt_last_begin=20220207, predict_period=1, 
+    #         time_unit='w',long=False, interval=4, bt_times=1, 
+    #         data_period=int(365 * 1), 
+    #         ma_values=[5,10,20], volume_thld=400,
+    #         compete_mode=0, cv=list(range(3, 4)),
+    #         market='tw', hold=hold,
+    #         load_result=False, dev=True)
+    
     
     # Dev - Day
-    master(bt_last_begin=20220207, predict_period=1, 
-           time_unit='d',long=False, interval=4, bt_times=1, 
-           data_period=int(365 * 1), 
-           ma_values=[5,10,20], volume_thld=400,
-           compete_mode=0, cv=list(range(3, 4)),
-           market='tw', hold=hold,
-           load_result=False, dev=True)    
+    # daily_actions = \
+    #     master(bt_last_begin=20220207, predict_period=1, 
+    #            time_unit='d',long=False, interval=4, bt_times=1, 
+    #            data_period=int(365 * 1), 
+    #            ma_values=[5,10,20], volume_thld=400,
+    #            compete_mode=0, cv=list(range(3, 4)),
+    #            market='tw', hold=hold,
+    #            load_result=False, dev=True)    
+        
     
-    
-    
-    # master(bt_last_begin=20220118, predict_period=4, 
-    #         long=False, interval=7, bt_times=1, 
-    #         data_period=int(365 * 5), 
-    #         ma_values=[10,20,60], volume_thld=300,
-    #         compete_mode=1, cv=list(range(3, 4)),
-    #         market='tw', hold=hold,
-    #         load_result=False, dev=False)
+    # Production - Week
+    weekly_actions = \
+        master(bt_last_begin=20220207, predict_period=1, 
+               time_unit='w',long=False, interval=4, bt_times=1, 
+               data_period=int(365 * 5), 
+               ma_values=[5,10,20,60], volume_thld=400,
+               compete_mode=0, cv=list(range(3, 4)),
+               market='tw', hold=hold,
+               load_result=False, dev=False)
 
 
-
-
+    # Production - Day
+    weekly_actions = \
+        master(bt_last_begin=20220207, predict_period=1, 
+               time_unit='d',long=False, interval=4, bt_times=1, 
+               data_period=int(365 * 5), 
+               ma_values=[5,10,20,60], volume_thld=400,
+               compete_mode=0, cv=list(range(3, 4)),
+               market='tw', hold=hold,
+               load_result=False, dev=False)

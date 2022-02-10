@@ -23,16 +23,14 @@ import pandas as pd
 import numpy as np
 import sys, time, os, gc
 import pickle
-
 # from sklearn.model_selection import train_test_split    
 # from sklearn.metrics import mean_squared_error
-import pickle
 
 
 host = 3
 host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -60,8 +58,8 @@ elif host == 4:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220124',
-                 r'/home/jupyter/Arsenal/20220124',
+                 r'/home/jupyter/Codebase_YZ/20220210',
+                 r'/home/jupyter/Arsenal/20220210',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -1015,7 +1013,6 @@ def sam_od_us_get_snp_data(begin_date):
     loc_df = stk.od_us_get_snp_data(daily_backup=True, path=path_temp)
     loc_df = loc_df.rename(columns={'WORK_DATE':'WORK_DATE_ORIG'})
     
-    
     # Handle Time Lag
     loc_df = cbyz.df_date_cal(df=loc_df, amount=-1, unit='d',
                               new_cols='WORK_DATE',
@@ -1494,7 +1491,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     # S&P 500 ......
     snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
-    main_data = main_data.merge(snp, how='left', on=['WORK_DATE'])
+    main_data = main_data.merge(snp, how='left', on=time_key)
     
     
     # COVID-19 ......
