@@ -1265,7 +1265,7 @@ if __name__ == '__main__':
     
     hold = [2009, 2605, 2633, 3062, 6120, 1611]
     
-    # # Week
+    # # Dev - Week
     # master(bt_last_begin=20220207, predict_period=1, 
     #        time_unit='w',long=False, interval=4, bt_times=1, 
     #        data_period=int(365 * 1), 
@@ -1274,7 +1274,7 @@ if __name__ == '__main__':
     #        market='tw', hold=hold,
     #        load_result=False, dev=True)
     
-    
+    # Dev - Day
     master(bt_last_begin=20220207, predict_period=1, 
            time_unit='d',long=False, interval=4, bt_times=1, 
            data_period=int(365 * 1), 
@@ -1282,6 +1282,8 @@ if __name__ == '__main__':
            compete_mode=0, cv=list(range(3, 4)),
            market='tw', hold=hold,
            load_result=False, dev=True)    
+    
+    
     
     # master(bt_last_begin=20220118, predict_period=4, 
     #         long=False, interval=7, bt_times=1, 
@@ -1291,13 +1293,6 @@ if __name__ == '__main__':
     #         market='tw', hold=hold,
     #         load_result=False, dev=False)
 
-    # master(bt_last_begin=20220118, predict_period=10, 
-    #        long=True, interval=7, bt_times=1, 
-    #        data_period=int(365 * 5), 
-    #        ma_values=[10,20,60], volume_thld=300,
-    #        compete_mode=1, cv=list(range(3, 4)),
-    #        market='tw', hold=hold,
-    #        load_result=False, dev=False)
 
 
 

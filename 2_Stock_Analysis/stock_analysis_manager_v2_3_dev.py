@@ -892,28 +892,29 @@ def sam_covid_19_tw():
     global ma_values, wma
     
     covid_19, _ = cbyz.get_covid19_data()
+    cols = ['COVID19_TW']
     
     # Scale Data
     covid_19, _, _ = cbml.df_scaler(df=covid_19, 
-                                    cols='COVID19_TW',
+                                    cols=cols,
                                     method=0)
     # MA
-    covid_19, cols = \
+    covid_19, ma_cols = \
         cbyz.df_add_ma(df=covid_19, cols='COVID19_TW',
                        group_by=[], date_col='WORK_DATE',
                        values=ma_values, wma=wma, 
                        show_progress=False
                        )   
         
-    covid_19 = covid_19.drop('COVID19_TW', axis=1)
+    covid_19 = covid_19.drop(cols, axis=1)
     
     
     if time_unit == 'w':
         covid_19 = covid_19 \
             .merge(calendar_full_key, how='left', on='WORK_DATE')
         
-        covid_19, cols = cbyz.df_summary(
-            df=covid_19, cols=cols, group_by=time_key, 
+        covid_19, ma_cols = cbyz.df_summary(
+            df=covid_19, cols=ma_cols, group_by=time_key, 
             add_mean=True, add_min=True, 
             add_max=True, add_median=True, add_std=True, 
             add_skew=False, add_count=False, quantile=[]
@@ -923,7 +924,7 @@ def sam_covid_19_tw():
     covid_19 = main_data_frame_calendar \
                 .merge(covid_19, how='left', on=time_key)    
 
-    return covid_19, cols
+    return covid_19, ma_cols
 
 
 # .................
@@ -979,7 +980,7 @@ def sam_tw_gov_own(dev=False):
 def sam_od_tw_get_index(begin_date, end_date):
     
     global ma_values, predict_period
-    global main_data_frame_calendar
+    global calendar, main_data_frame_calendar
     
     loc_df = stk.od_tw_get_index(path=path_dcm)
     
@@ -1008,9 +1009,8 @@ def sam_od_tw_get_index(begin_date, end_date):
 
 def sam_od_us_get_snp_data(begin_date):
     
-    
     global ma_values, predict_period, predict_date
-    global main_data_frame_calendar
+    global calendar, main_data_frame_calendar
     
     loc_df = stk.od_us_get_snp_data(daily_backup=True, path=path_temp)
     loc_df = loc_df.rename(columns={'WORK_DATE':'WORK_DATE_ORIG'})
@@ -1028,10 +1028,10 @@ def sam_od_us_get_snp_data(begin_date):
     # 1. 因為美股的交易時間可能和台灣不一樣，包含特殊節日等，為了避免日期無法對應，用fillna
     #    補上完整的日期
     # 2. 先執行fillna再ml_data_process比較合理
-    loc_calendar = cbyz.date_get_calendar(begin_date=begin_date, 
-                                          end_date=predict_date[-1])
-    loc_calendar = loc_calendar[['WORK_DATE']]
     
+    # loc_calendar = cbyz.date_get_calendar(begin_date=begin_date, 
+    #                                       end_date=predict_date[-1])
+    loc_calendar = calendar[['WORK_DATE']]
     
     loc_df = loc_calendar.merge(loc_df, how='left', on='WORK_DATE')
     cols = cbyz.df_get_cols_except(df=loc_df, except_cols='WORK_DATE')
@@ -1039,27 +1039,44 @@ def sam_od_us_get_snp_data(begin_date):
                             group_by=[], method='ffill')
 
     # Process
-    loc_df, cols, _, _ = \
-        cbml.ml_data_process(df=loc_df, 
-                             ma=True, scale=True, lag=True, 
-                             group_by=[],
-                             cols=[], 
-                             except_cols=['WORK_DATE'],
-                             drop_except=[],
-                             cols_mode='equal',
-                             date_col='WORK_DATE',
-                             ma_values=ma_values, 
-                             lag_period=predict_period
-                             )    
+    # loc_df, cols, _, _ = \
+    #     cbml.ml_data_process(df=loc_df, 
+    #                          ma=True, scale=True, lag=True, 
+    #                          group_by=[],
+    #                          cols=[], 
+    #                          except_cols=['WORK_DATE'],
+    #                          drop_except=[],
+    #                          cols_mode='equal',
+    #                          date_col='WORK_DATE',
+    #                          ma_values=ma_values, 
+    #                          lag_period=predict_period
+    #                          )    
+    
+    # Scale
+    loc_df, _, _ = cbml.df_scaler(df=loc_df, cols=cols, method=0)
+    
+    # MA
+    loc_df, ma_cols = \
+        cbyz.df_add_ma(df=loc_df, cols=cols,
+                       group_by=[], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+    loc_df = loc_df.drop(cols, axis=1)
+    
+    
+    # Agg for Weekly Prediction
+    if time_unit == 'w':
+        loc_df = loc_df \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
         
-    # Fillter the target period        
-    if begin_date != None:
-        loc_df = loc_df[(loc_df['WORK_DATE'])>=begin_date]
-        
-        
-    # 因為傳進來的begin_date是alert，所以有na是正常的
-    # cbyz.df_chk_col_na(df=loc_df, mode='alert')
-    # cbyz.df_chk_col_min_max(df=loc_df)
+        loc_df, cols = cbyz.df_summary(
+            df=loc_df, cols=ma_cols, group_by=time_key, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )    
+    
         
     return loc_df, cols
 
@@ -1224,7 +1241,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #     main_data = main_data \
     #                 .merge(buffett_indicator, how='left', on=['WORK_DATE'])
                 
-
 
     # Government Invest ......
     if market == 'tw':
@@ -1424,9 +1440,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #         pass
             
 
-        
-
-            
     #     main_data = main_data \
     #         .merge(ewtinst1c, how='left', on=['SYMBOL', 'WORK_DATE'])  
         
@@ -1474,19 +1487,18 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
     # # 台股加權指數 TW Index
     # tw_index = sam_od_tw_get_index(begin_date=shift_begin, 
-    #                                end_date=predict_date[-1])
+    #                                 end_date=predict_date[-1])
     
     # main_data = main_data.merge(tw_index, how='left', on=['WORK_DATE'])
     
     
-    # # S&P 500 ......
-    # snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
-    # main_data = main_data.merge(snp, how='left', on=['WORK_DATE'])
+    # S&P 500 ......
+    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
+    main_data = main_data.merge(snp, how='left', on=['WORK_DATE'])
     
     
     # COVID-19 ......
     if market == 'tw':
-
         covid_tw, cols = sam_covid_19_tw()
         
         # Future Plan
@@ -1496,7 +1508,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         main_data = cbyz.df_conv_na(df=main_data, cols=cols)
 
     elif market == 'en':
-        
         # Future Plan
         # covid_en = sam_covid_19_global()        
         
@@ -1599,37 +1610,6 @@ def master(param_holder, predict_begin, export_model=True,
     主工作區
     '''
     
-    # date_period為10年的時候會出錯
-    
-    # v2.00
-    # - Add Ultra_Tuner
-    # - Fix Ex-dividend issues
-    # - Rename stock_type and stock_symbol
-    # - Set df_fillna with interpolate method in arsenal_stock
-    # v2.01
-    # - Fix Date Issues
-    # v2.02
-    # - Add correlations detection > Done
-    # - Fix tw_get_stock_info_twse issues
-    # v2.03
-    # - Add S&P 500 data
-    # v2.04
-    # - Add 台股指數
-    # - Fix terrible date lag issues in get_model_data - Done
-    # v2.041
-    # - Update for new modules
-    # - Export Model Data
-    # v2.05
-    # - Add Financial Statements
-    # v2.07
-    # - Remove group_by paramaters when normalizing
-    # - Fix bug after removing group_by params of normalizing
-    # - Add GDP and Buffett Indicator
-    # v2.09
-    # - Update the calculation method of trade value as mean of high and low > Done
-    # - Add load data feature for get_model_data > Done
-    # - Update cbml and df_scaler > Done
-    # - Remove df_chk_col_min_max > Done
     # v2.10
     # - Rename symbols as symbol - Done
     # - Add symbol params to ewifinq - Done
@@ -1668,7 +1648,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 2.112
+    version = 2.3
 
 
     # Tracking
@@ -2027,6 +2007,37 @@ def update_history():
     # - Add low_volume_symbols
     # v1.08
     # - Add 每月投報率 data    
+    # v2.00
+    # - Add Ultra_Tuner
+    # - Fix Ex-dividend issues
+    # - Rename stock_type and stock_symbol
+    # - Set df_fillna with interpolate method in arsenal_stock
+    # v2.01
+    # - Fix Date Issues
+    # v2.02
+    # - Add correlations detection > Done
+    # - Fix tw_get_stock_info_twse issues
+    # v2.03
+    # - Add S&P 500 data
+    # v2.04
+    # - Add 台股指數
+    # - Fix terrible date lag issues in get_model_data - Done
+    # v2.041
+    # - Update for new modules
+    # - Export Model Data
+    # v2.05
+    # - Add Financial Statements
+    # v2.07
+    # - Remove group_by paramaters when normalizing
+    # - Fix bug after removing group_by params of normalizing
+    # - Add GDP and Buffett Indicator
+    # v2.09
+    # - Update the calculation method of trade value as mean of high and low > Done
+    # - Add load data feature for get_model_data > Done
+    # - Update cbml and df_scaler > Done
+    # - Remove df_chk_col_min_max > Done
+
+    
     pass
 
 
