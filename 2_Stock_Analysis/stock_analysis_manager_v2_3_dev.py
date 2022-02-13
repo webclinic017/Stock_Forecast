@@ -287,6 +287,8 @@ def sam_load_data(industry=True, trade_value=True):
     # - 這裡的method要用1，如果用2的話，mse會變成0.8
     # - 因為method是1，其他大部份都是0，所以這一段要獨立出來
     # - price和change_ratio都用method 1 scale
+    
+    
     market_data, scale_orig_ratio, y_scaler_ratio = \
         cbml.df_scaler(df=market_data, cols=ohlc_ratio,
                        show_progress=False, method=1)
@@ -563,7 +565,8 @@ def sam_load_data(industry=True, trade_value=True):
                 .mean() \
                 .reset_index()
         
-
+        
+        # y用平均就好，不要用high of high, low of low，避免漲一天跌四天
         print('skew很容易產生NA，先移除 / 還是每個skew的第一個數值都是NA？')
         loc_main, _ = \
             cbyz.df_summary(df=loc_main, cols=cols, group_by=id_keys, 
@@ -1730,8 +1733,6 @@ def master(param_holder, predict_begin, export_model=True,
     # - industry_one_hot 不用df_summary    
     # - Modify dev mode and test mode
     
-    # var_y df_summary >> high of high, low of low
-    
     
     # Update
     # Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
@@ -2726,7 +2727,6 @@ if __name__ == '__main__':
             }
     
     param_holder = ar.Param_Holder(**args)
-            
         
     master(param_holder=param_holder,
            predict_begin=20211201, threshold=30000)        

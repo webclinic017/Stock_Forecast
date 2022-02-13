@@ -1305,6 +1305,8 @@ if __name__ == '__main__':
             ma_values=[5,10,20], volume_thld=400,
             compete_mode=0, cv=list(range(3, 4)),
             market='tw', hold=hold)
+        
+    # stk.write_sheet(data=actions, sheet='Week')
     
     
     # Dev - Day
