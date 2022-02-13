@@ -13,19 +13,12 @@ Created on Sat Nov 14 17:23:08 2020
 # 2. Add crypto
 
 
-# Optimization
-# 1. 如何在回測的時候，不要分多次讀取歷史資料，而可以一次讀取完？
-
-
 
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
 import sys, time, os, gc
 import pickle
-# from sklearn.model_selection import train_test_split    
-# from sklearn.metrics import mean_squared_error
-
 
 host = 3
 host = 2
@@ -51,15 +44,15 @@ elif host == 3:
 elif host == 4:
     # RT
     path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\2_Stock_Analysis'
-    path_sam = r'D:\Data_Mining\GitHub共用\Stock_Forecast\1_Data_Collection'
+    path_dcm = r'D:\Data_Mining\GitHub共用\Stock_Forecast\1_Data_Collection'
 
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220210',
-                 r'/home/jupyter/Arsenal/20220210',
+                 r'/home/jupyter/Codebase_YZ/20220213',
+                 r'/home/jupyter/Arsenal/20220213',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -156,7 +149,7 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
                     )
 
     market_data = market_data_raw.copy()
-
+    
 
     # Check        
     global ohlc
@@ -279,7 +272,7 @@ def sam_load_data(industry=True, trade_value=True):
     global predict_period, data_end
     global symbol_df, wma
     global stock_info_raw
-    global debug, data_form
+    global data_form
     global ohlc, ohlc_ratio, ohlc_change
     
     # New Vars
@@ -328,7 +321,7 @@ def sam_load_data(industry=True, trade_value=True):
         #   更久的MA
         cols = cbyz.df_get_cols_except(
             df=loc_main, 
-            except_cols=ohlc+ohlc_ratio+['WORK_DATE']
+            except_cols=ohlc+ohlc_ratio+['SYMBOL', 'WORK_DATE']
             )
         
         loc_main, _, _ = cbml.df_scaler(df=loc_main, cols=cols,
@@ -392,16 +385,17 @@ def sam_load_data(industry=True, trade_value=True):
         
         
     # Drop Except會導致CLOSE_LAG, HIGH_LAG沒被排除
-    if 'CLOSE' in var_y and data_form == 1:
-        ohlc_str = '|'.join(ohlc)
-        drop_cols = cbyz.df_chk_col_na(df=loc_main, positive_only=True)
+    # - 20220212 - 因為把ml_data_process移除，所以這段應該也不需要了
+    # if 'CLOSE' in var_y and data_form == 1:
+    #     ohlc_str = '|'.join(ohlc)
+    #     drop_cols = cbyz.df_chk_col_na(df=loc_main, positive_only=True)
         
-        drop_cols = drop_cols[(~drop_cols['COLUMN'].isin(var_y)) \
-                              & (~drop_cols['COLUMN'].str.contains('MA')) \
-                              & (drop_cols['COLUMN'].str.contains(ohlc_str))]
+    #     drop_cols = drop_cols[(~drop_cols['COLUMN'].isin(var_y)) \
+    #                           & (~drop_cols['COLUMN'].str.contains('MA')) \
+    #                           & (drop_cols['COLUMN'].str.contains(ohlc_str))]
         
-        drop_cols = drop_cols['COLUMN'].tolist()
-        loc_main = loc_main.drop(drop_cols, axis=1)
+    #     drop_cols = drop_cols['COLUMN'].tolist()
+    #     loc_main = loc_main.drop(drop_cols, axis=1)
     
 
     
@@ -412,8 +406,8 @@ def sam_load_data(industry=True, trade_value=True):
                         .drop_duplicates(subset=['WORK_DATE'])
 
 
-        if data_form == 1:        
-
+        if data_form == 1:    
+            
             # Scale Data
             total_trade, _, _ = cbml.df_scaler(df=total_trade, 
                                             cols='TOTAL_TRADE_VALUE',
@@ -467,7 +461,6 @@ def sam_load_data(industry=True, trade_value=True):
     # Industry ......       
     # - 因為industry_data中會用到TOTAL_TRADE_VALUE，所以TOTAL_TRADE_VALUE沒辦法
     #   先獨立處理
-    
     if industry: 
         stock_industry = stock_info_raw[['SYMBOL', 'INDUSTRY_ONE_HOT']]
         
@@ -529,8 +522,8 @@ def sam_load_data(industry=True, trade_value=True):
         industry_data = industry_data.drop(cols, axis=1)   
         
         # Merge ...
+        # .merge(stock_info_dummy, how='left', on='SYMBOL') \
         loc_main = loc_main \
-            .merge(stock_info_dummy, how='left', on='SYMBOL') \
             .merge(stock_industry, how='left', on='SYMBOL') \
             .merge(industry_data, how='left', on=['WORK_DATE', 'INDUSTRY_ONE_HOT']) \
             .drop('INDUSTRY_ONE_HOT', axis=1)
@@ -555,6 +548,7 @@ def sam_load_data(industry=True, trade_value=True):
         # merge完main_data_frame後，新股的WORK_DATE會是NA
         loc_main = loc_main.dropna(subset=['WORK_DATE'] + time_key, axis=0)
         loc_main = loc_main.drop('WORK_DATE', axis=1)
+        
         cols = cbyz.df_get_cols_except(df=loc_main, 
                                        except_cols=id_keys + var_y)
         
@@ -605,6 +599,12 @@ def sam_load_data(industry=True, trade_value=True):
             suffix='', 
             remove_na=False
             )
+        
+    # 因為One Hot Encoding後的Industry欄位不用df_summary，也不用shift，所以最後
+    # 再merge即可
+    if industry:
+        loc_main = loc_main.merge(stock_info_dummy, how='left', on='SYMBOL')
+
 
     # 檢查shift完後YEAR和WEEK_NUM的NA
     chk_na = cbyz.df_chk_col_na(df=loc_main, cols=time_key)
@@ -640,16 +640,12 @@ def sam_load_data(industry=True, trade_value=True):
     na_cols = cbyz.df_chk_col_na(df=loc_main, except_cols=var_y)
     # na_cols = cbyz.df_chk_col_na(df=loc_main)
     
-    global debug_df
-    debug_df = loc_main.copy()
     
     
     # df_summary可能造成每一欄的NA數不一樣，所以先排除time_unit = 'w'
     
     if time_unit == 'd':
-        global debug_df2
-        debug_df2 = na_cols.copy()
-    
+
         assert len(na_cols) == 0 \
             or na_cols['NA_COUNT'].min() == na_cols['NA_COUNT'].max(), \
             'All the NA_COUNT should be the same.'
@@ -883,46 +879,105 @@ def set_frame():
 # %% TW Variables ------
 
 
+def sam_buffett_indicator():
+    
+    global time_key
+    global calendar_full_key, main_data_frame_calendar
+    global ma_values, wma    
+    
+    result = stk.cal_buffett_indicator(
+            end_date=predict_date.loc[len(predict_date) - 1, 'WORK_DATE']
+            )
+    
+    cols = cbyz.df_get_cols_except(df=result,
+                                   except_cols='WORK_DATE')
+    
+    # backup = buffett_indicator.copy()
+    # buffett_indicator = backup.copy()
+
+    # Scale Data
+    result, _, _ = \
+        cbml.df_scaler(df=result, cols=cols, method=0)
+        
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=[], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+
+    if time_unit == 'w':
+
+        result = calendar_full_key \
+            .merge(result, how='left', on='WORK_DATE') \
+            .drop(['WORK_DATE'], axis=1)
+
+        result, ma_cols = \
+            cbyz.df_summary(
+                df=result, cols=ma_cols, group_by=time_key, 
+                add_mean=True, add_min=True, 
+                add_max=True, add_median=True, add_std=True, 
+                add_skew=False, add_count=False, quantile=[]
+                )    
+
+    # Merge ......
+    result = main_data_frame_calendar \
+                .merge(result, how='left', on=time_key)    
+
+    return result, ma_cols
+
+
+# .........
+
 def sam_covid_19_tw():
     
     global time_key
     global calendar_full_key, main_data_frame_calendar
     global ma_values, wma
     
-    covid_19, _ = cbyz.get_covid19_data()
-    cols = ['COVID19_TW']
+    result, _ = cbyz.get_covid19_data()
+    
+    cols = cbyz.df_get_cols_except(
+        df=result, 
+        except_cols=['WORK_DATE', 'YEAR', 'WEEK_NUM']
+        )
     
     # Scale Data
-    covid_19, _, _ = cbml.df_scaler(df=covid_19, 
+    result, _, _ = cbml.df_scaler(df=result, 
                                     cols=cols,
                                     method=0)
     # MA
-    covid_19, ma_cols = \
-        cbyz.df_add_ma(df=covid_19, cols='COVID19_TW',
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
                        group_by=[], date_col='WORK_DATE',
                        values=ma_values, wma=wma, 
                        show_progress=False
                        )   
         
-    covid_19 = covid_19.drop(cols, axis=1)
+    result = result.drop(cols, axis=1)
     
     
     if time_unit == 'w':
-        covid_19 = covid_19 \
+        result = result \
             .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
         
-        covid_19, ma_cols = cbyz.df_summary(
-            df=covid_19, cols=ma_cols, group_by=time_key, 
+        result, ma_cols = cbyz.df_summary(
+            df=result, cols=ma_cols, group_by=time_key, 
             add_mean=True, add_min=True, 
             add_max=True, add_median=True, add_std=True, 
             add_skew=False, add_count=False, quantile=[]
             )
     
     # Merge ......
-    covid_19 = main_data_frame_calendar \
-                .merge(covid_19, how='left', on=time_key)    
+    result = main_data_frame_calendar \
+                .merge(result, how='left', on=time_key)    
 
-    return covid_19, ma_cols
+    return result, ma_cols
 
 
 # .................
@@ -978,31 +1033,53 @@ def sam_tw_gov_own(dev=False):
 def sam_od_tw_get_index(begin_date, end_date):
     
     global ma_values, predict_period
+    global time_unit, time_key
     global calendar, main_data_frame_calendar
     
-    loc_df = stk.od_tw_get_index(path=path_dcm)
+    # main_data_frame_calendar
+    # calendar_full_key
     
-    loc_df = main_data_frame_calendar \
-                .merge(loc_df, how='left', on='WORK_DATE')    
+    result = stk.od_tw_get_index()
+    cols = cbyz.df_get_cols_except(df=result, except_cols='WORK_DATE')
     
-    # Process
-    loc_df, cols, _, _ = \
-        cbml.ml_data_process(df=loc_df, 
-                             ma=True, scale=True, lag=True, 
-                             group_by=[],
-                             cols=[], 
-                             except_cols=['WORK_DATE'],
-                             drop_except=[],
-                             cols_mode='equal',
-                             date_col='WORK_DATE',
-                             ma_values=ma_values, 
-                             lag_period=predict_period
-                             )        
+    # 如果有NA的話，可能要先做fillna
+    cbyz.df_chk_col_na(df=result, mode='stop')
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
+    
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=[], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
         
-    loc_df = loc_df[(loc_df['WORK_DATE']>=begin_date) \
-                    & (loc_df['WORK_DATE']<=end_date)]
+    result = result.drop(cols, axis=1)
+    
+    
+    if time_unit == 'w':
         
-    return loc_df
+        result = result \
+            .merge(calendar_full_key, how='left', on='WORK_DATE') \
+            .drop(['WORK_DATE'], axis=1)
+            
+        result, ma_cols = cbyz.df_summary(
+            df=result, cols=ma_cols, group_by=time_key, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )
+    
+    # Merge ......
+    result = main_data_frame_calendar \
+                .merge(result, how='left', on=time_key)   
+
+    return result, ma_cols
+
+
+# .................
 
 
 def sam_od_us_get_snp_data(begin_date):
@@ -1210,33 +1287,30 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
-    # # Buffett Indicator ......
-    # if market == 'tw':
+    # Buffett Indicator ......
+    if market == 'tw':
         
-    #     buffett_indicator = \
-    #         stk.cal_buffett_indicator(end_date=predict_date[0])
-            
-    #     buffett_indicator = \
-    #         main_data_frame_calendar \
-    #             .merge(buffett_indicator, how='left', on='WORK_DATE')  
+        buffett_indicator, cols = sam_buffett_indicator()
+        
+        # 因為部份欄位和下面的tw_index重複，所以刪除
+        drop_cols = cbyz.df_get_cols_contains(df=buffett_indicator, 
+                                              string=['TW_INDEX'])
+        
+        buffett_indicator = buffett_indicator.drop(drop_cols, axis=1)
+        cols = cbyz.li_remove_items(cols, drop_cols)
+        
+        # Merge
+        main_data = main_data \
+                    .merge(buffett_indicator, how='left', on=time_key)
+
+
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, group_by=[], 
+                                   method='ffill')
     
-    #     buffett_indicator, _, _, _ = \
-    #            cbml.ml_data_process(df=buffett_indicator, 
-    #                                 ma=False, scale=True, lag=True, 
-    #                                 group_by=[], 
-    #                                 cols=[],
-    #                                 except_cols=['WORK_DATE'],
-    #                                 drop_except=[],
-    #                                 cols_mode='equal',
-    #                                 date_col='WORK_DATE',
-    #                                 ma_values=[], 
-    #                                 lag_period=predict_period
-    #                                 ) 
-      
-    #     cols = cbyz.df_get_cols_except(df=buffett_indicator,
-    #                                    except_cols=['WORK_DATE'])
-    #     main_data = main_data \
-    #                 .merge(buffett_indicator, how='left', on=['WORK_DATE'])
+        main_data = cbyz.df_fillna(df=main_data, cols=cols,
+                                   sort_keys=time_key, group_by=[], 
+                                   method='bfill')
                 
 
     # Government Invest ......
@@ -1482,12 +1556,29 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # # main_data = main_data.merge(pytrends, how='left', on=['WORK_DATE'])      
 
 
-    # # 台股加權指數 TW Index
-    # tw_index = sam_od_tw_get_index(begin_date=shift_begin, 
-    #                                 end_date=predict_date[-1])
+    # 台股加權指數 TW 
+    if market == 'tw':
+         
+        tw_index, cols = \
+            sam_od_tw_get_index(
+                begin_date=shift_begin,
+                end_date=predict_date.loc[len(predict_date)-1, 'WORK_DATE']
+                )
+        
+        # backup = main_data.copy()
+        # main_data = backup.copy()
+        
+        main_data = main_data.merge(tw_index, how='left', on=time_key)
+
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='ffill')
     
-    # main_data = main_data.merge(tw_index, how='left', on=['WORK_DATE'])
-    
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='bfill')     
+
+        
     
     # S&P 500 ......
     snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
@@ -1503,13 +1594,18 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
             
         main_data = main_data.merge(covid_tw, how='left', on=time_key)
         main_data = cbyz.df_conv_na(df=main_data, cols=cols)
+        
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='ffill')
+    
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='bfill')        
 
     elif market == 'en':
         # Future Plan
         # covid_en = sam_covid_19_global()        
-        
-        # main_data = main_data.merge(covid_en, how='left', on=time_key)
-        # main_data = cbyz.df_conv_na(df=main_data, cols=cols)
         pass
 
 
@@ -1590,9 +1686,13 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # Export Model ......
-    main_data.to_csv(path_temp + '/model_data.csv', index=False)
-    cbyz.li_to_csv(model_x, path_temp + '/model_x.csv')
-    scale_orig.to_csv(path_temp + '/scale_orig.csv', index=False)
+    main_data.to_csv(path_temp + '/model_data_' + time_unit + '.csv', 
+                     index=False)
+    
+    cbyz.li_to_csv(model_x, path_temp + '/model_x_' + time_unit + '.csv')
+    
+    scale_orig.to_csv(path_temp + '/scale_orig_' + time_unit + '.csv',
+                      index=False)
         
     return main_data, model_x, scale_orig
 
@@ -1608,25 +1708,30 @@ def master(param_holder, predict_begin, export_model=True,
     '''
     
     # v2.10
-    # - Rename symbols as symbol - Done
-    # - Add symbol params to ewifinq - Done
-    # - Update cbml for df_scaler - Done
+    # - Rename symbols as symbol
+    # - Add symbol params to ewifinq
+    # - Update cbml for df_scaler
     # v2.11 - 20220119
     # - The MVP version of data_for = 2
     # - Y can be price or change ratio
     # v2.112 - 20220123
     # - MVP of weekly prediction
-    
     # v2.2 - 20220209
     # - Restore variables for weekly prediction
     # - Change the way to shift day. The original method is shift var_x, and 
     #   the new version is to shift var_y and id_keys
     # - Remove ml_data_process
     # - Remove switch of trade_value
-    
+
     
     # v2.3 - 20220210
     # - Combine result of daily prediction and weekly prediction in BTM
+    # - add time_unit as suffix for saved_file of model_data
+    # - industry_one_hot 不用df_summary    
+    # - Modify dev mode and test mode
+    
+    # var_y df_summary >> high of high, low of low
+    
     
     # Update
     # Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
@@ -1669,8 +1774,6 @@ def master(param_holder, predict_begin, export_model=True,
     # 2. Add covid-19 daily backup
     # 3. 在get_market_data_raw中, OPEN_CHANGE_RATIO min_value 
     #    is -0.8897097625329815，暫時移除assert
-    # 5. 有些symbole會不見，像正隆
-    # 2. pred price和Last price都有錯置的問題，應該是stk有bug, df_fillna的interpolate
     # 6. Handle week_num cyclical issues
     #    https://towardsdatascience.com/how-to-handle-cyclical-data-in-machine-learning-3e0336f7f97c
     
@@ -1682,15 +1785,13 @@ def master(param_holder, predict_begin, export_model=True,
 
     # Optimization .....
     # - 如果買TEJ的達人方案，那也不需要額外加購三大法人持股成本
-    # 5. print('add_support_resistance - days == True時有bug，全部數值一樣，導致沒辦法標準化？')
-    # 6. 加上PRICE_CHANGE_ABS / PRICE_CHANGE加上STD
     # 6. 技術分析型態學
     # 10. buy_signal to int
     # Update - 20211220，暫時在get_tw_index中呼叫update_tw_index，但這個方式可能會漏資料
     
     
     global bt_last_begin, data_period, predict_period, long, time_unit
-    global debug, dev
+    global dev, test
     global symbol, ma_values, volume_thld, market, data_form
 
 
@@ -1704,7 +1805,7 @@ def master(param_holder, predict_begin, export_model=True,
     volume_thld = holder['volume_thld'][0]   
     compete_mode = holder['compete_mode'][0]   
     train_mode = holder['train_mode'][0]       
-    dev = holder['dev'][0]   
+    dev = holder['dev'][0]
     symbol = holder['symbol'][0]   
     ma_values = holder['ma_values'][0]   
     data_form = holder['data_form'][0]   
@@ -1717,8 +1818,8 @@ def master(param_holder, predict_begin, export_model=True,
     cv = holder['cv'][0]
     
     # Program
-    # debug = holder['debug'][0]
-    
+    dev = holder['dev'][0]
+    test = holder['test'][0]
     
     # export_model = False
     # dev = True
@@ -2588,24 +2689,7 @@ def test_support_resistance():
 
 def debug():
     
-
-    file = pd.read_csv(path_temp + '/debug_hist_df.csv')
-    chk = cbyz.df_chk_col_na(df=file)
-    chk = chk[~chk['COLUMN'].isin(var_y)]
-    chk['NA_COUNT'].max()
-    
-    chk2 = file[file['COVID19_TW_MA_20_LAG'].isna()]
-    
-    
-    debug_file = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis/debug/model_data.csv'
-    debug_file = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis/debug/reg_model_close_change_ratio_short_result_20220115_170956.csv'
-    
-    file = pd.read_csv(debug_file)    
-    file['CLOSE_CHANGE_RATIO'].min()
-    file['CLOSE_CHANGE_RATIO'].max()
-    
-    cbyz.df_chk_col_na(df=file)
-    cbyz.df_chk_col_min_max(df=file)
+    pass
     
 
 

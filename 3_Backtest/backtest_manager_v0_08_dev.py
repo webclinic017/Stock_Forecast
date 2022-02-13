@@ -50,11 +50,10 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220210',
-                 r'/home/jupyter/Arsenal/20220210',
+                 r'/home/jupyter/Codebase_YZ/20220213',
+                 r'/home/jupyter/Arsenal/20220213',
                  path + '/Function',
                  path_sam]
-
 
 
 for i in path_codebase:    
@@ -155,15 +154,18 @@ def set_calendar():
     # New Vars
     global calendar, calendar_lite, _bt_last_end
     
+    
     # Set Calendar Last ......
+    calendar = sam_calendar[sam_calendar['TRADE_DATE']>0]
+    
     if _time_unit == 'd':
-        sam_calendar = sam_calendar[time_key]
+        calendar = calendar[time_key]
         sam_predict_date = sam_predict_date[time_key]
         
     elif _time_unit == 'w':
-        sam_calendar = sam_calendar[['WORK_DATE'] + time_key]
+        calendar = calendar[['WORK_DATE'] + time_key]
         
-    calendar = sam_calendar.copy()
+        
     calendar = calendar[time_key] \
                     .drop_duplicates() \
                     .reset_index(drop=True)
@@ -190,10 +192,12 @@ def set_calendar():
     _bt_last_end = sam_calendar.loc[len(sam_calendar) - 1, 'WORK_DATE']
 
 
+# .........
+
 
 def set_frame():
 
-    global id_keys, time_key_last
+    global id_keys, time_key, time_key_last
     global symbol
     global calendar, calendar_lite, frame
     global _bt_last_begin, _bt_last_end, _predict_period, _time_unit
@@ -282,11 +286,12 @@ def set_frame():
         
     # Hist Main
     # - Real market data, used to inspect when backtesting
-    rename_dict = cbyz.li_to_dict(var_y, var_y_hist)        
-    hist_main = hist_data_raw.rename(columns=rename_dict) 
+    rename_dict = cbyz.li_to_dict(time_key + var_y,
+                                  time_key_last + var_y_hist)        
+    hist_main = hist_data_raw.rename(columns=rename_dict)
 
     hist_main = frame \
-        .merge(hist_main, how='left', on=id_keys) \
+        .merge(hist_main, how='left', on=['SYMBOL'] + time_key_last) \
         .drop(time_key_last, axis=1)
         
 
@@ -294,10 +299,11 @@ def set_frame():
     
 
 def backtest_predict(bt_last_begin, predict_period, interval, 
-                     data_period, dev=False):
+                     data_period):
     
-    global symbol, _market, bt_info, _bt_times, _ma_values, _load_result
+    global symbol, _market, bt_info, _bt_times, _ma_values
     global _time_unit
+    global dev, test
 
     # New Global Vars
     global bt_results_raw, bt_result
@@ -306,10 +312,16 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     global pred_scores, pred_features, pred_params
     
     
-    if _load_result:
-        bt_result_file = path_temp + '/bt_result.csv'
-        precision_file = path_temp + '/precision.csv' 
-        
+    if load_result:
+        bt_result_file = path_temp + '/bt_result_' + _time_unit + '.csv'
+        precision_file = path_temp + '/precision_' + _time_unit + '.csv'
+        sam_calendar_file = path_temp + '/sam_calendar_' + _time_unit + '.csv'        
+        sam_predict_date_file = path_temp + '/sam_predict_date_' \
+                                + _time_unit + '.csv'
+
+        sam_predict_week_file = path_temp + '/sam_predict_week_' \
+                                + _time_unit + '.csv'
+
         today = cbyz.date_get_today()
         
         # 為了避免跨日的問題，多計算一天
@@ -330,7 +342,18 @@ def backtest_predict(bt_last_begin, predict_period, interval,
             bt_result = pd.read_csv(bt_result_file)
             bt_result['SYMBOL'] = bt_result['SYMBOL'].astype('str')
             
-            precision = pd.read_csv(precision_file)
+            sam_calendar = pd.read_csv(sam_calendar_file)
+            
+            
+            sam_predict_date = pd.read_csv(sam_predict_date_file)
+            
+            # if _time_unit == 'w':
+            #     sam_predict_week = pd.read_csv(sam_predict_week_file)
+            #     precision = pd.read_csv(precision_file)
+                
+            sam_predict_week = pd.read_csv(sam_predict_week_file)
+            precision = pd.read_csv(precision_file)                
+                
             
             var_y = cbyz.df_get_cols_except(
                 df=bt_result,
@@ -340,7 +363,6 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     
     # Prepare For Backtest Records ......
-    print('backtest_predict - Update，應該用global calendar')
     bt_info_raw = cbyz.date_get_seq(begin_date=bt_last_begin,
                                     seq_length=_bt_times,
                                     unit='d', interval=-interval,
@@ -407,11 +429,22 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         except_cols=id_keys + ['BACKTEST_ID']
         )
 
-    if len(bt_result) > 800:
-        bt_result.to_csv(path_temp + '/bt_result.csv', 
+    if len(bt_result) > 800 or dev:
+        bt_result.to_csv(path_temp + '/bt_result_' + _time_unit + '.csv',
                          index=False)
         
-        precision.to_csv(path_temp + '/precision.csv', 
+        sam_calendar.to_csv(path_temp + '/sam_calendar_' + _time_unit + '.csv',
+                            index=False)
+        
+        sam_predict_date.to_csv(path_temp + '/sam_predict_date_' \
+                                + _time_unit + '.csv',
+                                index=False)        
+        
+        sam_predict_week.to_csv(path_temp + '/sam_predict_week_' \
+                                + _time_unit + '.csv',
+                                index=False)        
+
+        precision.to_csv(path_temp + '/precision_' + _time_unit + '.csv',
                          index=False)
 
 
@@ -783,9 +816,7 @@ def view_yesterday():
 
 def master(bt_last_begin, predict_period=14, time_unit='d', long=False, 
            interval=360, bt_times=2, data_period=5, ma_values=[5,10,20,60], 
-           volume_thld=400, 
-           cv=2, compete_mode=1, market='tw', hold=[], load_result=False,
-           dev=False):
+           volume_thld=400, cv=2, compete_mode=1, market='tw', hold=[]):
     '''
     主工作區
     '''
@@ -846,7 +877,9 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Remove set_calendar, then get calendar from SAM whose BACKTEST_ID is 0
     
     # v0.08
+    # - Add suffix of time unit for bt_result saved file
     # - Combine result of daily prediction and weekly prediction
+    # - Rename dev mode and test mode
     
 
     # Bug
@@ -867,7 +900,8 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
 
 
     # Worklist
-    # 0. Remove Open
+    # 1. Remove Open
+    # 2. 測試如果week_begin不是星期一時，是否會出錯
     # 0. Call notification function in backtest manager, and add stop loss 
     #    in excel
     # 1. Dev為True時就不匯出模型，避免檔案亂掉
@@ -882,15 +916,13 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 9. Add DIFF_MAPE_MIN
     # 12. Set the result of long-term MA as a table
     # 13. Update, optimize capitial_level with kmeans
-    # 15. excel中沒有 富鼎(8261)
-    # 17. 長期的forecast by week
     # 18. When backtest, check if the symbol reached the target price in the 
     #     next N weeks.
     # 19. Analysis, 近60日投報率，用產業或主題作分群 / 財報
     # 20. Add Sell Signal
     # 21. 產業上中下游關係，SNA
     # 22. Update, load last version of model
-    # 24. 把股性分群
+    # 24. 把股性分群；隱含波動率
     # 25. Do actions by change
     # 26. Add Auto-Competing Model    
     # 27. Signal A and B，A是反彈的，B是low和close差距N%
@@ -901,11 +933,13 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
 
 
     # # Not Collected Parameters ......
+    # global dev, test
+    # dev = True
+    # test = True
     # bt_times = 1
     # bt_index = 0
     # interval = 4
     # market = 'tw'
-    # dev = True 
     # time_unit = 'd'
     # time_unit = 'w'
     # hold = []
@@ -945,7 +979,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     global _interval, _bt_times, _volume_thld, _ma_values, _hold
     global symbol, _market
     global _bt_last_begin, _bt_last_end
-    global serial, _load_result
+    global serial
 
     _hold = [str(i) for i in hold]
     serial = cbyz.get_time_serial(with_time=True)
@@ -987,7 +1021,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # calendar = date_manager.calendar_lite    
 
 
-    if dev:
+    if dev or test:
         symbol = [2520, 2605, 6116, 6191, 3481, 
                    2409, 2520, 2603, 2409, 2603, 
                    2611, 3051, 3562, 2301, 
@@ -999,7 +1033,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     global _compete_mode, _time_unit
     _market = market    
     _compete_mode = compete_mode
-    _load_result = load_result    
     _time_unit = time_unit
 
 
@@ -1024,6 +1057,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
             'cv':[cv],
             'kbest':['all'],
             'dev':[dev],
+            'test':[test],
             'symbol':[symbol],
             'long':[long]
             }
@@ -1072,8 +1106,8 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     backtest_predict(bt_last_begin=bt_last_begin, 
                      predict_period=_predict_period, 
                      interval=interval,
-                     data_period=data_period,
-                     dev=dev)
+                     data_period=data_period)
+    
     
     # Set Calendar ------
     set_calendar()
@@ -1116,7 +1150,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
                export_file=True, load_file=True, path=path_temp,
                file_name=None)
     
-    eval_metrics()    
+    eval_metrics()
     
     
     # Write Google Sheets ...... 
@@ -1193,10 +1227,23 @@ def verify_prediction_results():
 
 # %% Dev -----
 
-def dev():
+def cbmbine_action():
     
-    weekly_actions
-    daily_actions
+    global action_weekly, action_daily    
+    action_key = ['SYMBOL', 'STOCK_NAME', 'INDUSTRY']
+    
+    
+    cols = cbyz.df_get_cols_except(df=action_daily, except_cols=action_key)
+    new_cols = ['DAY_' + c for c in cols]
+    rename_dict = cbyz.li_to_dict(cols, new_cols)
+    action_daily = action_daily.rename(columns=rename_dict)
+    
+    action_final = action_weekly \
+        .merge(action_daily, how='outer', on=action_key)
+    
+    stk.write_sheet(data=action_final, sheet='Combine')
+
+
 
 # %% Execute ------
 
@@ -1232,52 +1279,63 @@ if __name__ == '__main__':
     # eta: 0.2 /
     # min_child_weight: 0.8 / 
     # max_depth: 10 / 8, 12
-    # subsample: 1 / 0.8        
+    # subsample: 1 / 0.8
     
     
     global weekly_actions, daily_actions
     hold = [3596, 6698]
     
+    global dev, test, load_result
+    dev = True
+    test = True
+    load_result = True    
+    load_result = False
+    
+    global action_weekly, action_daily
+    
+    # test mode take few data to run, and dev mode will decrease the threshold
+    # to export temp file
+    
     
     # Dev - Week
-    # weekly_actions = \
-    #     master(bt_last_begin=20220207, predict_period=1, 
-    #         time_unit='w',long=False, interval=4, bt_times=1, 
-    #         data_period=int(365 * 1), 
-    #         ma_values=[5,10,20], volume_thld=400,
-    #         compete_mode=0, cv=list(range(3, 4)),
-    #         market='tw', hold=hold,
-    #         load_result=False, dev=True)
+    action_weekly = \
+        master(bt_last_begin=20220214, predict_period=1, 
+            time_unit='w',long=False, interval=4, bt_times=1, 
+            data_period=int(365 * 1), 
+            ma_values=[5,10,20], volume_thld=400,
+            compete_mode=0, cv=list(range(3, 4)),
+            market='tw', hold=hold)
     
     
     # Dev - Day
-    # daily_actions = \
-    #     master(bt_last_begin=20220207, predict_period=1, 
-    #            time_unit='d',long=False, interval=4, bt_times=1, 
-    #            data_period=int(365 * 1), 
-    #            ma_values=[5,10,20], volume_thld=400,
-    #            compete_mode=0, cv=list(range(3, 4)),
-    #            market='tw', hold=hold,
-    #            load_result=False, dev=True)    
+    action_daily = \
+        master(bt_last_begin=20220214, predict_period=1, 
+               time_unit='d', long=False, interval=4, bt_times=1, 
+               data_period=int(365 * 1), 
+               ma_values=[5,10,20], volume_thld=400,
+               compete_mode=0, cv=list(range(3, 4)),
+               market='tw', hold=hold)
         
     
-    # Production - Week
-    weekly_actions = \
-        master(bt_last_begin=20220207, predict_period=1, 
-               time_unit='w',long=False, interval=4, bt_times=1, 
-               data_period=int(365 * 5), 
-               ma_values=[5,10,20,60], volume_thld=400,
-               compete_mode=0, cv=list(range(3, 4)),
-               market='tw', hold=hold,
-               load_result=False, dev=False)
+    # # Production - Week
+    # weekly_actions = \
+    #     master(bt_last_begin=20220207, predict_period=1, 
+    #            time_unit='w',long=False, interval=4, bt_times=1, 
+    #            data_period=int(365 * 5), 
+    #            ma_values=[5,10,20,60], volume_thld=400,
+    #            compete_mode=0, cv=list(range(3, 4)),
+    #            market='tw', hold=hold)
 
 
-    # Production - Day
-    weekly_actions = \
-        master(bt_last_begin=20220207, predict_period=1, 
-               time_unit='d',long=False, interval=4, bt_times=1, 
-               data_period=int(365 * 5), 
-               ma_values=[5,10,20,60], volume_thld=400,
-               compete_mode=0, cv=list(range(3, 4)),
-               market='tw', hold=hold,
-               load_result=False, dev=False)
+    # # Production - Day
+    # weekly_actions = \
+    #     master(bt_last_begin=20220207, predict_period=1, 
+    #            time_unit='d',long=False, interval=4, bt_times=1, 
+    #            data_period=int(365 * 5), 
+    #            ma_values=[5,10,20,60], volume_thld=400,
+    #            compete_mode=0, cv=list(range(3, 4)),
+    #            market='tw', hold=hold)
+        
+        
+        
+        
