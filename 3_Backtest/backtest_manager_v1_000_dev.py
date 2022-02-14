@@ -18,7 +18,7 @@ import random
 host = 3
 host = 2
 host = 4
-host = 0
+# host = 0
 market = 'tw'
 
 
@@ -68,7 +68,7 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_10_dev as sam
 # import stock_analysis_manager_v2_11_dev as sam
 # import stock_analysis_manager_v2_112_dev as sam
-import stock_analysis_manager_v2_3_dev as sam
+import stock_analysis_manager_v2_400_dev as sam
 
 
 
@@ -880,7 +880,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Combine result of daily prediction and weekly prediction
     # - Rename dev mode and test mode
     
-    # v1.0000 - 20220214
+    # v1.000 - 20220214
     # - Temp
     
 

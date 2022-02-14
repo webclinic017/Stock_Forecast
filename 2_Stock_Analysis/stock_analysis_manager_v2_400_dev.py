@@ -23,7 +23,7 @@ import pickle
 host = 3
 host = 2
 host = 4
-host = 0
+# host = 0
 
 
 # Path .....
@@ -50,6 +50,7 @@ elif host == 4:
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
+                 r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
                  r'/home/jupyter/Codebase_YZ/20220213',
                  r'/home/jupyter/Arsenal/20220213',
@@ -1029,6 +1030,27 @@ def sam_tw_gov_own(dev=False):
     return result
     
 
+# .................
+    
+
+def sam_od_tw_get_fx_rate():
+    
+    data = stk.od_tw_get_fx_rate()
+    cols = cbyz.df_get_cols_except(df=data, except_cols=['WORK_DATE'])
+    data = pd.melt(data, id_vars=['WORK_DATE'], value_vars=cols,
+                   var_name='VAR', value_name='VALUE')
+    
+    data, _, _ = \
+        cbml.df_scaler(df=data, cols='VALUE', show_progress=False, method=1)
+        
+    data = data \
+            .pivot_table(index=['WORK_DATE'], columns=['VAR'], 
+                         values=['VALUE']) \
+            .reset_index()
+            
+    data = cbyz.df_flatten_columns(df=data)
+    return data       
+
 
 # .................
 
@@ -1358,6 +1380,8 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
             main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)                   
 
 
+
+
     # # 除權息資料 ......
     # # Close Lag ...
     # daily_close = market_data[['WORK_DATE', 'SYMBOL', 'CLOSE']]
@@ -1426,6 +1450,172 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # main_data = cbyz.df_conv_na(df=main_data, cols=temp_cols)
 
 
+    
+    # # 月營收資料表 ......
+    # # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
+    # # 1. 主要邏輯就是顯示最新的營收資料
+    # if market == 'tw':
+        
+    #     msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
+    #     再跑就正常了
+    #     '''
+    #     print(msg)
+        
+    #     ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
+    #     main_data = main_data \
+    #                 .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
+    
+    #     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
+    
+    
+    # # 財務報表
+    # # - 現在只用單季，需確認是否有缺漏
+    # print('財務報表現在只用單季，需確認是否有缺漏')
+    # # financial_statement = sam_tej_get_ewifinq()
+    
+    
+
+
+
+
+    # 台股加權指數 TW 
+    if market == 'tw':
+         
+        tw_index, cols = \
+            sam_od_tw_get_index(
+                begin_date=shift_begin,
+                end_date=predict_date.loc[len(predict_date)-1, 'WORK_DATE']
+                )
+        
+        # backup = main_data.copy()
+        # main_data = backup.copy()
+        
+        main_data = main_data.merge(tw_index, how='left', on=time_key)
+
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='ffill')
+    
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='bfill')     
+
+    
+    # S&P 500 ......
+    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
+    main_data = main_data.merge(snp, how='left', on=time_key)
+    
+    
+    # COVID-19 ......
+    if market == 'tw':
+        covid_tw, cols = sam_covid_19_tw()
+        
+        # Future Plan
+        # sam_covid_19_global()
+            
+        main_data = main_data.merge(covid_tw, how='left', on=time_key)
+        main_data = cbyz.df_conv_na(df=main_data, cols=cols)
+        
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='ffill')
+    
+        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                   sort_keys=time_key, 
+                                   group_by=[], method='bfill')        
+
+    elif market == 'en':
+        # Future Plan
+        # covid_en = sam_covid_19_global()        
+        pass
+
+
+    # Variables ......
+    model_x = cbyz.df_get_cols_except(df=main_data, 
+                                      except_cols=var_y + id_keys)
+    
+    
+    # Model Data ......
+
+
+    # Remove date before first_trading_day
+    # - 由於main_data_frame是用cross_join，所以會出現listing前的日期，但這個步驟要等到
+    #   最後才執行，否則在合併某些以月或季為單位的資料時會出現NA
+    print('是否可以移到sam_load_data最下面；暫時移除')
+    # global first_trading_day
+    # main_data = main_data \
+    #     .merge(first_trading_day, how='left', on=['SYMBOL'])
+    
+    # main_data = main_data[
+    #     main_data['WORK_DATE']>=main_data['FIRST_TRADING_DAY']] \
+    #     .drop('FIRST_TRADING_DAY', axis=1)
+
+
+    # Check NA ......
+    if time_unit == 'd':
+        hist_df = main_data[
+            main_data['WORK_DATE']<predict_date['WORK_DATE'].min()]
+        
+    elif time_unit == 'w':
+        hist_df = cbyz.df_anti_merge(main_data, predict_week, 
+                                     on=time_key)
+    
+    
+    # Debug ......
+    msg = ("get_model_data - 把normalize的group_by拿掉後，這個地方會出錯，但"
+           "只有一筆資料有問題，暫時直接drop")
+    print(msg)
+    
+    
+    # 當symbols=[]時，這裡會有18筆NA，都是var_y的欄位，應該是新股，因此直接排除
+    chk_na = cbyz.df_chk_col_na(df=hist_df)
+
+    assert len(chk_na) < 100, 'get_model_data - Check hist_df NA'
+    na_cols = chk_na['COLUMN'].tolist()
+    main_data = main_data.dropna(subset=na_cols, axis=0)
+    
+    
+    # Predict有NA是正常的，但NA_COUNT必須全部都一樣
+    global chk_predict_na
+    if time_unit == 'd':
+        predict_df = main_data.merge(predict_date, on=time_key)
+    elif time_unit == 'w':
+        predict_df = main_data.merge(predict_week, on=time_key)
+    
+    chk_predict_na = cbyz.df_chk_col_na(df=predict_df, mode='alert')
+    
+    
+    print('data_form=2時會出錯')
+    min_value = chk_predict_na['NA_COUNT'].min()
+    max_value = chk_predict_na['NA_COUNT'].max()    
+    assert min_value == max_value, 'All the NA_COUNT should be the same.'
+    
+
+    # Check min max ......
+    # global chk_min_max
+    # chk_min_max = cbyz.df_chk_col_min_max(df=main_data)
+    
+    # chk_min_max = \
+    #     chk_min_max[(~chk_min_max['COLUMN'].isin(id_keys)) \
+    #                 & ((chk_min_max['MIN_VALUE']<0) \
+    #                    | (chk_min_max['MAX_VALUE']>1))]
+    
+    # assert len(chk_min_max) == 0, 'get_model_data - normalize error'
+
+
+    # Export Model ......
+    main_data.to_csv(path_temp + '/model_data_' + time_unit + '.csv', 
+                     index=False)
+    
+    cbyz.li_to_csv(model_x, path_temp + '/model_x_' + time_unit + '.csv')
+    
+    scale_orig.to_csv(path_temp + '/scale_orig_' + time_unit + '.csv',
+                      index=False)
+        
+    return main_data, model_x, scale_orig
+
+
+def get_model_data_archive():
     
     # # TEJ 三大法人持股成本 ......
     # if market == 'tw':
@@ -1521,32 +1711,8 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #     print('Check - 全部填NA是否合理？')
     #     main_data = cbyz.df_conv_na(df=main_data, cols=cols_1 + cols_2)
     #     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
-
-
-    # # 月營收資料表 ......
-    # # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
-    # # 1. 主要邏輯就是顯示最新的營收資料
-    # if market == 'tw':
-        
-    #     msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
-    #     再跑就正常了
-    #     '''
-    #     print(msg)
-        
-    #     ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
-    #     main_data = main_data \
-    #                 .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
-    
-    #     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
     
     
-    # # 財務報表
-    # # - 現在只用單季，需確認是否有缺漏
-    # print('財務報表現在只用單季，需確認是否有缺漏')
-    # # financial_statement = sam_tej_get_ewifinq()
-    
-    
-
     # # Pytrends Data ......
     # # - Increase prediction time a lot, and made mape decrease.
     # # - Pytrends已經normalize過後才pivot，但後面又normalize一次
@@ -1556,150 +1722,11 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # #                                               stock_type=stock_type, 
     # #                                               local=local)
     
-    # # main_data = main_data.merge(pytrends, how='left', on=['WORK_DATE'])      
+    # # main_data = main_data.merge(pytrends, how='left', on=['WORK_DATE'])          
 
-
-    # 台股加權指數 TW 
-    if market == 'tw':
-         
-        tw_index, cols = \
-            sam_od_tw_get_index(
-                begin_date=shift_begin,
-                end_date=predict_date.loc[len(predict_date)-1, 'WORK_DATE']
-                )
-        
-        # backup = main_data.copy()
-        # main_data = backup.copy()
-        
-        main_data = main_data.merge(tw_index, how='left', on=time_key)
-
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='ffill')
-    
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='bfill')     
-
-        
-    
-    # S&P 500 ......
-    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
-    main_data = main_data.merge(snp, how='left', on=time_key)
+    pass
     
     
-    # COVID-19 ......
-    if market == 'tw':
-        covid_tw, cols = sam_covid_19_tw()
-        
-        # Future Plan
-        # sam_covid_19_global()
-            
-        main_data = main_data.merge(covid_tw, how='left', on=time_key)
-        main_data = cbyz.df_conv_na(df=main_data, cols=cols)
-        
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='ffill')
-    
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='bfill')        
-
-    elif market == 'en':
-        # Future Plan
-        # covid_en = sam_covid_19_global()        
-        pass
-
-
-    # Variables ......
-    model_x = cbyz.df_get_cols_except(df=main_data, 
-                                      except_cols=var_y + id_keys)
-    
-    
-    # Model Data ......
-    # - 20220209，已經在sam_load_data中處理完了
-    # main_data = main_data[main_data['WORK_DATE']>=data_begin] \
-    #                     .reset_index(drop=True)
-
-
-    # Remove date before first_trading_day
-    # - 由於main_data_frame是用cross_join，所以會出現listing前的日期，但這個步驟要等到
-    #   最後才執行，否則在合併某些以月或季為單位的資料時會出現NA
-    print('是否可以移到sam_load_data最下面；暫時移除')
-    # global first_trading_day
-    # main_data = main_data \
-    #     .merge(first_trading_day, how='left', on=['SYMBOL'])
-    
-    # main_data = main_data[
-    #     main_data['WORK_DATE']>=main_data['FIRST_TRADING_DAY']] \
-    #     .drop('FIRST_TRADING_DAY', axis=1)
-
-
-    # Check NA ......
-    if time_unit == 'd':
-        hist_df = main_data[
-            main_data['WORK_DATE']<predict_date['WORK_DATE'].min()]
-        
-    elif time_unit == 'w':
-        hist_df = cbyz.df_anti_merge(main_data, predict_week, 
-                                     on=time_key)
-    
-    
-    # Debug ......
-    msg = ("get_model_data - 把normalize的group_by拿掉後，這個地方會出錯，但"
-           "只有一筆資料有問題，暫時直接drop")
-    print(msg)
-    
-    
-    # 當symbols=[]時，這裡會有18筆NA，都是var_y的欄位，應該是新股，因此直接排除
-    chk_na = cbyz.df_chk_col_na(df=hist_df)
-
-    assert len(chk_na) < 100, 'get_model_data - Check hist_df NA'
-    na_cols = chk_na['COLUMN'].tolist()
-    main_data = main_data.dropna(subset=na_cols, axis=0)
-    
-    
-    # Predict有NA是正常的，但NA_COUNT必須全部都一樣
-    global chk_predict_na
-    if time_unit == 'd':
-        predict_df = main_data.merge(predict_date, on=time_key)
-    elif time_unit == 'w':
-        predict_df = main_data.merge(predict_week, on=time_key)
-    
-    chk_predict_na = cbyz.df_chk_col_na(df=predict_df, mode='alert')
-    
-    
-    print('data_form=2時會出錯')
-    min_value = chk_predict_na['NA_COUNT'].min()
-    max_value = chk_predict_na['NA_COUNT'].max()    
-    assert min_value == max_value, 'All the NA_COUNT should be the same.'
-    
-
-    # Check min max ......
-    # global chk_min_max
-    # chk_min_max = cbyz.df_chk_col_min_max(df=main_data)
-    
-    # chk_min_max = \
-    #     chk_min_max[(~chk_min_max['COLUMN'].isin(id_keys)) \
-    #                 & ((chk_min_max['MIN_VALUE']<0) \
-    #                    | (chk_min_max['MAX_VALUE']>1))]
-    
-    # assert len(chk_min_max) == 0, 'get_model_data - normalize error'
-
-
-    # Export Model ......
-    main_data.to_csv(path_temp + '/model_data_' + time_unit + '.csv', 
-                     index=False)
-    
-    cbyz.li_to_csv(model_x, path_temp + '/model_x_' + time_unit + '.csv')
-    
-    scale_orig.to_csv(path_temp + '/scale_orig_' + time_unit + '.csv',
-                      index=False)
-        
-    return main_data, model_x, scale_orig
-
-
 
 # %% Master ------
 
@@ -1733,7 +1760,7 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # v2.4 - 20220214
-    # - Temp    
+    # - Collect fx_rate in dcm
     
     
     
@@ -1754,7 +1781,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 2.3
+    version = 2.400
 
 
     # Tracking
