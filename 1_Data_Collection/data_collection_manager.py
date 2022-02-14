@@ -34,8 +34,8 @@ elif host == 3:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220101',
-                 r'/home/jupyter/Arsenal/20220101',
+                 r'/home/jupyter/Codebase_YZ/20220213',
+                 r'/home/jupyter/Arsenal/20220213',
                  path + '/1_Shareholding_Spread',
                  path + '/2_TEJ',
                  path + '/Function']
@@ -394,8 +394,7 @@ def automation():
     
     shareholding_spread.automation()
     tej.automation()
-
-
+    stk.od_tw_update_fx_rate()
 
 
 if __name__ == '__main__':
