@@ -52,8 +52,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220213',
-                 r'/home/jupyter/Arsenal/20220213',
+                 r'/home/jupyter/Codebase_YZ/20220216',
+                 r'/home/jupyter/Arsenal/20220216',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -1595,10 +1595,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
     
     
-    # # 財務報表
-    # # - 現在只用單季，需確認是否有缺漏
-    print('財務報表現在只用單季，需確認是否有缺漏')
+    # 財務報表
     if market == 'tw':
+        print('財務報表現在只用單季，需確認是否有缺漏')
         financial_statement, cols = sam_tej_get_ewifinq()
         
         main_data = main_data \

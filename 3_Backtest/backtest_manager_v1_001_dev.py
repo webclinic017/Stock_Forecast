@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220213',
-                 r'/home/jupyter/Arsenal/20220213',
+                 r'/home/jupyter/Codebase_YZ/20220216',
+                 r'/home/jupyter/Arsenal/20220216',
                  path + '/Function',
                  path_sam]
 
@@ -69,7 +69,7 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_11_dev as sam
 # import stock_analysis_manager_v2_112_dev as sam
 # import stock_analysis_manager_v2_400_dev as sam
-import stock_analysis_manager_v2_501_dev as sam
+import stock_analysis_manager_v2_502_dev as sam
 
 
 
@@ -373,6 +373,16 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         df=bt_result, 
         except_cols=id_keys + ['BACKTEST_ID']
         )
+    
+    
+    if _time_unit == 'd':
+        global precision_day
+        precision_day = precision.copy()
+        
+    elif _time_unit == 'w':
+        global precision_week
+        precision_week = precision.copy()
+    
 
     if len(bt_result) > 800 or dev:
         bt_result.to_csv(path_temp + '/bt_result_' + _time_unit + '.csv',
