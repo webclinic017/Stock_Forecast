@@ -13,9 +13,9 @@ import numpy as np
 import sys, time, os, gc
 
 
-host = 3
+# host = 3
 host = 2
-host = 0
+# host = 0
 
 market = 'tw'
 
@@ -33,8 +33,8 @@ elif host == 3:
 path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220103',
-                 r'/home/jupyter/Arsenal/20220103',    
+                 r'/home/jupyter/Codebase_YZ/20211208',
+                 r'/home/jupyter/Arsenal/20211208',    
                  path + '/Function']
 
 
@@ -445,11 +445,7 @@ def automation():
     # 2. TEJ只開放五年的資料
         
     # update(begin=20211216, end=20211231, ewprcd=False, ewtinst1c=False, 
-    #         ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
-    #         delete=True, upload=True)   
-
-    # update(begin=20210901, end=20211231, ewprcd=False, ewtinst1c=False, 
-    #        ewsale=False, ewprcd2=False, ewifinq=True, ewnprcstd=False,
+    #        ewsale=True, ewprcd2=False, ewifinq=False, ewnprcstd=False,
     #        delete=True, upload=True)        
 
     chk2 = chk_date()
@@ -465,27 +461,6 @@ if __name__ == '__main__':
     
     
 
-
-# %% Dev ------
-
-def dev():
-    
-
-    new_data = data.copy()
-    new_data.loc[:, 'year'] = new_data['mdate'].astype('str').str.slice(0, 3)
-    
-    
-    existing_data = result.copy()
-    existing_data.loc[:, 'year'] = existing_data['mdate'].astype('str').str.slice(0, 3)
-    existing_data = existing_data[['coid', 'year', 'sem', 'qflg']].reset_index(drop=True)
-    existing_data = cbyz.df_conv_col_type(df=existing_data, cols='sem', to='str')
-    
-    
-    temp = cbyz.df_anti_merge(new_data, existing_data, on=['coid', 'year', 'sem', 'qflg'])
-    
-    
-    if len(temp) > 0:
-        result = result.append(new_data)    
 
 
 

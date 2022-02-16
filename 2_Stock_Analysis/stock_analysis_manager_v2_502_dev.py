@@ -358,8 +358,8 @@ def sam_load_data(industry=True, trade_value=True):
         
     elif data_form == 2:
         
-        except_cols = ['WORK_DATE', 'YEAR', 'MONTH',
-                       'WEEKDAY', 'WEEK_NUM'] + id_keys  
+        except_cols = ['WORK_DATE', 'YEAR_ISO', 'MONTH',
+                       'WEEKDAY', 'WEEK_NUM_ISO'] + id_keys  
 
         # 新股會有NA，但直接drop的話會刪到pred preiod
         loc_main.loc[:, 'REMOVE'] = \
@@ -535,7 +535,7 @@ def sam_load_data(industry=True, trade_value=True):
             .merge(calendar_key, how='left', on=time_key)
         
         
-        # 這裡merge完後，shift_period的YEAR和WEEK_NUM中會有NA，且shift_period
+        # 這裡merge完後，shift_period的YEAR_ISO和WEEK_NUM_ISO中會有NA，且shift_period
         # 已經超出calendar的範圍，這是正常的
         loc_main = new_loc_main \
             .merge(loc_main, how='outer', on=['SYMBOL', 'WORK_DATE'])
@@ -574,7 +574,7 @@ def sam_load_data(industry=True, trade_value=True):
         
     elif time_unit == 'd':
         
-        # 這裡merge完後，shift_period的YEAR和WEEK_NUM中會有NA，且shift_period
+        # 這裡merge完後，shift_period的YEAR和WEEK_NUM_ISO中會有NA，且shift_period
         # 已經超出calendar的範圍，這是正常的
         loc_main = main_data_frame \
             .merge(loc_main, how='outer', on=['SYMBOL', 'WORK_DATE'])        
@@ -603,7 +603,7 @@ def sam_load_data(industry=True, trade_value=True):
         loc_main = loc_main.merge(stock_info_dummy, how='left', on='SYMBOL')
 
 
-    # 檢查shift完後YEAR和WEEK_NUM的NA
+    # 檢查shift完後YEAR和WEEK_NUM_ISO的NA
     chk_na = cbyz.df_chk_col_na(df=loc_main, cols=time_key)
     na_min = chk_na['NA_COUNT'].min()
     na_max = chk_na['NA_COUNT'].max()
@@ -628,7 +628,7 @@ def sam_load_data(industry=True, trade_value=True):
 
 
     # Simplify dtypes
-    # - YEAR and WEEK_NUM will be float here
+    # - YEAR and WEEK_NUM_ISO will be float here
     loc_main = ar.df_simplify_dtypes(df=loc_main)
 
 
@@ -669,26 +669,39 @@ def sam_load_data(industry=True, trade_value=True):
 
 
 def get_sale_mon_data():
-    
     '''
     除權息時間
-    Optimize
-    '''
+    1. 檔案放在資料夾中
     
+    '''
+
+    files = cbyz.os_get_dir_list(path=path_resource + '/sale_mon/',
+                                 level=0, extensions='xlsx', 
+                                 remove_temp=True)
+    files = files['FILES']
     file_raw = pd.DataFrame()
     
-    print('bug - 目前只有到2018')
-    years = list(range(2018, 2022))
-
-    for y in years:
-        new_file = pd.read_excel(path_resource + '/sale_mon/SaleMonDetail_' \
-                                 + str(y) + '.xlsx')
+    print('os_get_dir_list Bug - 當extensions為xlsx時，也會讀到xls')
+    for i in range(len(files)):
+        
+        if 'xlsx' not in files.loc[i, 'PATH']:
+            continue
+        
+        new_file = pd.read_excel(files.loc[i, 'PATH'])
         file_raw = file_raw.append(new_file)
         
+
+    ['市場', '代碼', '股票名稱', '股東會日期', 
+     '除息_除息交易日', '除息_除息參考價', '除息_填息完成日期', 
+     '除息_填息花費日數', '除息_現金股利發放日',
+     '除權_除權交易日', '除權_除權參考價', 
+     '除權_填權完成日期', '除權_填權花費日數',
+     '現金股利_盈餘', '現金股利_公債', '現金股利_合計',
+     '股票股利_盈餘', '股票股利_公積', '股票股利_合計', '股利合計']
+
         
     new_cols = range(len(file_raw.columns))
     new_cols = ['SALE_MON_' + str(c) for c in new_cols]
-
     file_raw.columns = new_cols
 
     file_raw = file_raw[['SALE_MON_1', 'SALE_MON_4', 'SALE_MON_5', 'SALE_MON_6']]
@@ -697,27 +710,29 @@ def get_sale_mon_data():
     file_raw = file_raw.dropna()
     
     
+    # 除息
     file1 = file_raw[['SYMBOL', 'WORK_DATE', 'EX_DIVIDENDS_PRICE']]
     file1.loc[:, 'WORK_DATE'] = '20' + file1['WORK_DATE']
-    file1.loc[:, 'WORK_DATE'] = file1['WORK_DATE'].str.replace("'", "")
-    file1.loc[:, 'WORK_DATE'] = file1['WORK_DATE'].str.replace("/", "")
-    file1 = cbyz.df_conv_col_type(df=file1, cols='WORK_DATE', to=np.int32)
+    file1 = cbyz.df_replace_special(df=file1, cols='WORK_DATE', value='')
     file1 = cbyz.df_conv_col_type(df=file1, cols='EX_DIVIDENDS_PRICE',
                                   to='float')    
     file1.loc[:, 'SALE_MON_DATE'] = 1
     file1 = cbyz.df_conv_na(df=file1, 
                             cols=['EX_DIVIDENDS_PRICE', 'SALE_MON_DATE'])
+    
+    file1 = ar.df_simplify_dtypes(df=file1)
 
     # 填息
     file2 = file_raw[['SYMBOL', 'EX_DIVIDENDS_DONE']]
     file2.columns = ['SYMBOL', 'WORK_DATE']
     file2.loc[:, 'WORK_DATE'] = '20' + file2['WORK_DATE']
-    file2.loc[:, 'WORK_DATE'] = file2['WORK_DATE'].str.replace("'", "")
-    file2.loc[:, 'WORK_DATE'] = file2['WORK_DATE'].str.replace("/", "")
+    file2 = cbyz.df_replace_special(df=file2, cols='WORK_DATE', value='')
     file2 = cbyz.df_conv_col_type(df=file2, cols='WORK_DATE', to=np.int32)
     file2.loc[:, 'EX_DIVIDENDS_DONE'] = 1
-    
     file2 = cbyz.df_conv_na(df=file2, cols=['EX_DIVIDENDS_DONE'])
+    file2 = ar.df_simplify_dtypes(df=file2)
+    
+    result = file1.merge(file2, how='outer', on=['SYMBOL', 'WORK_DATE'])
     
     return file1, file2
 
@@ -812,15 +827,15 @@ def set_frame():
         calendar_key = calendar_key[['WORK_DATE']]
         
     elif time_unit == 'w':
-        calendar_key = calendar_key[['WORK_DATE', 'YEAR', 'WEEK_NUM']]
+        calendar_key = calendar_key[['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']]
     
     
     # Duplicate year and week_num, then these two columns can be variables 
     # of the model
     if time_unit == 'w':
         
-        calendar_proc = calendar_proc[['YEAR', 'MONTH', 
-                                       'WEEK_NUM', 'TRADE_DATE']]
+        calendar_proc = calendar_proc[['YEAR_ISO', 'MONTH', 
+                                       'WEEK_NUM_ISO', 'TRADE_DATE']]
         
         calendar_proc = calendar_proc \
             .drop_duplicates() \
@@ -828,8 +843,8 @@ def set_frame():
             .reset_index() \
             .rename(columns={'index':'DATE_INDEX'}) 
         
-        calendar_proc.loc[:, 'YEAR_DUP'] = calendar_proc['YEAR']
-        calendar_proc.loc[:, 'WEEK_NUM_DUP'] = calendar_proc['WEEK_NUM']
+        calendar_proc.loc[:, 'YEAR_DUP'] = calendar_proc['YEAR_ISO']
+        calendar_proc.loc[:, 'WEEK_NUM_DUP'] = calendar_proc['WEEK_NUM_ISO']
         
 
     calendar_proc, _, _ = \
@@ -940,7 +955,7 @@ def sam_covid_19_tw():
     
     cols = cbyz.df_get_cols_except(
         df=result, 
-        except_cols=['WORK_DATE', 'YEAR', 'WEEK_NUM']
+        except_cols=['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']
         )
     
     # Scale Data
@@ -979,7 +994,10 @@ def sam_covid_19_tw():
 
 
 # .................
-    
+  
+
+# .................
+
 
 def sam_tw_gov_invest(dev=False):
     
@@ -1206,6 +1224,8 @@ def sam_od_us_get_snp_data(begin_date):
     return loc_df, cols
 
 
+# ...............
+
 
 def sam_tej_get_ewsale(begin_date):
 
@@ -1236,13 +1256,85 @@ def sam_tej_get_ewsale(begin_date):
     
     return loc_df
 
+# ...........
+
 
 def sam_tej_get_ewifinq():
+
+    global ma_values, predict_period, predict_date
+    global calendar, main_data_frame_calendar
+    global symbol
+    
+    result = stk.tej_get_ewifinq(fill_date=True, target_type='symbol',
+                                 target=symbol)
+
+    cols = cbyz.df_get_cols_except(
+        df=result, 
+        except_cols=['SYMBOL', 'WORK_DATE']
+        )
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
     
     
-    loc_df = stk.tej_get_ewifinq(path=path_dcm, fill_date=True)
+    if time_unit == 'w':
+        result = result.merge(calendar_full_key, on='WORK_DATE')
+        cbyz.df_chk_col_na(df=result, mode='stop')
+        
+    result = main_data_frame.merge(result, how='left', on=id_keys)
+    return result, cols
+
+
+# ..............
     
-    return loc_df
+
+def sam_tej_get_ewtinst1c():
+    
+    
+    result = stk.tej_get_ewtinst1c(begin_date=shift_begin,
+                                          end_date=None, 
+                                          symbol=symbol,
+                                          trade=True)
+    
+    cols = cbyz.df_get_cols_except(
+        df=result, 
+        except_cols=['SYMBOL', 'WORK_DATE']
+        )
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
+    
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=['SYMBOL'], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+    
+    
+    if time_unit == 'w':
+        result = result \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        
+        result, ma_cols = cbyz.df_summary(
+            df=result, cols=ma_cols, group_by=id_keys, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )    
+    
+    result = main_data_frame.merge(result, how='left', on=id_keys)
+    result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
+                                  sort_keys=time_key,
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+
+    return result, ma_cols    
 
 
 
@@ -1338,6 +1430,15 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
+    # TEJ 三大法人持股成本 ......
+    if market == 'tw':
+        ewtinst1c, cols = sam_tej_get_ewtinst1c()
+        main_data = main_data.merge(ewtinst1c, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=['SYMBOL'])          
+
     # Buffett Indicator ......
     if market == 'tw':
         
@@ -1354,15 +1455,11 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         main_data = main_data \
                     .merge(buffett_indicator, how='left', on=time_key)
 
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=[])
 
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, group_by=[], 
-                                   method='ffill')
-    
-        main_data = cbyz.df_fillna(df=main_data, cols=cols,
-                                   sort_keys=time_key, group_by=[], 
-                                   method='bfill')
-                
 
     # Government Invest ......
     if market == 'tw':
@@ -1407,8 +1504,11 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
 
-
     # # 除權息資料 ......
+    # - 手動下載，一年下載一次。由於實際的日期可能會跟預期的不同，所以在2022年時，
+    #   建議重新下載2021年的完整檔案
+    # https://goodinfo.tw/tw/StockDividendScheduleList.asp?MARKET_CAT=%E5%85%A8%E9%83%A8&INDUSTRY_CAT=%E5%85%A8%E9%83%A8&YEAR=%E5%8D%B3%E5%B0%87%E9%99%A4%E6%AC%8A%E6%81%AF            
+            
     # # Close Lag ...
     # daily_close = market_data[['WORK_DATE', 'SYMBOL', 'CLOSE']]
     # daily_close, _ = cbyz.df_add_shift(df=daily_close, 
@@ -1425,7 +1525,8 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                              method='both')
                 
     
-    # # 除權息 ...
+    # 除權息 ...
+    # 重新確認資料源
     # sale_mon_data1, sale_mon_data2 = get_sale_mon_data()
     
     # # Data 1 - 除權息日期及價錢 ...
@@ -1479,7 +1580,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     # # 月營收資料表 ......
     # # 1. 當predict_date=20211101，且為dev時, 造成每一個symbol都有na，先移除
-    # # 1. 主要邏輯就是顯示最新的營收資料
+    # 1. 主要邏輯就是顯示最新的營收資料
     # if market == 'tw':
         
     #     msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
@@ -1487,7 +1588,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #     '''
     #     print(msg)
         
-    #     ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
+        # ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
     #     main_data = main_data \
     #                 .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
     
@@ -1496,9 +1597,18 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     # # 財務報表
     # # - 現在只用單季，需確認是否有缺漏
-    # print('財務報表現在只用單季，需確認是否有缺漏')
-    # # financial_statement = sam_tej_get_ewifinq()
-    
+    print('財務報表現在只用單季，需確認是否有缺漏')
+    if market == 'tw':
+        financial_statement, cols = sam_tej_get_ewifinq()
+        
+        main_data = main_data \
+                .merge(financial_statement, how='left', on=id_keys)
+                
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=[])                
+
     
     # Fiat Currency Exchange
     fx_rate, cols = sam_od_tw_get_fx_rate()
@@ -1508,8 +1618,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                                   sort_keys=time_key, 
                                   method=['ffill', 'bfill'], 
                                   group_by=[])
-
-
 
 
     # 台股加權指數 .......
@@ -1522,14 +1630,11 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                 )
         
         main_data = main_data.merge(tw_index, how='left', on=time_key)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=[])        
 
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='ffill')
-    
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='bfill')     
 
     # S&P 500 ......
     snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
@@ -1546,14 +1651,10 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         main_data = main_data.merge(covid_tw, how='left', on=time_key)
         main_data = cbyz.df_conv_na(df=main_data, cols=cols)
         
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='ffill')
-    
-        main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                   sort_keys=time_key, 
-                                   group_by=[], method='bfill')        
-
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=[])
     elif market == 'en':
         # Future Plan
         # covid_en = sam_covid_19_global()        
@@ -1645,118 +1746,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     return main_data, model_x, scale_orig
 
 
-def get_model_data_archive():
-    
-    # # TEJ 三大法人持股成本 ......
-    # if market == 'tw':
-        
-    #     ewtinst1c_raw = stk.tej_get_ewtinst1c(begin_date=shift_begin,
-    #                                           end_date=None, 
-    #                                           symbol=symbol,
-    #                                           trade=True)
-        
-    #     ewtinst1c = main_data_frame \
-    #                 .merge(ewtinst1c_raw, how='left', on=['WORK_DATE', 'SYMBOL']) \
-    #                 .merge(symbol_df, on=['SYMBOL'])
-    
-    #     cols = cbyz.df_get_cols_except(df=ewtinst1c,
-    #                                     except_cols=['WORK_DATE', 'SYMBOL']) 
-        
-    #     ewtinst1c = cbyz.df_fillna(df=ewtinst1c, cols=cols, 
-    #                                 sort_keys=['SYMBOL', 'WORK_DATE'], 
-    #                                 group_by=[], method='ffill')    
 
-    #     # 獲利率HROI、Sell、Buy用globally normalize，所以要分兩段
-    #     hroi_cols = cbyz.df_get_cols_contains(
-    #         df=ewtinst1c, 
-    #         string=['_HROI', '_SELL', '_BUY']
-    #         )
-                
-    #     if data_form == 1:
-            
-    #         #     ewtinst1c, cols_1, _, _ = \
-    #         #         cbml.ml_data_process(df=ewtinst1c, 
-    #         #                              ma=True, scale=True, lag=True, 
-    #         #                              group_by=[],
-    #         #                              cols=hroi_cols, 
-    #         #                              except_cols=[],
-    #         #                              drop_except=[],
-    #         #                              cols_mode='contains',
-    #         #                              date_col='WORK_DATE',
-    #         #                              ma_values=ma_values, 
-    #         #                              lag_period=predict_period
-    #         #                              ) 
-            
-    #         #     ewtinst1c, cols_2, _, _ = \
-    #         #         cbml.ml_data_process(df=ewtinst1c, 
-    #         #                              ma=True, scale=True, lag=True, 
-    #         #                              group_by=['SYMBOL'],
-    #         #                              cols=['_HAP'], 
-    #         #                              except_cols=[],
-    #         #                              drop_except=[],
-    #         #                              cols_mode='contains',
-    #         #                              date_col='WORK_DATE',
-    #         #                              ma_values=ma_values, 
-    #         #                              lag_period=predict_period
-    #         #                              )
-            
-            
-    #         ewtinst1c, cols_1, _, _ = \
-    #             cbml.ml_data_process(df=ewtinst1c, 
-    #                                   ma=True, scale=True, lag=True, 
-    #                                   group_by=[],
-    #                                   sort_by=['SYMBOL', 'WORK_DATE'],
-    #                                   cols=hroi_cols, 
-    #                                   except_cols=[],
-    #                                   drop_except=[],
-    #                                   cols_mode='contains',
-    #                                   date_col='WORK_DATE',
-    #                                   ma_values=ma_values, 
-    #                                   lag_period=predict_period
-    #                                   ) 
-        
-    #         ewtinst1c, cols_2, _, _ = \
-    #             cbml.ml_data_process(df=ewtinst1c, 
-    #                                   ma=True, scale=True, lag=True, 
-    #                                   group_by=['SYMBOL'],
-    #                                   sort_by=['SYMBOL', 'WORK_DATE'],
-    #                                   cols=['_HAP'], 
-    #                                   except_cols=[],
-    #                                   drop_except=[],
-    #                                   cols_mode='contains',
-    #                                   date_col='WORK_DATE',
-    #                                   ma_values=ma_values, 
-    #                                   lag_period=predict_period
-    #                                   )            
-            
-    #     elif data_form == 2:
-        
-    #         pass
-            
-
-    #     main_data = main_data \
-    #         .merge(ewtinst1c, how='left', on=['SYMBOL', 'WORK_DATE'])  
-        
-    #     print('ewtinst1c Check')
-    #     print('Check - 全部填NA是否合理？')
-    #     main_data = cbyz.df_conv_na(df=main_data, cols=cols_1 + cols_2)
-    #     cbyz.df_chk_col_na(df=main_data, except_cols=var_y, mode='stop')
-    
-    
-    # # Pytrends Data ......
-    # # - Increase prediction time a lot, and made mape decrease.
-    # # - Pytrends已經normalize過後才pivot，但後面又normalize一次
-    # # pytrends, pytrends_cols = get_google_treneds(begin_date=shift_begin, 
-    # #                                               end_date=data_end, 
-    # #                                               scale=True, 
-    # #                                               stock_type=stock_type, 
-    # #                                               local=local)
-    
-    # # main_data = main_data.merge(pytrends, how='left', on=['WORK_DATE'])          
-
-    pass
-    
-    
 
 # %% Master ------
 
@@ -1787,15 +1777,16 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add time_unit as suffix for saved_file of model_data
     # - industry_one_hot 不用df_summary    
     # - Modify dev mode and test mode
-    
     # v2.400 - 20220214
     # - Collect fx_rate in dcm
     # - Add fx_rate to pipeline
     # - Remove open_change_ratio and open from var_y
-    
     # v2.500 - 20220215
+    # v2.501 - 20220216
+    # - Replace YEAR with YEAR_ISO, and WEEK with WEEK_ISO
     
-    
+    # v2.502 - 20220216
+    # - Restore sam_tej_get_ewifinq
     
     
     # Update
@@ -1805,17 +1796,26 @@ def master(param_holder, predict_begin, export_model=True,
     #   or industry or 大盤
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
+    # - 財報的更新時間很慢，20220216的時候，2021年12月的財報還沒出來；所以
+    #   在tej_get_ewtinst1c需要有提醒，列出最新的財報日期，並用assert檢查中間
+    #   是否有空缺
 
 
-    # - 確認TEJ財務報表的資料會不會自動更新
     # - Fix Support and resistant
     # - select_symbols用過去一周的總成交量檢查
-    # - Short term model and long term model be overwirtted
     # 以close price normalize，評估高價股和低價股
+    
+    
+    # Dataset ......
+    # - 美元利率
+    # - 台幣利率
+    # https://www.cbc.gov.tw/tw/np-1166-1.html
+    # - 國際油價
+    # - 確認現金流入率 / 流出率的算法，是否要買賣金額，還是只要有交易額就可以了
     
 
     global version
-    version = 2.400
+    version = 2.502
 
 
     # Tracking
@@ -1832,6 +1832,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - 合併Yahoo Finance和TEJ的market data，兩邊都有可能缺資料。現在的方法是用interpolate，
     #   但如果begin_date剛好缺值，這檔股票就會被排除
     # - 把symbol改成target，且多一個target_type，值可以是symbol或industry
+    # - Add 法說會日期
     
     
     # Bug
@@ -1908,8 +1909,8 @@ def master(param_holder, predict_begin, export_model=True,
     global var_y, var_y_orig
     
     if time_unit == 'w':
-        id_keys = ['SYMBOL', 'YEAR', 'WEEK_NUM']
-        time_key = ['YEAR', 'WEEK_NUM']
+        id_keys = ['SYMBOL', 'YEAR_ISO', 'WEEK_NUM_ISO']
+        time_key = ['YEAR_ISO', 'WEEK_NUM_ISO']
         
     elif time_unit == 'd':
         id_keys = ['SYMBOL', 'WORK_DATE']    
@@ -1940,7 +1941,7 @@ def master(param_holder, predict_begin, export_model=True,
                                shift=-int((max(ma_values) + 20)))
                 
     # 有些資料可能包含非交易日，像是COVID-19，所以需要一個額外的calendar作比對
-    calendar_full_key = calendar[['WORK_DATE', 'YEAR', 'WEEK_NUM']]
+    calendar_full_key = calendar[['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']]
                 
                 
     # ......
@@ -2538,7 +2539,7 @@ def get_season(df):
     
     loc_df = df.copy() \
             .rename(columns={'STOCK_SYMBOL':'SYMBOL'}) \
-            .sort_values(by=['SYMBOL', 'YEAR', 'WEEK_NUM']) \
+            .sort_values(by=['SYMBOL', 'YEAR_ISO', 'WEEK_NUM_ISO']) \
             .reset_index(drop=True)
             
     # loc_df['x'] = loc_df['WORK_DATE'].apply(cbyz.ymd)

@@ -1258,13 +1258,13 @@ if __name__ == '__main__':
     
     
     # Dev - Day
-    # action_daily = \
-    #     master(bt_last_begin=20220214, predict_period=1, 
-    #             time_unit='d', long=False, interval=4, bt_times=1, 
-    #             data_period=int(365 * 1), 
-    #             ma_values=[5,10,20], volume_thld=400,
-    #             compete_mode=0, cv=list(range(3, 4)),
-    #             market='tw', hold=hold)
+    action_daily = \
+        master(bt_last_begin=20220214, predict_period=1, 
+                time_unit='d', long=False, interval=4, bt_times=1, 
+                data_period=int(365 * 1), 
+                ma_values=[5,10,20], volume_thld=400,
+                compete_mode=0, cv=list(range(3, 4)),
+                market='tw', hold=hold)
         
     
     # # Production - Week
