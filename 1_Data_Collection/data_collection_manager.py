@@ -14,7 +14,6 @@ import sys, time, os, gc
 import yfinance as yf
 
 
-host = 3
 host = 2
 host = 0
 
@@ -50,7 +49,7 @@ import arsenal as ar
 import arsenal_stock as stk
 
 import shareholding_spread
-import tej
+import tej_v1_10 as tej
 
 
 # 自動設定區 -------
