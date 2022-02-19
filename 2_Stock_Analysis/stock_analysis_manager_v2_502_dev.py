@@ -23,7 +23,7 @@ import pickle
 host = 3
 host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -52,8 +52,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220216',
-                 r'/home/jupyter/Arsenal/20220216',
+                 r'/home/jupyter/Codebase_YZ/20220219',
+                 r'/home/jupyter/Arsenal/20220219',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -676,101 +676,6 @@ def sam_load_data(industry=True, trade_value=True):
 # ...........
 
 
-def get_sale_mon_data():
-    '''
-    除權息時間
-    1. 檔案放在SAM Resource資料夾中
-    
-    '''
-
-    files = cbyz.os_get_dir_list(path=path_resource + '/sale_mon/',
-                                 level=0, extensions='xlsx', 
-                                 remove_temp=True)
-    files = files['FILES']
-    file_raw = pd.DataFrame()
-    
-    print('os_get_dir_list Bug - 當extensions為xlsx時，也會讀到xls')
-    for i in range(len(files)):
-        
-        if 'xlsx' not in files.loc[i, 'PATH']:
-            continue
-        
-        new_file = pd.read_excel(files.loc[i, 'PATH'])
-        file_raw = file_raw.append(new_file)
-        
-
-    # ['市場', '代碼', '股票名稱', 
-    # '股東會日期', 
-    #  '除息_除息交易日', '除息_除息參考價', 
-    # '除息_填息完成日期', '除息_填息花費日數', '除息_現金股利發放日',
-    #  '除權_除權交易日', '除權_除權參考價', 
-    #  '除權_填權完成日期', '除權_填權花費日數',
-    #  '現金股利_盈餘', '現金股利_公債', '現金股利_合計',
-    #  '股票股利_盈餘', '股票股利_公積', '股票股利_合計', '股利合計']
-
-        
-    # new_cols = range(len(file_raw.columns))
-    # new_cols = ['SALE_MON_' + str(c) for c in new_cols]
-    # file_raw.columns = new_cols
-    file_raw.columns = ['MARKET', 'SYMBOL', 'SYMBOL_NAME', 
-                        'SHAREHOLDER_MEETING_DATE', 
-                        'EX_DIVIDENDS_DATE', 'EX_DIVIDENDS_PRICE',
-                        'EX_DIVIDENDS_FINISH_DATE', 'EX_DIVIDENDS_DAYS',
-                        'CASH_DIVIDENDS_PAY_DATE',
-                        'EX_RIGHTS_DATE', 'EX_RIGHTS_PRICE',
-                        'EX_RIGHTS_FINISH_DATE', 'EX_RIGHTS_DAYS',
-                        'CASH_DIVIDENDS_SURPLUS', 
-                        'CASH_DIVIDENDS_GOVERNMENT_BOND',
-                        'CASH_DIVIDENDS_TOTAL',
-                        'STOCK_DIVIDENDS_SURPLUS', 
-                        'STOCK_DIVIDENDS_GOVERNMENT_BOND',
-                        'STOCK_DIVIDENDS_TOTAL',
-                        'DIVIDENDS_TOTAL']
-    
-    data = file_raw \
-            .copy() \
-            .dropna(subset=['SYMBOL', 'EX_DIVIDENDS_DATE']) \
-            .reset_index(drop=True)
-    
-    drop_cols = ['MARKET', 'SYMBOL_NAME']
-    data = data.drop(drop_cols, axis=1)
-    
-    
-    # Fix Date
-    date_cols = ['SHAREHOLDER_MEETING_DATE', 
-                 'EX_DIVIDENDS_DATE', 'EX_DIVIDENDS_FINISH_DATE',
-                 'CASH_DIVIDENDS_PAY_DATE',
-                 'EX_RIGHTS_DATE', 'EX_RIGHTS_FINISH_DATE']  
-    
-    # data = cbyz.df_conv_col_type(df=data, cols=date_cols, to='str')
-
-
-    print('get_sale_mon_data - 為避免overfitting，只先保留date_cols')
-    data = data[['SYMBOL'] + date_cols]    
-    
-    # Clean Data ......
-    result = pd.DataFrame()
-    
-    # 因為資料很混亂，所以每個日期分別處理
-    for i in range(len(date_cols)):
-        
-        col = date_cols[i]
-        temp_data = data[['SYMBOL', col]].dropna(axis=0)
-        temp_data[col] = '20' + temp_data[col]
-        temp_data = cbyz.df_replace_special(df=temp_data, cols=col, value='')
-        temp_data = cbyz.df_conv_col_type(df=temp_data, cols=col, to='int')
-        temp_data = temp_data.rename(columns={col:'WORK_DATE'})
-        temp_data[col] = 1
-        
-        if i == 0:
-            result = temp_data.copy()
-        else:
-            result = result \
-                .merge(temp_data, how='outer', on=['SYMBOL', 'WORK_DATE'])
-    
-    result = cbyz.df_conv_na(df=result, cols=date_cols, value=0)
-    return result
-
 
 # .............
 
@@ -1044,10 +949,7 @@ def sam_ex_dividend():
     global calendar_full_key, main_data_frame_calendar
     global ma_values, wma    
     
-    # - 手動下載，一年下載一次。由於實際的日期可能會跟預期的不同，所以在2022年時，
-    #   建議重新下載2021年的完整檔案
-    # https://goodinfo.tw/tw/StockDividendScheduleList.asp?MARKET_CAT=%E5%85%A8%E9%83%A8&INDUSTRY_CAT=%E5%85%A8%E9%83%A8&YEAR=%E5%8D%B3%E5%B0%87%E9%99%A4%E6%AC%8A%E6%81%AF            
-            
+    
     # # Close Lag ...
     # daily_close = market_data[['WORK_DATE', 'SYMBOL', 'CLOSE']]
     
@@ -1069,7 +971,7 @@ def sam_ex_dividend():
     #                                    method=['ffill', 'bfill'])
 
     print('sam_ex_dividend - Only return date')
-    result = get_sale_mon_data()
+    result = stk.od_tw_get_ex_dividends()
     cols = cbyz.df_get_cols_except(df=result, 
                                    except_cols=['SYMBOL', 'WORK_DATE'])
     
@@ -1839,6 +1741,7 @@ def master(param_holder, predict_begin, export_model=True,
     # v2.502 - 20220216
     # - Restore sam_tej_get_ewifinq
     # - Set model params for week and day seperately
+    # - Move od_tw_get_ex_dividends to arsenal_stock
     
     
     # Update

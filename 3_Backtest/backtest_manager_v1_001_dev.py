@@ -18,7 +18,7 @@ import random
 host = 3
 host = 2
 host = 4
-# host = 0
+host = 0
 market = 'tw'
 
 
@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220216',
-                 r'/home/jupyter/Arsenal/20220216',
+                 r'/home/jupyter/Codebase_YZ/20220219',
+                 r'/home/jupyter/Arsenal/20220219',
                  path + '/Function',
                  path_sam]
 
@@ -1254,7 +1254,7 @@ if __name__ == '__main__':
     
     # Dev - Week
     action_weekly = \
-        master(bt_last_begin=20220214, predict_period=1, 
+        master(bt_last_begin=20220219, predict_period=1, 
             time_unit='w',long=False, interval=4, bt_times=1, 
             data_period=int(365 * 1), 
             ma_values=[5,10,20], volume_thld=400,
@@ -1266,7 +1266,7 @@ if __name__ == '__main__':
     
     # Dev - Day
     # action_daily = \
-    #     master(bt_last_begin=20220214, predict_period=1, 
+    #     master(bt_last_begin=20220219, predict_period=1, 
     #             time_unit='d', long=False, interval=4, bt_times=1, 
     #             data_period=int(365 * 1), 
     #             ma_values=[5,10,20], volume_thld=400,
@@ -1276,7 +1276,7 @@ if __name__ == '__main__':
     
     # # Production - Week
     # weekly_actions = \
-    #     master(bt_last_begin=20220207, predict_period=1, 
+    #     master(bt_last_begin=20220219, predict_period=1, 
     #            time_unit='w',long=False, interval=4, bt_times=1, 
     #            data_period=int(365 * 5), 
     #            ma_values=[5,10,20,60], volume_thld=400,
@@ -1286,7 +1286,7 @@ if __name__ == '__main__':
 
     # # Production - Day
     # weekly_actions = \
-    #     master(bt_last_begin=20220207, predict_period=1, 
+    #     master(bt_last_begin=20220219, predict_period=1, 
     #            time_unit='d',long=False, interval=4, bt_times=1, 
     #            data_period=int(365 * 5), 
     #            ma_values=[5,10,20,60], volume_thld=400,

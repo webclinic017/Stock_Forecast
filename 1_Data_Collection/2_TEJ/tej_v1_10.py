@@ -15,7 +15,7 @@ import sys, time, os, gc
 
 host = 2
 # host = 4
-# host = 0
+host = 0
 
 market = 'tw'
 
