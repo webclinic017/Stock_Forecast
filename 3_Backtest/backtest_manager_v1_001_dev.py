@@ -798,7 +798,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Replace YEAR with YEAR_ISO, and WEEK with WEEK_ISO
     # v1.001 - 20220216
 
-    
+    # - 當time_unit為w時，讓predict_begin可以不是星期一 >> 直接shift calendar
     
     # Optimization ......
     # - weekly forecast的y如果是price，就應該設為high of high, low of low
@@ -811,7 +811,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
 
 
     # Worklist ......
-    # 1. Remove Open
     # 0. Call notification function in backtest manager, and add stop loss 
     #    in excel
     # 1. Dev為True時就不匯出模型，避免檔案亂掉
@@ -820,7 +819,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 2. Add DIFF_MAPE_MEDIAN
     # 3. 除權息會拉抬N天的服價，把N用weight的方式考慮進去
     # 4. data_process中的lag，應該是要針對vars處理，還是針對y處理？
-    # 5. 美股指數 https://iexcloud.io/pricing/#price-table-section
     # 7. Add machine learning error function
     # 8. 之前的code是不是沒有把股本正確normalize / Add EPS
     # 12. Set the result of long-term MA as a table
@@ -836,7 +834,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 26. Add Auto-Competing Model    
     # 27. Signal A and B，A是反彈的，B是low和close差距N%
     # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
-    # 28. 當bt_times為2，且load_file=false時，重新訓練一次模型就好
 
 
     # # Not Collected Parameters ......
@@ -1268,13 +1265,13 @@ if __name__ == '__main__':
     
     
     # Dev - Day
-    action_daily = \
-        master(bt_last_begin=20220214, predict_period=1, 
-                time_unit='d', long=False, interval=4, bt_times=1, 
-                data_period=int(365 * 1), 
-                ma_values=[5,10,20], volume_thld=400,
-                compete_mode=0, cv=list(range(3, 4)),
-                market='tw', hold=hold)
+    # action_daily = \
+    #     master(bt_last_begin=20220214, predict_period=1, 
+    #             time_unit='d', long=False, interval=4, bt_times=1, 
+    #             data_period=int(365 * 1), 
+    #             ma_values=[5,10,20], volume_thld=400,
+    #             compete_mode=0, cv=list(range(3, 4)),
+    #             market='tw', hold=hold)
         
     
     # # Production - Week
