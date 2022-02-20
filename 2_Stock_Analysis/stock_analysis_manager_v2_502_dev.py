@@ -13,7 +13,6 @@ Created on Sat Nov 14 17:23:08 2020
 # 2. Add crypto
 
 
-
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -21,9 +20,9 @@ import sys, time, os, gc
 import pickle
 
 host = 3
-host = 2
-host = 4
-host = 0
+# host = 2
+# host = 4
+# host = 0
 
 
 # Path .....
@@ -315,7 +314,8 @@ def sam_load_data(industry=True, trade_value=True):
     elif 'CLOSE' in var_y:
         y_scaler = y_scaler_price
         
-    pickle.dump(y_scaler, open(path_temp + '/y_scaler.sav', 'wb'))
+    pickle.dump(y_scaler, 
+                open(path_temp + '/y_scaler_' + time_unit + '.sav', 'wb'))
     
     loc_main = market_data.copy()
     loc_main = loc_main.drop('TOTAL_TRADE_VALUE', axis=1)
@@ -1375,16 +1375,16 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global params, error_msg
     global id_keys
     global main_data
-    global time_unit
+    global time_unit, y_scaler
     
     
     if load_file:
     
-        main_data_file = path_temp + '/model_data.csv'
-        model_x_file = path_temp + '/model_x.csv'
-        norm_orig_file = path_temp + '/norm_orig.csv'
+        main_data_file = path_temp + '/model_data_' + time_unit + '.csv'
+        model_x_file = path_temp + '/model_x_' + time_unit + '.csv'
+        scale_orig_file = path_temp + '/scale_orig_' + time_unit + '.csv'
+        y_scaler_file = path_temp + '/y_scaler_' + time_unit + '.sav'
         
-
         # 為了避免跨日的問題，多計算一天
         today = cbyz.date_get_today()
         
@@ -1396,7 +1396,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         model_x_mdate = cbyz.date_cal(model_x_mdate, 1, 'd')
         model_x_diff = cbyz.date_diff(today, model_x_mdate, absolute=True)
         
-        norm_mdate = cbyz.os_get_file_modify_date(norm_orig_file)
+        norm_mdate = cbyz.os_get_file_modify_date(scale_orig_file)
         norm_mdate = cbyz.date_cal(norm_mdate, 1, 'd')
         norm_diff = cbyz.date_diff(today, norm_mdate, absolute=True)        
 
@@ -1404,13 +1404,18 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         # Ensure files were saved recently
         if main_data_diff <= 2 and  model_x_diff <= 2 and norm_diff <= 2:
             try:
-                main_data = pd.read_csv(main_data_file)
+                model_data = pd.read_csv(main_data_file)
                 model_x = cbyz.li_read_csv(model_x_file)
-                norm_orig = pd.read_csv(norm_orig_file)
+                scale_orig = pd.read_csv(scale_orig_file)
+                y_scaler = pickle.load(open(y_scaler_file, 'rb'))
+                
             except Exception as e:
+                print('get_model_data - fail to load files.')                
                 print(e)
+                
             else:
-                return model_data, model_x, norm_orig                
+                print('get_model_data - load files successfully.')
+                return model_data, model_x, scale_orig                
     
 
     # Check ......
@@ -1688,18 +1693,12 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # Export Model ......
-    main_data.to_csv(path_temp + '/model_data_' + time_unit + '.csv', 
-                     index=False)
-    
-    cbyz.li_to_csv(model_x, path_temp + '/model_x_' + time_unit + '.csv')
-    
-    scale_orig.to_csv(path_temp + '/scale_orig_' + time_unit + '.csv',
-                      index=False)
+    main_data.to_csv(main_data_file, index=False)
+    cbyz.li_to_csv(model_x, model_x_file)
+    scale_orig.to_csv(scale_orig_file, index=False)
         
     return main_data, model_x, scale_orig
-
-
-
+    
 
 # %% Master ------
 
@@ -1742,6 +1741,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - Restore sam_tej_get_ewifinq
     # - Set model params for week and day seperately
     # - Move od_tw_get_ex_dividends to arsenal_stock
+    # - Optimize load_data feature of get_model_data 
     
     
     # Update
@@ -1813,7 +1813,7 @@ def master(param_holder, predict_begin, export_model=True,
     
     global bt_last_begin, data_period, predict_period, long, time_unit
     global dev, test
-    global symbol, ma_values, volume_thld, market, data_form
+    global symbol, ma_values, volume_thld, market, data_form, load_model_data
 
 
     holder = param_holder.params
@@ -1831,6 +1831,7 @@ def master(param_holder, predict_begin, export_model=True,
     ma_values = holder['ma_values'][0]   
     data_form = holder['data_form'][0]   
     time_unit = holder['time_unit'][0]
+    load_model_data = holder['load_model_data'][0]
     
     # Modeling
     predict_period = holder['predict_period'][0]
@@ -1912,8 +1913,8 @@ def master(param_holder, predict_begin, export_model=True,
     # ......
     global model_data, model_x, scale_orig
     model_data, model_x, scale_orig = \
-        get_model_data(industry=industry, 
-                       trade_value=trade_value)
+        get_model_data(industry=industry, trade_value=trade_value,
+                       load_file=load_model_data)
     
     
     # Training Model ......

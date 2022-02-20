@@ -884,6 +884,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     global symbol, _market
     global _bt_last_begin, _bt_last_end
     global serial
+    global load_model_data
 
     _hold = [str(i) for i in hold]
     serial = cbyz.get_time_serial(with_time=True)
@@ -951,6 +952,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
             'predict_period': [predict_period], 
             'data_period':[data_period],
             'data_form':[data_form],
+            'load_model_data':[load_model_data],
             'ma_values':[ma_values],
             'volume_thld':[volume_thld],
             'industry':[True],
@@ -1240,11 +1242,16 @@ if __name__ == '__main__':
     global weekly_actions, daily_actions
     hold = [3596, 6698]
     
-    global dev, test, load_result
+    global dev, test, load_result, load_model_data
     dev = True
+    dev = False
     test = True
+    test = False
     load_result = True    
     load_result = False
+    
+    load_model_data = True
+    load_model_data = False
     
     global action_weekly, action_daily
     
