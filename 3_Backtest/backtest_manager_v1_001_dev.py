@@ -384,7 +384,8 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         precision_week = precision.copy()
     
 
-    if len(bt_result) > 800 or dev:
+    # unit為w時，bt_result約390筆
+    if len(bt_result) > 300 or dev:
         bt_result.to_csv(path_temp + '/bt_result_' + _time_unit + '.csv',
                          index=False)
         
