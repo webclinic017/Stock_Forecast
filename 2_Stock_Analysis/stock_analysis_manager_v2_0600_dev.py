@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# %%
 """
 Created on Sat Nov 14 17:23:08 2020
 
@@ -1668,13 +1667,13 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global chk_predict_na
     if time_unit == 'd':
         predict_df = main_data.merge(predict_date, on=time_key)
+        
     elif time_unit == 'w':
         predict_df = main_data.merge(predict_week, on=time_key)
     
     chk_predict_na = cbyz.df_chk_col_na(df=predict_df, mode='alert')
     
     
-    print('data_form=2時會出錯')
     min_value = chk_predict_na['NA_COUNT'].min()
     max_value = chk_predict_na['NA_COUNT'].max()    
     assert min_value == max_value, 'All the NA_COUNT should be the same.'
@@ -1742,8 +1741,11 @@ def master(param_holder, predict_begin, export_model=True,
     # - Move od_tw_get_ex_dividends to arsenal_stock
     # - Optimize load_data feature of get_model_data 
     
-    # v2.0601 - 20220221
+    # v2.0600 - 20220221
     # - 當time_unit為w時，讓predict_begin可以不是星期一 >> 直接shift calendar
+    # - week_align為True時，get_model_data最下面的assert會出錯
+    # assert min_value == max_value, 'All the NA_COUNT should be the same.'    
+    
     
     # Update
     # Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
@@ -1772,7 +1774,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 2.502
+    version = 2.0600
 
 
     # Tracking
@@ -1904,8 +1906,9 @@ def master(param_holder, predict_begin, export_model=True,
                 stk.get_period(predict_begin=predict_begin,
                                predict_period=predict_period,
                                data_period=data_period,
-                               unit=time_unit,
+                               unit=time_unit, week_align=True,
                                shift=-int((max(ma_values) + 20)))
+                
                 
     # 有些資料可能包含非交易日，像是COVID-19，所以需要一個額外的calendar作比對
     calendar_full_key = calendar[['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']]
