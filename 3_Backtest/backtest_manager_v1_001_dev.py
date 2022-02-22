@@ -801,6 +801,12 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
 
     # - 當time_unit為w時，讓predict_begin可以不是星期一 >> 直接shift calendar
     
+    
+    # Trading Bot
+    # 是不是能在btm中測停損不停利策略
+    # 寫一個stk_simulate()，目的是讓回測的數值可以算得出損益
+    # stop_loss strategy該怎麼寫成function
+    
     # Optimization ......
     # - weekly forecast的y如果是price，就應該設為high of high, low of low
     # 4. Calculate IRR, remove outliers
