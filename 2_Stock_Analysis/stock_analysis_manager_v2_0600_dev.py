@@ -21,7 +21,7 @@ import pickle
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220219',
-                 r'/home/jupyter/Arsenal/20220219',
+                 r'/home/jupyter/Codebase_YZ/20220223',
+                 r'/home/jupyter/Arsenal/20220223',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -66,7 +66,7 @@ import arsenal_stock as stk
 # import ultra_tuner_v0_26 as ut
 # import ultra_tuner_v0_261 as ut
 # import ultra_tuner_v0_27_dev as ut
-import ultra_tuner_v0_29_dev as ut
+import ultra_tuner_v0_29 as ut
 
 ar.host = host
 
@@ -1377,12 +1377,14 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     global time_unit, y_scaler
     
     
-    if load_file:
     
-        main_data_file = path_temp + '/model_data_' + time_unit + '.csv'
-        model_x_file = path_temp + '/model_x_' + time_unit + '.csv'
-        scale_orig_file = path_temp + '/scale_orig_' + time_unit + '.csv'
-        y_scaler_file = path_temp + '/y_scaler_' + time_unit + '.sav'
+    main_data_file = path_temp + '/model_data_' + time_unit + '.csv'
+    model_x_file = path_temp + '/model_x_' + time_unit + '.csv'
+    scale_orig_file = path_temp + '/scale_orig_' + time_unit + '.csv'
+    y_scaler_file = path_temp + '/y_scaler_' + time_unit + '.sav'    
+
+    
+    if load_file:
         
         # 為了避免跨日的問題，多計算一天
         today = cbyz.date_get_today()
@@ -1770,6 +1772,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - 台幣利率
     # https://www.cbc.gov.tw/tw/np-1166-1.html
     # - 國際油價
+    # - 黃金價格
     # - 確認現金流入率 / 流出率的算法，是否要買賣金額，還是只要有交易額就可以了
     
 

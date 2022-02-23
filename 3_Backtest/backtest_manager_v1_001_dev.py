@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220219',
-                 r'/home/jupyter/Arsenal/20220219',
+                 r'/home/jupyter/Codebase_YZ/20220223',
+                 r'/home/jupyter/Arsenal/20220223',
                  path + '/Function',
                  path_sam]
 
@@ -69,7 +69,7 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_11_dev as sam
 # import stock_analysis_manager_v2_112_dev as sam
 # import stock_analysis_manager_v2_400_dev as sam
-import stock_analysis_manager_v2_502_dev as sam
+import stock_analysis_manager_v2_0600_dev as sam
 
 
 
@@ -802,6 +802,11 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - 當time_unit為w時，讓predict_begin可以不是星期一 >> 直接shift calendar
     
     
+    
+    # Bug
+    # - Actions會有大量重複，總筆數11465筆，但直接drop_duplicates()，沒設任何subset後，
+    # 就剩961筆
+    
     # Trading Bot
     # 是不是能在btm中測停損不停利策略
     # 寫一個stk_simulate()，目的是讓回測的數值可以算得出損益
@@ -815,6 +820,8 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 7. Backtest也可以用parameter做A/B        
     # Add signal type: 接下來全部漲，或是先跌再漲
     # 1. 當time_unit為w時，目前的日期一定要用星期一，否則會出錯
+    # - 加入三大法人買賣明細後，df_summary需要加上sum，代表總賣張數，所以不一定完全
+    #   套用global summary params
 
 
     # Worklist ......
@@ -1206,6 +1213,28 @@ def cbmbine_action():
         .merge(action_daily, how='outer', on=action_key)
     
     stk.write_sheet(data=action_final, sheet='Combine')
+    
+    
+def simulate():
+    
+    # 如果time_unit為w，且predict_begin不是星期一的話，WEEK_NUM會shift，這會導致
+    # simulate的時候不準確；但通常只有回測的時候需要simulate
+    data = pd.read_csv(path_temp + '/bt_result_simulate.csv')
+    
+    # Get Hist Data
+    begin_data = data['WORK_DATE'].min()
+    begin_data = cbyz.date_cal(begin_data, -14, 'd')
+    end_date = cbyz.date_get_today()
+  
+    hist_data = stk.get_data(data_begin=begin_data, 
+                             data_end=end_date, 
+                             market=market, 
+                             symbol=symbol, 
+                             price_change=False,
+                             restore=False)
+    
+    Calculate Price
+    Iteration by date
 
 
 
@@ -1251,7 +1280,7 @@ if __name__ == '__main__':
     
     global dev, test, load_result, load_model_data
     dev = True
-    dev = False
+    # dev = False
     test = True
     test = False
     load_result = True    
@@ -1266,9 +1295,11 @@ if __name__ == '__main__':
     # to export temp file
     
     
-    # Dev - Week
+    # Bug, week 的ma_values要跟day不一樣
+    
+    # Week
     action_weekly = \
-        master(bt_last_begin=20220219, predict_period=1, 
+        master(bt_last_begin=20220216, predict_period=1, 
             time_unit='w',long=False, interval=4, bt_times=1, 
             data_period=int(365 * 1), 
             ma_values=[5,10,20], volume_thld=400,
@@ -1277,10 +1308,9 @@ if __name__ == '__main__':
         
     # stk.write_sheet(data=actions, sheet='Week')
     
-    
-    # Dev - Day
+    # Day
     # action_daily = \
-    #     master(bt_last_begin=20220219, predict_period=1, 
+    #     master(bt_last_begin=20220216, predict_period=1, 
     #             time_unit='d', long=False, interval=4, bt_times=1, 
     #             data_period=int(365 * 1), 
     #             ma_values=[5,10,20], volume_thld=400,
@@ -1288,25 +1318,6 @@ if __name__ == '__main__':
     #             market='tw', hold=hold)
         
     
-    # # Production - Week
-    # weekly_actions = \
-    #     master(bt_last_begin=20220219, predict_period=1, 
-    #            time_unit='w',long=False, interval=4, bt_times=1, 
-    #            data_period=int(365 * 5), 
-    #            ma_values=[5,10,20,60], volume_thld=400,
-    #            compete_mode=0, cv=list(range(3, 4)),
-    #            market='tw', hold=hold)
-
-
-    # # Production - Day
-    # weekly_actions = \
-    #     master(bt_last_begin=20220219, predict_period=1, 
-    #            time_unit='d',long=False, interval=4, bt_times=1, 
-    #            data_period=int(365 * 5), 
-    #            ma_values=[5,10,20,60], volume_thld=400,
-    #            compete_mode=0, cv=list(range(3, 4)),
-    #            market='tw', hold=hold)
-        
         
         
         
