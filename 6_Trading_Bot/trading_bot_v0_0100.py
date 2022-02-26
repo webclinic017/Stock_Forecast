@@ -25,23 +25,19 @@ market = 'tw'
 # Path .....
 if host == 0:
     # Home
-    path = '/Users/aron/Documents/GitHub/Stock_Forecast/3_Backtest'
-    path_sam = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
+    path = '/Users/aron/Documents/GitHub/Stock_Forecast/6_Trading_Bot'
 
 elif host == 2:
     # PythonAnyWhere
-    path = '/home/jupyter/Production/3_Backtest'
-    path_sam = '/home/jupyter/Production/2_Stock_Analysis'    
+    path = '/home/jupyter/Production/6_Trading_Bot'
     
 elif host == 3:
     # GCP
-    path = '/home/jupyter/Develop/3_Backtest'
-    path_sam = '/home/jupyter/Develop/2_Stock_Analysis'      
+    path = '/home/jupyter/Develop/6_Trading_Bot'
 
 elif host == 4:    
     # RT
-    path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\3_Backtest'
-    path_sam = r'D:\Data_Mining\GitHub共用\Stock_Forecast\2_Stock_Analysis'    
+    path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\6_Trading_Bot'
 
 
 # Codebase ......
@@ -50,8 +46,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220219',
-                 r'/home/jupyter/Arsenal/20220219',
+                 r'/home/jupyter/Codebase_YZ/20220223',
+                 r'/home/jupyter/Arsenal/20220223',
                  path + '/Function',
                  path_sam]
 
@@ -69,7 +65,7 @@ import codebase_ml as cbml
 # import stock_analysis_manager_v2_11_dev as sam
 # import stock_analysis_manager_v2_112_dev as sam
 # import stock_analysis_manager_v2_400_dev as sam
-import stock_analysis_manager_v2_502_dev as sam
+# import stock_analysis_manager_v2_502_dev as sam
 
 
 
@@ -122,6 +118,11 @@ def master():
         # - Can I request multiple symbols from fugle
         for s in symbols:
             master_single()
+            
+        # Multiprocessing and Lock
+        # https://stackoverflow.com/questions/70516936/python-multiprocessing-api-query            
+        # https://dmort-ca.medium.com/part-2-multiprocessing-api-requests-with-python-19e593bd7904
+            
 
         stop_loss()
 

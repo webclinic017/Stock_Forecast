@@ -1755,6 +1755,8 @@ def master(param_holder, predict_begin, export_model=True,
     
     # v3.0000 - 20220225
     # - 開發重心轉移至trading bot
+    # - Drop correlated columns in variable function, or it will cause 
+    #   expensive to execute this in the ultra_tuner
     
     
     global version
