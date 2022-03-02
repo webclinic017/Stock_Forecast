@@ -18,7 +18,7 @@ import random
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 market = 'tw'
 
 
@@ -67,7 +67,7 @@ import arsenal_stock as stk
 import codebase_ml as cbml
 # import stock_analysis_manager_v2_400_dev as sam
 # import stock_analysis_manager_v2_502_dev as sam
-import stock_analysis_manager_v2_0600_dev as sam
+import stock_analysis_manager_v3_0000_dev as sam
 
 
 
@@ -244,7 +244,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
                      data_period):
     
     global symbol, _market, bt_info, _bt_times, _ma_values
-    global _time_unit
+    global _time_unit, _bt_last_begin
     global dev, test
 
     # New Global Vars
@@ -254,15 +254,17 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     global pred_scores, pred_features, pred_params
     
     
+    suffix = _time_unit + '_' + str(_bt_last_begin)
+    
     if load_result:
-        bt_result_file = path_temp + '/bt_result_' + _time_unit + '.csv'
-        precision_file = path_temp + '/precision_' + _time_unit + '.csv'
-        sam_calendar_file = path_temp + '/sam_calendar_' + _time_unit + '.csv'        
+        bt_result_file = path_temp + '/bt_result_' + suffix + '.csv'
+        precision_file = path_temp + '/precision_' + suffix + '.csv'
+        sam_calendar_file = path_temp + '/sam_calendar_' + suffix + '.csv'        
         sam_predict_date_file = path_temp + '/sam_predict_date_' \
-                                + _time_unit + '.csv'
+                                + suffix + '.csv'
 
         sam_predict_week_file = path_temp + '/sam_predict_week_' \
-                                + _time_unit + '.csv'
+                                + suffix + '.csv'
 
         today = cbyz.date_get_today()
         
@@ -382,21 +384,21 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
 
     if len(bt_result) > 300  or dev:
-        bt_result.to_csv(path_temp + '/bt_result_' + _time_unit + '.csv',
+        bt_result.to_csv(path_temp + '/bt_result_' + suffix + '.csv',
                          index=False)
         
-        sam_calendar.to_csv(path_temp + '/sam_calendar_' + _time_unit + '.csv',
+        sam_calendar.to_csv(path_temp + '/sam_calendar_' + suffix + '.csv',
                             index=False)
         
         sam_predict_date.to_csv(path_temp + '/sam_predict_date_' \
-                                + _time_unit + '.csv',
+                                + suffix + '.csv',
                                 index=False)        
         
         sam_predict_week.to_csv(path_temp + '/sam_predict_week_' \
-                                + _time_unit + '.csv',
+                                + suffix + '.csv',
                                 index=False)        
 
-        precision.to_csv(path_temp + '/precision_' + _time_unit + '.csv',
+        precision.to_csv(path_temp + '/precision_' + suffix + '.csv',
                          index=False)
 
 
@@ -792,8 +794,9 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Replace YEAR with YEAR_ISO, and WEEK with WEEK_ISO
     
     # v1.0100 - 20220216
-    # - 當time_unit為w時，讓predict_begin可以不是星期一 >> 直接shift calendar
+    # - 當time_unit為w時，讓predict_begin可以不是星期一
     # - Rename backtest_manager_v1_001_dev as backtest_manager_v1_0100_dev
+    # - Add date as suffix of bt_result
     
 
 

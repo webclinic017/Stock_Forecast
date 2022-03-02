@@ -21,7 +21,7 @@ import pickle
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -816,6 +816,10 @@ def set_frame():
     
     # Organize
     main_data_frame = main_data_frame[id_keys]
+    
+    global debug
+    debug = main_data_frame.copy()
+    
     main_data_frame = ar.df_simplify_dtypes(df=main_data_frame)
     
     print('Check - main_data_frame_calendar是否等同calendar_lite')
@@ -1757,10 +1761,13 @@ def master(param_holder, predict_begin, export_model=True,
     # - 開發重心轉移至trading bot
     # - Drop correlated columns in variable function, or it will cause 
     #   expensive to execute this in the ultra_tuner
+
+    # v3.0100 - 
+    # - Update for ut v2.xxxs
     
     
     global version
-    version = 2.0600
+    version = 3.0000
     
     # Update
     # - Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，
@@ -1887,6 +1894,8 @@ def master(param_holder, predict_begin, export_model=True,
     global df_summary_mean, df_summary_min, df_summary_max
     global df_summary_median, df_summary_std
     
+    
+    print('有些dataset需要sum，如交易量')
     df_summary_mean = True
     df_summary_min = True
     df_summary_max = True
@@ -1897,7 +1906,7 @@ def master(param_holder, predict_begin, export_model=True,
     # Calendar ------
     global shift_begin, shift_end, data_begin, data_end
     global predict_date, predict_week
-    global calendar, calendar_full, calendar_full_key
+    global calendar, calendar_full_key
     
     shift_begin, shift_end, data_begin, data_end, \
         predict_date, predict_week, calendar = \
@@ -1906,8 +1915,11 @@ def master(param_holder, predict_begin, export_model=True,
                                data_period=data_period,
                                unit=time_unit, week_align=True,
                                shift=-int((max(ma_values) + 20)))
-                
-                
+
+    # df may have na if week_align is true
+    if time_unit == 'w':
+        calendar = calendar.dropna(subset=time_key, axis=0)
+        
     # 有些資料可能包含非交易日，像是COVID-19，所以需要一個額外的calendar作比對
     calendar_full_key = calendar[['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']]
                 
