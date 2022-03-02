@@ -107,7 +107,9 @@ def update(begin=None, end=None, ewprcd=True, ewtinst1c=True,
 
     if begin == None and end == None:
         end = cbyz.date_get_today()
-        begin = cbyz.date_cal(end, -7, 'd')
+        begin = cbyz.date_cal(end, -14, 'd')
+        
+    print('tej update - ' + str(begin) + ' - ' + str(end)) 
     
     
     # Time Setting

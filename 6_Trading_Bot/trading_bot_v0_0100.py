@@ -18,7 +18,7 @@ import random
 host = 3
 host = 2
 host = 4
-host = 0
+# host = 0
 market = 'tw'
 
 
@@ -60,19 +60,16 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-import codebase_ml as cbml
-# import stock_analysis_manager_v2_10_dev as sam
-# import stock_analysis_manager_v2_11_dev as sam
-# import stock_analysis_manager_v2_112_dev as sam
+# import codebase_ml as cbml
 # import stock_analysis_manager_v2_400_dev as sam
 # import stock_analysis_manager_v2_502_dev as sam
 
 
-import trading_bot_function as tbf
-import multiprocessing as mp
+# import multiprocessing as mp
+# import trading_bot_function as tbf
 import fugle_v1_0100_dev as fugle
 
-
+ar.host = host
 
 
 
@@ -91,7 +88,6 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
-
 def master_single():
     
     # new_data = query_quote()
@@ -103,8 +99,19 @@ def master_single():
     
 
 
-
 def master():
+    
+    
+    
+    
+    # Version Plan
+    # v1. Only Sell, Not Buy
+    # v2. Automatically sell and buy    
+    
+    
+    # Worklist
+    # - Multiprocessing
+    
     
     
     # Sell Signal
@@ -123,18 +130,17 @@ def master():
     
     
     
-    # v1. Only Sell, Not Buy
-    # v2. Automatically sell and buy
-    import multiprocessing
-    stop_loss = 0.7
+
+    # import multiprocessing
+    # stop_loss = 0.7
     
-    # Schedule to restart
-    connnect_sql()
+    # # Schedule to restart
+    # connnect_sql()
     
-    ledger = stk.read_ledger()
+    # ledger = stk.read_ledger()
     
-    target = [2601]
-    ignore_symbol = []
+    # target = [2601]
+    # ignore_symbol = []
     
     
     while 2 > 1:
@@ -181,26 +187,11 @@ def master():
 
 
 
-def work(number):
-    """
-    Multiprocessing work
-    
-    Parameters
-    ----------
-    number : integer
-        unit of work number
-    """
-    
-    print("Unit of work number %d" % number)  # simply print the worker's number
+
+# %% Archive ------
 
 
-
-
-# def multiprocessing_api_call():
-    
-if __name__ == "__main__":    
-    
-    
+def multiplrocessing_archive():
     
     # - https://cslocumwx.github.io/blog/2015/02/23/python-multiprocessing/
     # Since Python will only run processes on available cores, setting 
@@ -213,21 +204,20 @@ if __name__ == "__main__":
     # - Multiprocessing for heavy API requests with Python and the PokéAPI
     #   https://hackernoon.com/multiprocessing-for-heavy-api-requests-with-python-and-the-pokeapi-3u4h3ypn
     
-    cpu_count = mp.cpu_count()
-    cpu_count = max(cpu_count -1, 1)
+    # cpu_count = mp.cpu_count()
+    # cpu_count = max(cpu_count -1, 1)
     # cpu_count = 2 # Dev 
     # max_number_processes = cpu_count
     
     
-    
     # Test 1 ......
-    with mp.Pool(5) as p:
-        print(p.map(tbf.test1_fun, [1, 2, 3]))    
+    # with mp.Pool(5) as p:
+    #     print(p.map(tbf.test1_fun, [1, 2, 3]))    
 
 
-    # Test 2 ......
-    with mp.Pool(5) as p:
-        print(p.map(tbf.test2_fun, [1, 2, 3]))
+    # # Test 2 ......
+    # with mp.Pool(5) as p:
+    #     print(p.map(tbf.test2_fun, [1, 2, 3]))
      
     
     # multiprocessing_lock = multiprocessing.Lock()
@@ -239,9 +229,6 @@ if __name__ == "__main__":
     # results = pool.map_async(tbf.api_query_process, tasks)
     # pool.close()
     # pool.join()    
-    
-
- 
     
     
     # def locked_api_query_process(cloud_type, api_name, cloud_account, resource_type):
@@ -267,19 +254,16 @@ if __name__ == "__main__":
             
     #     for job in jobs:
     #         job.wait()
+
+    pass
+
+
+# %% Execution ------
     
-
-
-# 資料科學家的難題與困境
-# 1. 因為習慣用資料思考，但很多前瞻性，根本還沒有發生的事情，根本不能用這種方式作判斷
-# 2. 因為習慣用數據佐境，
-# 3. 使用的都是歷史資料，代表前過去的經驗得出預測結果
-
-
-
-
-
-
-
-
+    
+if __name__ == "__main__":    
+    
+    
+    pass
+    
 
