@@ -18,7 +18,7 @@ import random
 host = 3
 host = 2
 host = 4
-# host = 0
+host = 0
 market = 'tw'
 
 
@@ -38,6 +38,7 @@ elif host == 3:
 elif host == 4:    
     # RT
     path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\6_Trading_Bot'
+
 
 
 # Codebase ......
@@ -99,24 +100,34 @@ def master_single():
     
 
 
-def master():
+def master_level_1():
     
-    
-    
-    
-    # Version Plan
-    # v1. Only Sell, Not Buy
-    # v2. Automatically sell and buy    
-    
+    # Version Plan ......
+    # - Level 1只能賣不能買，設一些簡單的條件停損或是在下跌的時候獲利了結
+    # - Level 2是每天給幾萬塊的扣打，只能從選我給的幾個標的中買進
+    # - Level 3才讓模型自選標的        
     
     # Worklist
     # - Multiprocessing
-    
+    # - Set global complete marke_data in stk
+    # - Review buy_signa, did the price of symbol increase in the past days
     
     
     # Sell Signal
     # - 停損不停利策略
     # - 事先預判有多少法人持股，如果數量很少，當他們賣的時候就要跟著賣了
+        
+
+
+    # Ledger
+    ledger, hold_volume, hold_data = \
+        stk.get_ledger(begin_date=None, end_date=None, market=market)
+    
+    
+    
+    
+
+    
     
     # Fugle API ......
     # HTTP request 每分鐘	60
