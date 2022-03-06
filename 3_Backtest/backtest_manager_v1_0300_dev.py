@@ -17,7 +17,7 @@ import random
 
 host = 3
 # host = 2
-host = 4
+# host = 4
 host = 0
 market = 'tw'
 
@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220223',
-                 r'/home/jupyter/Arsenal/20220223',
+                 r'/home/jupyter/Codebase_YZ/20220305',
+                 r'/home/jupyter/Arsenal/20220305',
                  path + '/Function',
                  path_sam]
 
@@ -245,7 +245,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
     global symbol, _market, bt_info, _bt_times, _ma_values
     global _time_unit, _bt_last_begin
-    global dev, test
+    global dev, test, serial
 
     # New Global Vars
     global bt_results_raw, bt_result
@@ -257,18 +257,41 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     suffix = _time_unit + '_' + str(_bt_last_begin)
     
     if load_result:
-        bt_result_file = path_temp + '/bt_result_' + suffix + '.csv'
-        precision_file = path_temp + '/precision_' + suffix + '.csv'
-        sam_calendar_file = path_temp + '/sam_calendar_' + suffix + '.csv'        
+        
+        # Search for suffix and the serial of last executed
+        files = cbyz.os_get_dir_list(path=path_temp, level=-1, 
+                                     extensions='csv', remove_temp=True)
+        
+        files = files['FILES']
+        files = files[files['FILE_NAME'].str.contains('bt_result_' + suffix)] \
+                .sort_values(by='FILE_NAME', ascending=False) \
+                .reset_index(drop=True)
+        
+        # File Serial
+        file_serial = files.loc[0, 'FILE_NAME']
+        file_serial = file_serial[-19:- 4]
+        
+        
+        # ......
+        bt_result_file = path_temp + '/bt_result_' \
+                        + suffix + '-' + file_serial + '.csv'
+                            
+        precision_file = path_temp + '/precision_' \
+                        + suffix + '-' + file_serial + '.csv'
+            
+        sam_calendar_file = path_temp + '/sam_calendar_' \
+                        + suffix + '-' + file_serial + '.csv'
+                        
         sam_predict_date_file = path_temp + '/sam_predict_date_' \
-                                + suffix + '.csv'
+                                + suffix + '-' + file_serial + '.csv'
 
         sam_predict_week_file = path_temp + '/sam_predict_week_' \
-                                + suffix + '.csv'
+                                + suffix + '-' + file_serial + '.csv'
 
         today = cbyz.date_get_today()
         
-        # 為了避免跨日的問題，多計算一天
+        # 為了避免跨日的問題，多計算一天 ......
+        print('這段真的需要嗎')
         bt_result_mdate = cbyz.os_get_file_modify_date(bt_result_file)
         bt_result_mdate = cbyz.date_cal(bt_result_mdate, 1, 'd')
         bt_result_date_diff = cbyz.date_diff(today, bt_result_mdate, 
@@ -367,10 +390,11 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     # Organize ......
     bt_result = ar.df_simplify_dtypes(df=bt_results_raw)
     bt_result = bt_result.reset_index(drop=True)
+    bt_result['SAM_VERSION'] = sam.version
     
     var_y = cbyz.df_get_cols_except(
         df=bt_result, 
-        except_cols=id_keys + ['BACKTEST_ID']
+        except_cols=id_keys + ['BACKTEST_ID', 'SAM_VERSION']
         )
     
     
@@ -384,21 +408,24 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     
 
     if len(bt_result) > 300  or dev:
-        bt_result.to_csv(path_temp + '/bt_result_' + suffix + '.csv',
+        bt_result.to_csv(path_temp + '/bt_result_' \
+                         + suffix + '_' + serial + '.csv',
                          index=False)
         
-        sam_calendar.to_csv(path_temp + '/sam_calendar_' + suffix + '.csv',
+        sam_calendar.to_csv(path_temp + '/sam_calendar_' \
+                            + suffix + '_' + serial + '.csv',
                             index=False)
         
         sam_predict_date.to_csv(path_temp + '/sam_predict_date_' \
-                                + suffix + '.csv',
+                                + suffix + '_' + serial + '.csv',
                                 index=False)        
         
         sam_predict_week.to_csv(path_temp + '/sam_predict_week_' \
-                                + suffix + '.csv',
+                                + suffix + '_' + serial + '.csv',
                                 index=False)        
 
-        precision.to_csv(path_temp + '/precision_' + suffix + '.csv',
+        precision.to_csv(path_temp + '/precision_' \
+                         + suffix + '_' + serial + '.csv',
                          index=False)
 
 
@@ -777,7 +804,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     '''
     主工作區
     '''
-    
 
     # v0.0781 - 20220124
     # - Add Time Unit
@@ -792,12 +818,17 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # v1.000 - 20220214
     # - Remove open from var_y
     # - Replace YEAR with YEAR_ISO, and WEEK with WEEK_ISO
-    
     # v1.0100 - 20220216
     # - 當time_unit為w時，讓predict_begin可以不是星期一
     # - Rename backtest_manager_v1_001_dev as backtest_manager_v1_0100_dev
     # - Add date as suffix of bt_result
+    # v1.0200 - 20220305
+    # - Add time serial of execution as suffix of bt_result to prevent 
+    #   duplicated and overwrite
+    # - Add SAM version in the bt_result
     
+    # v1.0300 - 20220305
+    # - Calculate data_period from 20170101
 
 
     # Bug
@@ -813,6 +844,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     
     
     # Optimization ......
+    # 讓data begin都從20170101開始；如果超出db實際有的資料會怎樣
     # - weekly forecast的y如果是price，就應該設為high of high, low of low
     # 4. Calculate IRR, remove outliers
     # 5. Google Sheet Add Manual Tick
@@ -851,6 +883,25 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 26. Add Auto-Competing Model    
     # 27. Signal A and B，A是反彈的，B是low和close差距N%
     # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
+    # - DRL資產配置
+    #   http://nccur.lib.nccu.edu.tw/bitstream/140.119/137167/1/100701.pdf
+    # - 賽局理論
+    #   https://luckylong.pixnet.net/blog/post/61539988
+    #   證券市場主力與散戶投資人跟從行為之研究 - ─一個簡單的賽局模型
+    #   http://www.bm.nsysu.edu.tw/tutorial/vwliu/Publish/Journal/Herd%20Behavior.pdf
+
+    # - Entity Resolution
+    #   不同的資料顆粒度導致same value issues 不確定有沒有誤解名詞的意思
+    #   An introduction to Entity Resolution — needs and challenges
+    #   https://towardsdatascience.com/an-introduction-to-entity-resolution-needs-and-challenges-97fba052dde5
+    # 
+    #   ERBlox: Combining matching dependencies with machine learning for entity resolution
+    #   https://www.sciencedirect.com/science/article/pii/S0888613X17300439
+    # 
+    #   How to Perform Data Cleaning for Machine Learning with Python
+    #   https://machinelearningmastery.com/basic-data-cleaning-for-machine-learning/
+
+
 
 
     # # Not Collected Parameters ......
@@ -1087,7 +1138,9 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
                             predict_begin=_bt_last_begin)            
     
         # View And Log .....
-        view_yesterday()
+        print(('view_yesterday暫時移除，time_unit為w時，actions中沒有LAST_DATE，'
+               '所以會出錯'))
+        # view_yesterday()
 
         
         # Error when load_result = True
@@ -1103,7 +1156,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     return actions
 
 
-def master_histor():
+def master_history():
 
     # v0.0 - First Version
     # v0.1
@@ -1186,7 +1239,7 @@ def verify_prediction_results():
                             market='tw', 
                             symbol=[], 
                             price_change=True,
-                            adj=True, 
+                            ratio_limit=True, 
                             price_limit=False, 
                             trade_value=False)
 
@@ -1506,9 +1559,9 @@ if __name__ == '__main__':
     
     global dev, test, load_result, load_model_data
     dev = True
-    # dev = False
+    dev = False
     test = True
-    test = False
+    # test = False
     load_result = True    
     load_result = False
     
@@ -1522,9 +1575,15 @@ if __name__ == '__main__':
     
     
     if not dev:
-        data_period = int(365 * 5)
+        # - TEJ的資料從2017年開始，但用dev的測試結果，即使data_period從20150110開始算
+        #   也不會出錯
+        # - TEJ報價
+        #   集保股權分散的資料，個人使用9000/年，歷史資料5400/年
+        today = cbyz.date_get_today()
+        data_period = cbyz.date_diff(today, 20170101, absolute=True)
     else:
         data_period = 365    
+    
     
     
     # Week

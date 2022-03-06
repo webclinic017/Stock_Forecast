@@ -68,7 +68,7 @@ import arsenal_stock as stk
 
 # import multiprocessing as mp
 # import trading_bot_function as tbf
-import fugle_v1_0100_dev as fugle
+import fugle_v1_0100_dev as arfg
 
 ar.host = host
 
@@ -95,7 +95,6 @@ def master_single():
     
     # extract price and volume 
     # append(new_data)
-    
     pass
     
 
@@ -107,8 +106,17 @@ def master_level_1():
     # - Level 2是每天給幾萬塊的扣打，只能從選我給的幾個標的中買進
     # - Level 3才讓模型自選標的        
     
+    
+    # v0.0100
+    # - First version
+    
+    # v0.0200
+    # - 考慮query_quote時剛好刷新max high的記錄
+    
+    
     # Worklist
-    # - Multiprocessing
+    # - New symbol strategy，大部份新股在上市櫃後是否都會上漲，如果再加停損不停利策略，
+    #   這樣勝率是不是會很高
     # - Set global complete marke_data in stk
     # - Review buy_signa, did the price of symbol increase in the past days
     
@@ -119,16 +127,73 @@ def master_level_1():
         
 
 
-    # Ledger
+    # Get Mean Cost ......
+    
+    # Develop
     ledger, hold_volume, hold_data = \
-        stk.get_ledger(begin_date=None, end_date=None, market=market)
+        stk.get_ledger(begin_date=20220101, end_date=20220120, market=market)
+    
+    # # Production
+    # ledger, hold_volume, hold_data = \
+    #     stk.get_ledger(begin_date=None, end_date=None, market=market)
+
+
+    # Hold Symbol
+    hold = hold_volume['SYMBOL'].tolist()
     
     
+    # Mean Cost
+    hold_data = hold_data \
+                .groupby(['SYMBOL']) \
+                .agg({'WORK_DATE':'min',
+                      'VOLUME':'sum',
+                      'COST':'sum'}) \
+                .reset_index()
     
+    hold_data['COST_MEAN'] = hold_data['COST'] / hold_data['VOLUME']
+    
+    
+    # First BUy
+    first_buy = hold_data[['SYMBOL', 'WORK_DATE']] \
+                .sort_values(by=['SYMBOL', 'WORK_DATE'], ascending=True) \
+                .drop_duplicates(subset=['SYMBOL']) \
+                .reset_index(drop=True)
+                
+    first_buy['KEEP'] = 1
+    
+    
+    # Market Data ......
+    min_date = hold_data['WORK_DATE'].min()
+    today = cbyz.date_get_today()
+    
+    market_data = stk.get_data(data_begin=min_date, data_end=today, 
+                               market=market, restore=True, unit='d', 
+                               symbol=symbol, ratio_limit=True, 
+                               price_change=False, price_limit=True,
+                               trade_value=False)
+    
+    # Stop Loss
+    stop_loss = market_data \
+        .merge(first_buy, how='left', on=['SYMBOL', 'WORK_DATE'])
+        
+    stop_loss = cbyz.df_fillna(df=stop_loss, cols='KEEP', 
+                               sort_keys=['SYMBOL', 'WORK_DATE'], 
+                               group_by=['SYMBOL'], method='ffill')
+    
+    stop_loss = stop_loss.dropna(subset=['KEEP'], axis=0)
+    stop_loss = stop_loss \
+                .groupby(['SYMBOL']) \
+                .agg({'HIGH':'max'}) \
+                .reset_index()
+                
+    stop_loss = stop_loss \
+        .merge(hold_data, how='left', on='SYMBOL')
+     
+    # 本來設定0.8，但0.8很容易超過
+    stop_loss['STOP_LOSS'] = stop_loss['COST_MEAN'] \
+        + (stop_loss['HIGH'] - stop_loss['COST_MEAN']) * 0.7
     
 
-    
-    
     # Fugle API ......
     # HTTP request 每分鐘	60
     # WebSocket 連線數 5    
@@ -141,11 +206,7 @@ def master_level_1():
     
     
     
-
-    # import multiprocessing
-    # stop_loss = 0.7
-    
-    # # Schedule to restart
+    # Schedule to restart
     # connnect_sql()
     
     # ledger = stk.read_ledger()
@@ -156,24 +217,26 @@ def master_level_1():
     
     while 2 > 1:
         
+        Bug, query quote一定要從arfg啟動嗎？還是可以從其他fuction呼叫，後者的話還需要
+        儲存嗎
+        arfg.query_quote(hold)
         
         # Reference ......
         # # - Can I request multiple symbols from fugle
         # for s in symbols:
         #     master_single()
             
-        # 1. Multiprocessing and Lock
-        # https://stackoverflow.com/questions/70516936/python-multiprocessing-api-query            
-        # https://dmort-ca.medium.com/part-2-multiprocessing-api-requests-with-python-19e593bd7904
-            
-        # 2. Multiprocessing example giving AttributeError
-        # https://stackoverflow.com/questions/41385708/multiprocessing-example-giving-attributeerror
 
         # stop_loss()
+        
+        
+
+        if sell:
+            hold.remove(sell_symbol)
 
 
         # if mode == 1:
-        #     Stimulate()
+        #     Simulate()
             
         # elif mode == 2:
         #     # Enhance Learning()
@@ -192,7 +255,7 @@ def master_level_1():
         #     pass
 
 
-        sys.sleep(2)
+        sys.sleep(1)
 
 
 
@@ -203,6 +266,14 @@ def master_level_1():
 
 
 def multiplrocessing_archive():
+
+    # 1. Multiprocessing and Lock
+    # https://stackoverflow.com/questions/70516936/python-multiprocessing-api-query            
+    # https://dmort-ca.medium.com/part-2-multiprocessing-api-requests-with-python-19e593bd7904
+        
+    # 2. Multiprocessing example giving AttributeError
+    # https://stackoverflow.com/questions/41385708/multiprocessing-example-giving-attributeerror
+
     
     # - https://cslocumwx.github.io/blog/2015/02/23/python-multiprocessing/
     # Since Python will only run processes on available cores, setting 

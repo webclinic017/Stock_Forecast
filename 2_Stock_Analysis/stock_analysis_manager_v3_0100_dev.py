@@ -1767,6 +1767,8 @@ def master(param_holder, predict_begin, export_model=True,
     # - Drop correlated columns in variable function, or it will cause 
     #   expensive to execute this in the ultra_tuner
     
+    
+    
     # Bug
     # SNP有NA是合理的嗎？
     #                      COLUMN  NA_COUNT
@@ -1785,7 +1787,7 @@ def master(param_holder, predict_begin, export_model=True,
 
     
     global version
-    version = 3.0000
+    version = 3.0100
     
     # Update
     # - Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，
