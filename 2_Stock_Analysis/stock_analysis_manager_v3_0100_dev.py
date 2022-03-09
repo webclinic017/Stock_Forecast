@@ -18,6 +18,7 @@ import numpy as np
 import sys, time, os, gc
 import pickle
 
+
 host = 3
 # host = 2
 # host = 4
@@ -836,9 +837,9 @@ def set_frame():
 
 def sam_buffett_indicator():
     
-    global time_key
+    global id_keys, time_key
     global calendar_full_key, main_data_frame_calendar
-    global ma_values, wma    
+    global ma_values, wma, corr_threshold
     
     result = stk.cal_buffett_indicator(
             end_date=predict_date.loc[len(predict_date) - 1, 'WORK_DATE']
@@ -877,6 +878,12 @@ def sam_buffett_indicator():
                 add_max=True, add_median=True, add_std=True, 
                 add_skew=False, add_count=False, quantile=[]
                 )    
+            
+
+    # Drop Highly Correlated Features
+    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)
+            
 
     # Merge ......
     result = main_data_frame_calendar \
@@ -890,9 +897,9 @@ def sam_buffett_indicator():
 
 def sam_covid_19_tw():
     
-    global time_key
+    global id_keys, time_key
     global calendar_full_key, main_data_frame_calendar
-    global ma_values, wma
+    global ma_values, wma, corr_threshold
     global df_summary_mean, df_summary_min, df_summary_max
     global df_summary_median, df_summary_std    
     
@@ -935,6 +942,11 @@ def sam_covid_19_tw():
                 add_std=df_summary_std, 
                 add_skew=False, add_count=False, quantile=[]
                 )
+
+    # Drop Highly Correlated Features
+    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)
+        
     
     # Merge ......
     result = main_data_frame_calendar \
@@ -948,9 +960,9 @@ def sam_covid_19_tw():
     
 def sam_ex_dividend():
     
-    global time_key
+    global id_keys, time_key
     global calendar_full_key, main_data_frame_calendar
-    global ma_values, wma    
+    global ma_values, wma, corr_threshold
     
     
     # # Close Lag ...
@@ -1008,6 +1020,12 @@ def sam_ex_dividend():
                 .groupby(id_keys) \
                 .max() \
                 .reset_index()
+                
+                
+    # Drop Highly Correlated Features                
+    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)
+        
             
     # Merge ......
     result = main_data_frame_calendar \
@@ -1025,7 +1043,9 @@ def sam_ex_dividend():
 
 def sam_tw_gov_invest(dev=False):
     
-    global time_key, symbol_df, calendar_key
+    global symbol_df, calendar_key
+    global id_keys, time_key, var_y, corr_threshold
+    
     result = stk.od_tw_get_gov_invest(path=path_resource)
     
     if not dev:
@@ -1039,6 +1059,11 @@ def sam_tw_gov_invest(dev=False):
     if time_unit == 'w':
         result = result.merge(calendar_key, how='left', on='WORK_DATE')
         result = result.drop('WORK_DATE', axis=1)
+        
+        
+    # Drop Highly Correlated Features
+    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)
     
     return result
     
@@ -1048,7 +1073,9 @@ def sam_tw_gov_invest(dev=False):
 
 def sam_tw_gov_own(dev=False):
     
-    global time_key, symbol_df, calendar_key
+    global id_keys, time_key, symbol_df, calendar_key
+    global corr_threshold
+    
     result = stk.od_tw_get_gov_own(path=path_resource)
     
     if not dev:
@@ -1062,6 +1089,10 @@ def sam_tw_gov_own(dev=False):
     if time_unit == 'w':
         result = result.merge(calendar_key, how='left', on='WORK_DATE')
         result = result.drop('WORK_DATE', axis=1)
+        
+    # Drop Highly Correlated Features
+    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)        
     
     return result
     
@@ -1071,9 +1102,9 @@ def sam_tw_gov_own(dev=False):
 
 def sam_od_tw_get_fx_rate():
     
-    global time_key
+    global id_keys, time_key
     global calendar_full_key, main_data_frame_calendar
-    global ma_values, wma    
+    global ma_values, wma, corr_threshold
     
     result = stk.od_tw_get_fx_rate()
     cols = cbyz.df_get_cols_except(df=result, except_cols=['WORK_DATE'])
@@ -1117,6 +1148,10 @@ def sam_od_tw_get_fx_rate():
             add_skew=False, add_count=False, quantile=[]
             )
         
+    # Drop Highly Correlated Features
+    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)    
+        
     return result, ma_cols       
 
 
@@ -1125,8 +1160,8 @@ def sam_od_tw_get_fx_rate():
 
 def sam_od_tw_get_index(begin_date, end_date):
     
-    global ma_values, predict_period
-    global time_unit, time_key
+    global ma_values, predict_period, corr_threshold
+    global id_keys, time_unit, time_key
     global calendar, main_data_frame_calendar
     
     # main_data_frame_calendar
@@ -1165,6 +1200,11 @@ def sam_od_tw_get_index(begin_date, end_date):
             add_skew=False, add_count=False, quantile=[]
             )
     
+    
+    # Drop Highly Correlated Features
+    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)    
+    
     # Merge ......
     result = main_data_frame_calendar \
                 .merge(result, how='left', on=time_key)   
@@ -1177,6 +1217,7 @@ def sam_od_tw_get_index(begin_date, end_date):
 
 def sam_od_us_get_snp_data(begin_date):
     
+    global id_keys, corr_threshold
     global ma_values, predict_period, predict_date
     global calendar, main_data_frame_calendar
     
@@ -1205,20 +1246,6 @@ def sam_od_us_get_snp_data(begin_date):
     loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
                             group_by=[], method='ffill')
 
-    # Process
-    # loc_df, cols, _, _ = \
-    #     cbml.ml_data_process(df=loc_df, 
-    #                          ma=True, scale=True, lag=True, 
-    #                          group_by=[],
-    #                          cols=[], 
-    #                          except_cols=['WORK_DATE'],
-    #                          drop_except=[],
-    #                          cols_mode='equal',
-    #                          date_col='WORK_DATE',
-    #                          ma_values=ma_values, 
-    #                          lag_period=predict_period
-    #                          )    
-    
     # Scale
     loc_df, _, _ = cbml.df_scaler(df=loc_df, cols=cols, method=0)
     
@@ -1244,6 +1271,10 @@ def sam_od_us_get_snp_data(begin_date):
             add_skew=False, add_count=False, quantile=[]
             )    
     
+
+    # Drop Highly Correlated Features
+    loc_df = cbml.drop_high_corr_var(df=loc_df, threshold=corr_threshold, 
+                                     except_cols=id_keys) 
         
     return loc_df, cols
 
@@ -1253,6 +1284,8 @@ def sam_od_us_get_snp_data(begin_date):
 
 def sam_tej_get_ewsale(begin_date):
 
+    
+    print('還沒加drop_high_corr_var')
     global main_data_frame, symbol
     loc_df = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
                                 symbol=symbol, fill=True, host=host)
@@ -1289,6 +1322,7 @@ def sam_tej_get_ewifinq():
     global calendar, main_data_frame_calendar
     global symbol
     
+    print('還沒加drop_high_corr_var')    
     result = stk.tej_get_ewifinq(fill_date=True, target_type='symbol',
                                  target=symbol)
 
@@ -1314,7 +1348,7 @@ def sam_tej_get_ewifinq():
 
 def sam_tej_get_ewtinst1c():
     
-    
+    print('還沒加drop_high_corr_var')    
     result = stk.tej_get_ewtinst1c(begin_date=shift_begin,
                                           end_date=None, 
                                           symbol=symbol,
@@ -1766,6 +1800,9 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0100 - 20220305
     # - Drop correlated columns in variable function, or it will cause 
     #   expensive to execute this in the ultra_tuner
+    # - Add MLP
+    # - Fix ultra_tuner serial issues, then have ability to calculate
+    #   regression of hyperparameters - Not yet
     
     
     
@@ -1785,7 +1822,6 @@ def master(param_holder, predict_begin, export_model=True,
     # 352     SNP_VOLUME_MA_1_STD       446
     
 
-    
     global version
     version = 3.0100
     
@@ -1907,8 +1943,9 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # Update, add to BTM
-    global wma
+    global wma, corr_threshold
     wma = False
+    corr_threshold = 0.85
     
     
     global df_summary_mean, df_summary_min, df_summary_max
@@ -1954,6 +1991,7 @@ def master(param_holder, predict_begin, export_model=True,
     # Training Model ......
     import xgboost as xgb
     from sklearn.linear_model import LinearRegression
+    import tensorflow as tf
 
     
     if len(symbol) > 0 and len(symbol) < 10:
@@ -1964,11 +2002,22 @@ def master(param_holder, predict_begin, export_model=True,
                          }]         
     else:
         
+        # MLP
+        vars_len = len(list(model_data.columns)) - len(id_keys) - 1
+        
+        mlp_model = tf.keras.Sequential()
+        mlp_model.add(tf.keras.layers.Dense(30, input_dim=vars_len, activation='relu'))
+        mlp_model.add(tf.keras.layers.Dense(30, activation='softmax'))
+        mlp_model.add(tf.keras.layers.Dense(1, activation='linear'))  
+        
+        
         # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
         # data_form1 - Change Ratio
-        
         if time_unit == 'd' and 'CLOSE_CHANGE_RATIO' in var_y:
-            model_params = [
+            
+            model_params = [{'model': mlp_model,
+                             'params': {}
+                             },        
                             {'model': LinearRegression(),
                               'params': {
                                   'normalize': [True, False],
@@ -1986,7 +2035,7 @@ def master(param_holder, predict_begin, export_model=True,
                                 'subsample':[1]
                               }
                             }
-                            ] 
+                            ]
             
         elif time_unit == 'w' and 'CLOSE_CHANGE_RATIO' in var_y:
             

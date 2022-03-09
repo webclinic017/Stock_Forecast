@@ -844,7 +844,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     
     
     # Optimization ......
-    # 讓data begin都從20170101開始；如果超出db實際有的資料會怎樣
     # - weekly forecast的y如果是price，就應該設為high of high, low of low
     # 4. Calculate IRR, remove outliers
     # 5. Google Sheet Add Manual Tick
@@ -867,7 +866,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     #    > Add this to sam v7 and v8
     # 2. Add DIFF_MAPE_MEDIAN
     # 3. 除權息會拉抬N天的服價，把N用weight的方式考慮進去
-    # 4. data_process中的lag，應該是要針對vars處理，還是針對y處理？
     # 7. Add machine learning error function
     # 8. 之前的code是不是沒有把股本正確normalize / Add EPS
     # 12. Set the result of long-term MA as a table
@@ -877,10 +875,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 19. Analysis, 近60日投報率，用產業或主題作分群 / 財報
     # 20. Add Sell Signal
     # 21. 產業上中下游關係，SNA
-    # 22. Update, load last version of model
     # 24. 把股性分群；隱含波動率
-    # 25. Do actions by change
-    # 26. Add Auto-Competing Model    
     # 27. Signal A and B，A是反彈的，B是low和close差距N%
     # global parama 應該是在一開始就訂好，而不是最後才收集，參考rtml
     # - DRL資產配置
