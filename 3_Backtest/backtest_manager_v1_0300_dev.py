@@ -17,8 +17,8 @@ import random
 
 host = 3
 # host = 2
-# host = 4
-host = 0
+host = 4
+# host = 0
 market = 'tw'
 
 
@@ -65,9 +65,8 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 import codebase_ml as cbml
-# import stock_analysis_manager_v2_400_dev as sam
 # import stock_analysis_manager_v2_502_dev as sam
-import stock_analysis_manager_v3_0000_dev as sam
+import stock_analysis_manager_v3_0100_dev as sam
 
 
 

@@ -21,8 +21,8 @@ import pickle
 
 host = 3
 # host = 2
-# host = 4
-host = 0
+host = 4
+# host = 0
 
 
 # Path .....
@@ -64,8 +64,6 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-# import ultra_tuner_v0_26 as ut
-# import ultra_tuner_v0_261 as ut
 # import ultra_tuner_v0_27_dev as ut
 import ultra_tuner_v0_3100 as ut
 
@@ -881,9 +879,11 @@ def sam_buffett_indicator():
             
 
     # Drop Highly Correlated Features
-    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)
-            
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys)
+         
+    # Filter exist columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
 
     # Merge ......
     result = main_data_frame_calendar \
@@ -944,9 +944,12 @@ def sam_covid_19_tw():
                 )
 
     # Drop Highly Correlated Features
-    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
                                      except_cols=id_keys)
         
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
+    
     
     # Merge ......
     result = main_data_frame_calendar \
@@ -1023,9 +1026,11 @@ def sam_ex_dividend():
                 
                 
     # Drop Highly Correlated Features                
-    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys)
         
+    # Filter existing columns
+    cols = cbyz.df_filter_exist_cols(df=result, cols=cols)    
             
     # Merge ......
     result = main_data_frame_calendar \
@@ -1062,8 +1067,11 @@ def sam_tw_gov_invest(dev=False):
         
         
     # Drop Highly Correlated Features
-    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys)
+    
+    
+    print('是否需要return cols，並df_filter_exist_cols')
     
     return result
     
@@ -1091,8 +1099,10 @@ def sam_tw_gov_own(dev=False):
         result = result.drop('WORK_DATE', axis=1)
         
     # Drop Highly Correlated Features
-    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)        
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys)     
+    
+    print('是否需要return cols，並df_filter_exist_cols')
     
     return result
     
@@ -1149,8 +1159,11 @@ def sam_od_tw_get_fx_rate():
             )
         
     # Drop Highly Correlated Features
-    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)    
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                     except_cols=id_keys)   
+    
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
         
     return result, ma_cols       
 
@@ -1202,8 +1215,11 @@ def sam_od_tw_get_index(begin_date, end_date):
     
     
     # Drop Highly Correlated Features
-    result = cbml.drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)    
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys)    
+    
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)    
     
     # Merge ......
     result = main_data_frame_calendar \
@@ -1273,8 +1289,11 @@ def sam_od_us_get_snp_data(begin_date):
     
 
     # Drop Highly Correlated Features
-    loc_df = cbml.drop_high_corr_var(df=loc_df, threshold=corr_threshold, 
-                                     except_cols=id_keys) 
+    loc_df = cbml.df_drop_high_corr_var(df=loc_df, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    cols = cbyz.df_filter_exist_cols(df=loc_df, cols=cols)    
         
     return loc_df, cols
 
@@ -1285,7 +1304,7 @@ def sam_od_us_get_snp_data(begin_date):
 def sam_tej_get_ewsale(begin_date):
 
     
-    print('還沒加drop_high_corr_var')
+    print('還沒加df_drop_high_corr_var')
     global main_data_frame, symbol
     loc_df = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
                                 symbol=symbol, fill=True, host=host)
@@ -1322,7 +1341,7 @@ def sam_tej_get_ewifinq():
     global calendar, main_data_frame_calendar
     global symbol
     
-    print('還沒加drop_high_corr_var')    
+    print('還沒加df_drop_high_corr_var')    
     result = stk.tej_get_ewifinq(fill_date=True, target_type='symbol',
                                  target=symbol)
 
@@ -1348,7 +1367,8 @@ def sam_tej_get_ewifinq():
 
 def sam_tej_get_ewtinst1c():
     
-    print('還沒加drop_high_corr_var')    
+    global id_keys, corr_threshold
+    
     result = stk.tej_get_ewtinst1c(begin_date=shift_begin,
                                           end_date=None, 
                                           symbol=symbol,
@@ -1391,6 +1411,14 @@ def sam_tej_get_ewtinst1c():
                                   sort_keys=time_key,
                                   method=['ffill', 'bfill'], 
                                   group_by='SYMBOL')
+
+
+    # Drop Highly Correlated Features
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)    
 
     return result, ma_cols    
 
@@ -1803,7 +1831,14 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add MLP
     # - Fix ultra_tuner serial issues, then have ability to calculate
     #   regression of hyperparameters - Not yet
+    # - Drop high corr cols again after creating the model_data
+    # - Give the common serial when predict for each y
     
+    
+    # v3.0200
+    # - Add df_expend_one_hot_signal
+    # - Update for new selectkbest
+    # - Update for new cbml.selectkbestm
     
     
     # Bug
@@ -2003,10 +2038,14 @@ def master(param_holder, predict_begin, export_model=True,
     else:
         
         # MLP
-        vars_len = len(list(model_data.columns)) - len(id_keys) - 1
+        vars_len = cbyz.df_get_cols_except(df=model_data, 
+                                           except_cols=id_keys + var_y)
+        vars_len = len(vars_len)
         
         mlp_model = tf.keras.Sequential()
-        mlp_model.add(tf.keras.layers.Dense(30, input_dim=vars_len, activation='relu'))
+        mlp_model.add(tf.keras.layers.Dense(30, input_dim=vars_len, 
+                                            activation='relu'))
+        
         mlp_model.add(tf.keras.layers.Dense(30, activation='softmax'))
         mlp_model.add(tf.keras.layers.Dense(1, activation='linear'))  
         
@@ -2136,6 +2175,7 @@ def master(param_holder, predict_begin, export_model=True,
                                model_type='reg', suffix=long_suffix,
                                compete_mode=compete_mode,
                                train_mode=train_mode, 
+                               serial=exe_serial,
                                path=path_temp)
         
         # 排除其他y，否則會出錯
