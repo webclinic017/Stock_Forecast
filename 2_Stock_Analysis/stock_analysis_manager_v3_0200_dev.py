@@ -51,8 +51,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220305',
-                 r'/home/jupyter/Arsenal/20220305',
+                 r'/home/jupyter/Codebase_YZ/20220314',
+                 r'/home/jupyter/Arsenal/20220314',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -64,8 +64,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-# import ultra_tuner_v0_27_dev as ut
-import ultra_tuner_v0_3100 as ut
+import ultra_tuner_v1_0000 as ut
 
 ar.host = host
 
@@ -1160,7 +1159,7 @@ def sam_od_tw_get_fx_rate():
         
     # Drop Highly Correlated Features
     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)   
+                                        except_cols=id_keys)   
     
     # Filter existing columns
     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
@@ -1431,6 +1430,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     global shift_begin, shift_end, data_begin, data_end, ma_values
+    global corr_threshold
     global predict_date, predict_week, predict_period
     global calendar, calendar_lite, calendar_proc
     global calendar_key, calendar_full_key
@@ -1686,11 +1686,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         pass
 
 
-    # Variables ......
-    model_x = cbyz.df_get_cols_except(df=main_data, 
-                                      except_cols=var_y + id_keys)
-    
-    
+
     # Model Data ......
 
 
@@ -1769,6 +1765,29 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # assert len(chk_min_max) == 0, 'get_model_data - normalize error'
 
 
+    # Select Features ......
+    # - Select featuers after completing data cleaning
+    
+    # Drop Highly Correlated Features
+    main_data = cbml.df_drop_high_corr_var(df=main_data, 
+                                           threshold=corr_threshold, 
+                                           except_cols=id_keys + var_y) 
+    
+    # 挑選最好的變數
+    best_var_raw, best_var_score, best_var = \
+        cbml.selectkbest(df=main_data, model_type='reg', 
+                         y=var_y, X=[], except_cols=id_keys, k=60)
+        
+    main_data = main_data[id_keys + var_y + best_var] 
+
+
+    # Variables ......
+    model_x = cbyz.df_get_cols_except(df=main_data, 
+                                      except_cols=var_y + id_keys)
+
+
+
+
     # Export Model ......
     main_data.to_csv(main_data_file, index=False)
     cbyz.li_to_csv(model_x, model_x_file)
@@ -1828,17 +1847,14 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0100 - 20220305
     # - Drop correlated columns in variable function, or it will cause 
     #   expensive to execute this in the ultra_tuner
-    # - Add MLP
-    # - Fix ultra_tuner serial issues, then have ability to calculate
-    #   regression of hyperparameters - Not yet
-    # - Drop high corr cols again after creating the model_data
     # - Give the common serial when predict for each y
+    # - Add MLP
     
     
     # v3.0200
+    # - Update for cbml.selectkbest
+    # - Update for ut_v1.0001, and add epochs to model_params
     # - Add df_expend_one_hot_signal
-    # - Update for new selectkbest
-    # - Update for new cbml.selectkbestm
     
     
     # Bug
@@ -1858,7 +1874,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 3.0100
+    version = 3.0200
     
     # Update
     # - Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，
@@ -1893,6 +1909,7 @@ def master(param_holder, predict_begin, export_model=True,
     #      手上的持股狀況；
     # - Add 流通股數 from ewprcd
     # - Add 法說會日期
+    # - Add 道瓊指數
     
 
     # Optimization ......
@@ -2038,26 +2055,29 @@ def master(param_holder, predict_begin, export_model=True,
     else:
         
         # MLP
-        vars_len = cbyz.df_get_cols_except(df=model_data, 
-                                           except_cols=id_keys + var_y)
-        vars_len = len(vars_len)
-        
-        mlp_model = tf.keras.Sequential()
-        mlp_model.add(tf.keras.layers.Dense(30, input_dim=vars_len, 
-                                            activation='relu'))
-        
-        mlp_model.add(tf.keras.layers.Dense(30, activation='softmax'))
-        mlp_model.add(tf.keras.layers.Dense(1, activation='linear'))  
+        # - Prevent error on host 4
+        if host in [2, 3]:
+            vars_len = cbyz.df_get_cols_except(df=model_data, 
+                                               except_cols=id_keys + var_y)
+            vars_len = len(vars_len)
+            
+            mlp_model = tf.keras.Sequential()
+            mlp_model.add(tf.keras.layers.Dense(30, input_dim=vars_len, 
+                                                activation='relu'))
+            
+            mlp_model.add(tf.keras.layers.Dense(30, activation='softmax'))
+            mlp_model.add(tf.keras.layers.Dense(1, activation='linear'))  
+            
+            mlp_param = {'model': mlp_model,
+                         'params': {'optimizer':'adam',
+                                    'epochs':15}}
         
         
         # eta 0.01、0.03的效果都很差，目前測試0.08和0.1的效果較佳
         # data_form1 - Change Ratio
         if time_unit == 'd' and 'CLOSE_CHANGE_RATIO' in var_y:
             
-            model_params = [{'model': mlp_model,
-                             'params': {}
-                             },        
-                            {'model': LinearRegression(),
+            model_params = [{'model': LinearRegression(),
                               'params': {
                                   'normalize': [True, False],
                                   }
@@ -2098,7 +2118,11 @@ def master(param_holder, predict_begin, export_model=True,
                               }
                             }
                             ]             
-
+            
+        # Prevent error on host 4
+        if host in [2, 3]:
+            model_params.insert(0, mlp_param)
+            
         
         # # Price
         # model_params = [
@@ -2158,8 +2182,8 @@ def master(param_holder, predict_begin, export_model=True,
         #                 ]         
         
         
-    # 1. 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同
-    #    產業的預測值完全相同
+    # - 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同
+    #   產業的預測值完全相同
     global pred_result, pred_scores, pred_params, pred_features
     
     long_suffix = 'long' if long else 'short'
@@ -2185,7 +2209,7 @@ def master(param_holder, predict_begin, export_model=True,
                 log_scores, log_params, log_features = \
                     tuner.fit(data=cur_model_data, 
                               model_params=model_params,
-                              k=kbest, cv=cv, threshold=threshold, 
+                              cv=cv, threshold=threshold, 
                               scale_orig=[],
                               export_model=True, export_log=True)
                  
@@ -2666,31 +2690,58 @@ def get_season(df):
 
 
 
-def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
+def add_support_resistance(df, cols, rank_thld=10, prominence=4, 
+                           unit='d', interval=True,
                            threshold=0.9, plot_data=False):
-
     '''
     1. Calculate suppport and resistance
     2. The prominence of each symbol is different, so it will cause problems
        if apply a static number. So use quantile as the divider.
     3. Update, add multiprocessing
     
+
+    Parameters
+    ----------
+    df : TYPE
+        DESCRIPTION.
+    cols : TYPE
+        DESCRIPTION.
+    rank_thld : TYPE, optional
+        DESCRIPTION. The default is 10.
+    prominence : TYPE, optional
+        DESCRIPTION. The default is 4.
+    interval : boolean, optional
+        Add interval of peaks.
+    threshold : TYPE, optional
+        DESCRIPTION. The default is 0.9.
+    plot_data : TYPE, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    result : TYPE
+        DESCRIPTION.
+    return_cols : TYPE
+        DESCRIPTION.
+
     '''
-    
     
     print('Bug, 回傳必要的欄位，不要直接合併整個dataframe，減少記憶體用量')
     
+
     from scipy.signal import find_peaks
     cols = cbyz.conv_to_list(cols)
-    
+
     cols_support = [c + '_SUPPORT' for c in cols]
     cols_resistance = [c + '_RESISTANCE' for c in cols]
     return_cols = cols_support + cols_resistance
     
     
-    # .......
-    loc_df = df.copy().rename(columns={'STOCK_SYMBOL':'SYMBOL'})
+    group_key = ['SYMBOL', 'COLUMN', 'TYPE']
     
+    
+    # .......
+    loc_df = df[['SYMBOL', 'WORK_DATE'] + cols]
     
     date_index = loc_df[['SYMBOL', 'WORK_DATE']]
     date_index = cbyz.df_add_rank(df=date_index, value='WORK_DATE',
@@ -2700,17 +2751,31 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
                               rank_name='index',
                               rank_method='min', inplace=False)
     
-    
     result_raw = pd.DataFrame()
-    symbol = loc_df['SYMBOL'].unique().tolist()
-    value_cols = []
     
+    symbol_df = loc_df[['SYMBOL']].drop_duplicates()
+    symbol = symbol_df['SYMBOL'].tolist()
+
+
+    # Frame ......
+    begin_date = loc_df['WORK_DATE'].min()
+    today = cbyz.date_get_today()
+
+    calendar = cbyz.date_get_calendar(begin_date=begin_date,
+                                      end_date=today)
+    
+    calendar = calendar[['WORK_DATE']]
+    cols_df = pd.DataFrame({'COLUMN':cols})
+    
+    frame = cbyz.df_cross_join(symbol_df, calendar)
+    frame = cbyz.df_cross_join(frame, cols_df)
+
     
     # Calculate ......
     for j in range(len(symbol)):
         
-        symbol = symbol[j]
-        temp_df = loc_df[loc_df['SYMBOL']==symbol].reset_index(drop=True)
+        symbol_cur = symbol[j]
+        temp_df = loc_df[loc_df['SYMBOL']==symbol_cur].reset_index(drop=True)
     
         for i in range(len(cols)):
             col = cols[i]
@@ -2725,12 +2790,13 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
             threshold_value = new_top['VALUE'].quantile(threshold)
             new_top = new_top[new_top['VALUE']>=threshold_value]
             
-            new_top['SYMBOL'] = symbol
+            new_top['SYMBOL'] = symbol_cur
             new_top['COLUMN'] = col
             new_top['TYPE'] = 'RESISTANCE'
             
             
             # 計算低點
+            # - 使用-x反轉，讓低點變成高點，所以quantile一樣threshold
             peaks_btm, prop_btm = find_peaks(-x, prominence=prominence)   
             new_btm = pd.DataFrame({'VALUE':[i for i in prop_btm['prominences']]})
             new_btm.index = peaks_btm
@@ -2738,7 +2804,7 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
             threshold_value = new_btm['VALUE'].quantile(threshold)
             new_btm = new_btm[new_btm['VALUE']>=threshold_value]            
             
-            new_btm['SYMBOL'] = symbol
+            new_btm['SYMBOL'] = symbol_cur
             new_btm['COLUMN'] = col
             new_btm['TYPE'] = 'SUPPORT'
             
@@ -2759,7 +2825,13 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
             .merge(date_index, how='left', on=['SYMBOL', 'index']) \
             .drop('index', axis=1)
             
-    result = result[['SYMBOL', 'WORK_DATE', 'COLUMN', 'TYPE', 'VALUE']]
+    result = result[['SYMBOL', 'WORK_DATE', 'COLUMN', 'TYPE']] \
+            .sort_values(by=['SYMBOL', 'COLUMN', 'WORK_DATE']) \
+            .reset_index(drop=True)
+
+    # Dummy Encoding
+    result = cbml.df_get_dummies(df=result, cols='TYPE', 
+                                 expand_col_name=True,inplace=False)
 
 
     if plot_data:
@@ -2775,54 +2847,84 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
 
     print('以下還沒改完')
     # .......
-    if days:
+    if interval:
         
-        for i in range(len(cols)):
-            col = cols[i]
-            resist_col = col + '_RESISTANCE'
-            support_col = col + '_SUPPORT'
+        interval_df, _ = \
+            cbyz.df_add_shift(df=result, cols='WORK_DATE', shift=1, 
+                              sort_by=['SYMBOL', 'COLUMN', 'WORK_DATE'],
+                              group_by=['SYMBOL', 'COLUMN'], 
+                              suffix='_PREV', remove_na=False)
             
-            resist_days = col + '_RESISTANCE_DAYS'
-            support_days = col + '_SUPPORT_DAYS'  
-    
-            result.loc[result.index, resist_days] = \
-                np.where(result[resist_col].isna(), np.nan, result.index)
+        # NA will cause error when calculate date difference
+        interval_df = interval_df.dropna(subset=['WORK_DATE_PREV'], axis=0)
         
-            result.loc[result.index, support_days] = \
-                np.where(result[support_col].isna(), np.nan, result.index)
+        interval_df = cbyz.df_conv_col_type(df=interval_df,
+                                            cols=['WORK_DATE', 'WORK_DATE_PREV'],
+                                            to='int')
         
-            # FIll NA ......
-            # 這裡理論上不該用backward，所以補進平均值
-            result = cbyz.df_shift_fill_na(df=result, 
-                                            loop_times=loop_times,
-                                            cols=resist_days, 
-                                            group_by=['STOCK_SYMBOL'],
-                                            forward=True, backward=False)  
+        interval_df = cbyz.df_date_diff(df=interval_df, col1='WORK_DATE', 
+                                    col2='WORK_DATE_PREV', name='INTERVAL', 
+                                    absolute=True, inplace=False)
         
-            result = cbyz.df_shift_fill_na(df=result, 
-                                            loop_times=loop_times,
-                                            cols=support_days, 
-                                            group_by=['STOCK_SYMBOL'],
-                                            forward=True, backward=False)  
+        interval_df = cbyz.df_conv_col_type(df=interval_df,
+                                            cols=['INTERVAL'],
+                                            to='int')
         
-            # Calculate date difference
-            result.loc[result.index, resist_col] = \
-                result.index - result[resist_col]
+        interval_df = interval_df.drop('WORK_DATE_PREV', axis=1)
         
-            result.loc[result.index, support_col] = \
-                result.index - result[support_col]
+        print(('Does it make sense to use median? Or quantile is better, '
+              'then I can go ahead of the market'))
+        interval_df = interval_df \
+                    .groupby(['SYMBOL', 'COLUMN']) \
+                    .agg({'INTERVAL':'median'}) \
+                    .reset_index()
+            
+        # Merge
+        result_full = frame \
+            .merge(result, how='left', on=['SYMBOL', 'WORK_DATE', 'COLUMN'])
         
+        result_full = cbyz.df_conv_na(df=result_full, 
+                                      cols=['TYPE_RESISTANCE', 'TYPE_SUPPORT'],
+                                      value=0)
+        
+        result_full = result_full \
+            .merge(interval_df, how='left', on=['SYMBOL', 'COLUMN'])
+        
+        
+        result_full['RESIS_SUPPORT_SIGNAL'] = \
+            np.select([result_full['TYPE_RESISTANCE']==1,
+                       result_full['TYPE_SUPPORT']==1],
+                      [result_full['INTERVAL'], -result_full['INTERVAL']],
+                      default=np.nan)
+         
+        result_full['INDEX'] = \
+            np.where((result_full['TYPE_RESISTANCE']==1) \
+                      | (result_full['TYPE_SUPPORT']==1),
+                      result_full.index, np.nan)
+            
+        result_full = \
+            cbyz.df_fillna(df=result_full, 
+                           cols=['RESIS_SUPPORT_SIGNAL', 'INDEX'], 
+                           sort_keys=['SYMBOL', 'COLUMN', 'WORK_DATE'], 
+                           group_by=['SYMBOL', 'COLUMN'],
+                           method='ffill')
+            
+        result_full['RESIS_SUPPORT_SIGNAL'] = \
+            np.where((result_full['TYPE_RESISTANCE']==1) \
+                     | (result_full['TYPE_SUPPORT']==1),
+                     result_full['RESIS_SUPPORT_SIGNAL'],
+                     result_full['RESIS_SUPPORT_SIGNAL'] \
+                         - (result_full.index - result_full['INDEX']))
+            
+    else:
+        pass
+            
 
-            # COnvert NA
-            result = cbyz.df_conv_na(df=result, 
-                                      cols=[resist_col, support_col])
-            
-            result = cbyz.df_conv_na(df=result, cols=resist_days,
-                                      value=result[resist_days].mean())            
-            
-            result = cbyz.df_conv_na(df=result, cols=support_days,
-                                      value=result[support_days].mean())        
-                
+    # if unit == 'w':
+    #     interval_df['INTERVAL'] = interval_df['INTERVAL'] / 7
+
+        
+        
     return result, return_cols
 
 
@@ -2831,11 +2933,13 @@ def add_support_resistance(df, cols, rank_thld=10, prominence=4, days=True,
 def test_support_resistance():
     
 
-    loc_df = stk.od_tw_get_index(path=path_dcm)
-    loc_df['SYMBOL'] = 1001
+    data = stk.od_tw_get_index()
+    
+    # data = data.rename(columns={'TW_INDEX_CLOSE':'CLOSE'})
+    data['SYMBOL'] = 1001
     
     
-    add_support_resistance(df=loc_df, cols='TW_INDEX_CLOSE', 
+    add_support_resistance(df=data, cols='TW_INDEX_CLOSE', 
                            rank_thld=10, prominence=4, 
                            days=True, threshold=0.9, plot_data=False)    
 

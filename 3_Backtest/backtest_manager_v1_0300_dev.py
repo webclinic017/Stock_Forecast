@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220305',
-                 r'/home/jupyter/Arsenal/20220305',
+                 r'/home/jupyter/Codebase_YZ/20220314',
+                 r'/home/jupyter/Arsenal/20220314',
                  path + '/Function',
                  path_sam]
 
@@ -65,8 +65,8 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 import codebase_ml as cbml
-# import stock_analysis_manager_v2_502_dev as sam
-import stock_analysis_manager_v3_0100_dev as sam
+# import stock_analysis_manager_v3_0100 as sam
+import stock_analysis_manager_v3_0200_dev as sam
 
 
 
@@ -1551,6 +1551,9 @@ if __name__ == '__main__':
     global weekly_actions, daily_actions
     hold = [3596, 6698]
     
+    
+    # test mode take few data to run, and dev mode will decrease the threshold
+    # to export temp file    
     global dev, test, load_result, load_model_data
     dev = True
     dev = False
@@ -1564,11 +1567,8 @@ if __name__ == '__main__':
     
     global action_weekly, action_daily
     
-    # test mode take few data to run, and dev mode will decrease the threshold
-    # to export temp file
     
-    
-    if not dev:
+    if not dev and not test:
         # - TEJ的資料從2017年開始，但用dev的測試結果，即使data_period從20150110開始算
         #   也不會出錯
         # - TEJ報價
