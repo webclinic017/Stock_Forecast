@@ -1796,6 +1796,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     return main_data, model_x, scale_orig
     
 
+
 # %% Master ------
 
 
@@ -1843,7 +1844,6 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0000 - 20220225
     # - 開發重心轉移至trading bot
     # - Update for ultra_tuner v0.3100
-
     # v3.0100 - 20220305
     # - Drop correlated columns in variable function, or it will cause 
     #   expensive to execute this in the ultra_tuner
@@ -1852,8 +1852,8 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # v3.0200
-    # - Update for cbml.selectkbest
-    # - Update for ut_v1.0001, and add epochs to model_params
+    # - Update for cbml.selectkbest - Done
+    # - Update for ut_v1.0001, and add epochs to model_params - Done
     # - Add df_expend_one_hot_signal
     
     
