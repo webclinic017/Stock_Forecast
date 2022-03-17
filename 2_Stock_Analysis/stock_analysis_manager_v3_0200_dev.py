@@ -50,6 +50,7 @@ elif host == 4:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
+                 r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
                  r'/home/jupyter/Codebase_YZ/20220314',
                  r'/home/jupyter/Arsenal/20220314',
@@ -1230,13 +1231,13 @@ def sam_od_tw_get_index(begin_date, end_date):
 # .................
 
 
-def sam_od_us_get_snp_data(begin_date):
+def sam_od_us_get_snp(begin_date):
     
     global id_keys, corr_threshold
     global ma_values, predict_period, predict_date
     global calendar, main_data_frame_calendar
     
-    loc_df = stk.od_us_get_snp_data(daily_backup=True, path=path_temp)
+    loc_df = stk.od_us_get_dji(daily_backup=True, path=path_temp)
     loc_df = loc_df.rename(columns={'WORK_DATE':'WORK_DATE_ORIG'})
     
     # Handle Time Lag
@@ -1663,7 +1664,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # S&P 500 ......
-    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
+    snp, cols = sam_od_us_get_snp(begin_date=shift_begin)
     main_data = main_data.merge(snp, how='left', on=time_key)
     
     
@@ -2647,6 +2648,9 @@ def get_google_treneds(begin_date=None, end_date=None,
 
 
 # %% Dev ------
+
+
+
 
 
 def get_season(df):

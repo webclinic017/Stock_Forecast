@@ -50,6 +50,7 @@ elif host == 4:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
+                 r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
                  r'/home/jupyter/Codebase_YZ/20220314',
                  r'/home/jupyter/Arsenal/20220314',
@@ -1230,36 +1231,109 @@ def sam_od_tw_get_index(begin_date, end_date):
 # .................
 
 
-def sam_od_us_get_snp_data(begin_date):
+def sam_od_us_get_dji():
+    
+    # Dow Jones Industrial Average (^DJI)
+    global id_keys, corr_threshold
+    global ma_values, predict_period, predict_date
+    global calendar, main_data_frame_calendar
+    
+    loc_df = stk.od_us_get_dji(daily_backup=True, path=path_temp)
+    
+    # Handle Time Lag
+    # - 20220317 - 移至stk，待確認是否會出錯，沒問題的話這一段就刪除
+    # loc_df = loc_df.rename(columns={'WORK_DATE':'WORK_DATE_ORIG'})
+    # loc_df = cbyz.df_date_cal(df=loc_df, amount=-1, unit='d',
+    #                           new_cols='WORK_DATE',
+    #                           cols='WORK_DATE_ORIG')
+    
+    # loc_df = loc_df.drop('WORK_DATE_ORIG', axis=1)
+
+
+    # Fillna .......
+    # 1. 因為美股的交易時間可能和台灣不一樣，包含特殊節日等，為了避免日期無法
+    #    對應，用fillna
+    #    補上完整的日期
+    # - 20220317 - 移至stk，待確認是否會出錯，沒問題的話這一段就刪除
+    
+    # loc_calendar = cbyz.date_get_calendar(begin_date=begin_date, 
+    #                                       end_date=predict_date[-1])
+    # loc_calendar = calendar[['WORK_DATE']]
+    # loc_df = loc_calendar.merge(loc_df, how='left', on='WORK_DATE')
+    # cols = cbyz.df_get_cols_except(df=loc_df, except_cols='WORK_DATE')
+    # loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
+    #                         group_by=[], method='ffill')
+
+    # Scale
+    loc_df, _, _ = cbml.df_scaler(df=loc_df, cols=cols, method=0)
+    
+    # MA
+    loc_df, ma_cols = \
+        cbyz.df_add_ma(df=loc_df, cols=cols,
+                       group_by=[], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+    loc_df = loc_df.drop(cols, axis=1)
+    
+    
+    # Agg for Weekly Prediction
+    if time_unit == 'w':
+        loc_df = loc_df \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
+        
+        loc_df, cols = cbyz.df_summary(
+            df=loc_df, cols=ma_cols, group_by=time_key, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )    
+    
+
+    # Drop Highly Correlated Features
+    loc_df = cbml.df_drop_high_corr_var(df=loc_df, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    cols = cbyz.df_filter_exist_cols(df=loc_df, cols=cols)    
+        
+    return loc_df, cols    
+
+
+# .................
+
+
+def sam_od_us_get_snp(begin_date):
     
     global id_keys, corr_threshold
     global ma_values, predict_period, predict_date
     global calendar, main_data_frame_calendar
     
-    loc_df = stk.od_us_get_snp_data(daily_backup=True, path=path_temp)
-    loc_df = loc_df.rename(columns={'WORK_DATE':'WORK_DATE_ORIG'})
+    loc_df = stk.od_us_get_snp(daily_backup=True, path=path_temp)
     
     # Handle Time Lag
-    loc_df = cbyz.df_date_cal(df=loc_df, amount=-1, unit='d',
-                              new_cols='WORK_DATE',
-                              cols='WORK_DATE_ORIG')
+    # - 20220317 - 移至stk，待確認是否會出錯，沒問題的話這一段就刪除
+    # loc_df = loc_df.rename(columns={'WORK_DATE':'WORK_DATE_ORIG'})
+    # loc_df = cbyz.df_date_cal(df=loc_df, amount=-1, unit='d',
+    #                           new_cols='WORK_DATE',
+    #                           cols='WORK_DATE_ORIG')
     
-    loc_df = loc_df.drop('WORK_DATE_ORIG', axis=1)
+    # loc_df = loc_df.drop('WORK_DATE_ORIG', axis=1)
 
 
     # Fillna .......
     # 1. 因為美股的交易時間可能和台灣不一樣，包含特殊節日等，為了避免日期無法對應，用fillna
     #    補上完整的日期
-    # 2. 先執行fillna再ml_data_process比較合理
+    # - 20220317 - 移至stk，待確認是否會出錯，沒問題的話這一段就刪除
     
     # loc_calendar = cbyz.date_get_calendar(begin_date=begin_date, 
     #                                       end_date=predict_date[-1])
-    loc_calendar = calendar[['WORK_DATE']]
+    # loc_calendar = calendar[['WORK_DATE']]
     
-    loc_df = loc_calendar.merge(loc_df, how='left', on='WORK_DATE')
-    cols = cbyz.df_get_cols_except(df=loc_df, except_cols='WORK_DATE')
-    loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
-                            group_by=[], method='ffill')
+    # loc_df = loc_calendar.merge(loc_df, how='left', on='WORK_DATE')
+    # cols = cbyz.df_get_cols_except(df=loc_df, except_cols='WORK_DATE')
+    # loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
+    #                         group_by=[], method='ffill')
 
     # Scale
     loc_df, _, _ = cbml.df_scaler(df=loc_df, cols=cols, method=0)
@@ -1348,7 +1422,7 @@ def tej_get_ewgin():
         )
     
     # Scale Data
-    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=1)
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
     
     # MA
     result, ma_cols = \
@@ -1436,7 +1510,7 @@ def sam_tej_get_ewtinst1():
         )
     
     # Scale Data
-    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=1)
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
     
     # MA
     result, ma_cols = \
@@ -1796,14 +1870,23 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     main_data = main_data.merge(fx_rate, how='left', on=time_key)
 
     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                  sort_keys=time_key, 
-                                  method=['ffill', 'bfill'], 
-                                  group_by=[])
+                                     sort_keys=time_key, 
+                                     method=['ffill', 'bfill'], 
+                                     group_by=[])
+
+
+    # Get Dow Jones Industrial Average (^DJI) ......
+    dji, cols = sam_od_us_get_snp(begin_date=shift_begin)
+    main_data = main_data.merge(dji, how='left', on=time_key)
+    del dji
+    gc.collect()   
 
 
     # S&P 500 ......
-    snp, cols = sam_od_us_get_snp_data(begin_date=shift_begin)
+    snp, cols = sam_od_us_get_snp(begin_date=shift_begin)
     main_data = main_data.merge(snp, how='left', on=time_key)
+    del snp
+    gc.collect()
     
     
     # COVID-19 ......
@@ -1989,16 +2072,14 @@ def master(param_holder, predict_begin, export_model=True,
     #   expensive to execute this in the ultra_tuner
     # - Give the common serial when predict for each y
     # - Add MLP
-    
-    
     # v3.0200
-    # - Update for cbml.selectkbest - Done
-    # - Update for ut_v1.0001, and add epochs to model_params - Done
-    
+    # - Update for cbml.selectkbest
+    # - Update for ut_v1.0001, and add epochs to model_params
     
     # v3.0300
     # - Add tej_get_ewgin
     # - Add tej_get_ewtinst1
+    # - Add od_us_get_dji
     
     
     # v3.0400
@@ -2790,6 +2871,8 @@ def get_google_treneds(begin_date=None, end_date=None,
 
 
 # %% Dev ------
+
+    
 
 
 def get_season(df):
