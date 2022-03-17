@@ -1585,7 +1585,7 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220216, predict_period=1, 
+        master(bt_last_begin=20180301, predict_period=1, 
             time_unit='w',long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,48], volume_thld=400,

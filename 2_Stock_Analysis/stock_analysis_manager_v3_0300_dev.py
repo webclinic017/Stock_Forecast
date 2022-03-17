@@ -65,7 +65,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v1_0000 as ut
+import ultra_tuner_v1_0002 as ut
 
 ar.host = host
 
@@ -1239,6 +1239,7 @@ def sam_od_us_get_dji():
     global calendar, main_data_frame_calendar
     
     loc_df = stk.od_us_get_dji(daily_backup=True, path=path_temp)
+    cols = cbyz.df_get_cols_except(df=loc_df, except_cols=['WORK_DATE'])
     
     # Handle Time Lag
     # - 20220317 - 移至stk，待確認是否會出錯，沒問題的話這一段就刪除
@@ -1310,6 +1311,7 @@ def sam_od_us_get_snp(begin_date):
     global calendar, main_data_frame_calendar
     
     loc_df = stk.od_us_get_snp(daily_backup=True, path=path_temp)
+    cols = cbyz.df_get_cols_except(df=loc_df, except_cols=['WORK_DATE'])
     
     # Handle Time Lag
     # - 20220317 - 移至stk，待確認是否會出錯，沒問題的話這一段就刪除
@@ -1714,27 +1716,28 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
-    # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
-    if market == 'tw':
-        ewtinst1, cols = sam_tej_get_ewtinst1()
-        main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                         sort_keys=time_key, 
-                                         method=['ffill', 'bfill'], 
-                                         group_by=['SYMBOL'])   
-        del ewtinst1
-        gc.collect()
+    # # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
+    # if market == 'tw':
+    #     ewtinst1, cols = sam_tej_get_ewtinst1()
+    #     main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                       sort_keys=time_key, 
+    #                                       method=['ffill', 'bfill'], 
+    #                                       group_by=['SYMBOL'])   
+    #     del ewtinst1
+    #     gc.collect()
 
 
-    # TEJ EWGIN ......
-    if market == 'tw':
-        ewgin, cols = tej_get_ewgin()
-        main_data = main_data.merge(ewgin, how='left', on=id_keys)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                         sort_keys=time_key, 
-                                         method=['ffill', 'bfill'], 
-                                         group_by=['SYMBOL'])          
-
+    # # TEJ EWGIN ......
+    # if market == 'tw':
+    #     ewgin, cols = tej_get_ewgin()
+    #     main_data = main_data.merge(ewgin, how='left', on=id_keys)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                       sort_keys=time_key, 
+    #                                       method=['ffill', 'bfill'], 
+    #                                       group_by=['SYMBOL'])          
+    #     del ewgin
+    #     gc.collect()
 
 
     # Ex-Dividend And Ex-Right ...
