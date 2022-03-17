@@ -64,7 +64,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v1_0002 as ut
+import ultra_tuner_v1_0000 as ut
 
 ar.host = host
 
@@ -1328,8 +1328,67 @@ def sam_tej_get_ewsale(begin_date):
                               drop_except=[],
                               ma_values=ma_values, 
                               lag_period=predict_period)    
-    
+
     return loc_df
+
+
+# ...........
+
+
+def tej_get_ewgin():
+    
+    global id_keys, corr_threshold
+    
+    result = stk.tej_get_ewgin(begin_date=shift_begin, end_date=None, 
+                               symbol=symbol)
+    
+    cols = cbyz.df_get_cols_except(
+        df=result, 
+        except_cols=['SYMBOL', 'WORK_DATE']
+        )
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=1)
+    
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=['SYMBOL'], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+    
+    
+    if time_unit == 'w':
+        result = result \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        
+        result, ma_cols = cbyz.df_summary(
+            df=result, cols=ma_cols, group_by=id_keys, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )    
+    
+    result = main_data_frame.merge(result, how='left', on=id_keys)
+    result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
+                                  sort_keys=time_key,
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+
+    # Drop Highly Correlated Features
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)    
+
+    return result, ma_cols   
+
 
 # ...........
 
@@ -1364,14 +1423,72 @@ def sam_tej_get_ewifinq():
 # ..............
     
 
+def sam_tej_get_ewtinst1():
+    
+    global id_keys, corr_threshold
+    
+    result = stk.tej_get_ewtinst1(begin_date=shift_begin, end_date=None, 
+                                  symbol=symbol)
+    
+    cols = cbyz.df_get_cols_except(
+        df=result, 
+        except_cols=['SYMBOL', 'WORK_DATE']
+        )
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=1)
+    
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=['SYMBOL'], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+    
+    
+    if time_unit == 'w':
+        result = result \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        
+        result, ma_cols = cbyz.df_summary(
+            df=result, cols=ma_cols, group_by=id_keys, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )    
+    
+    result = main_data_frame.merge(result, how='left', on=id_keys)
+    result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
+                                  sort_keys=time_key,
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+
+
+    # Drop Highly Correlated Features
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)    
+
+    return result, ma_cols   
+
+
+
+# .............
+
+
 def sam_tej_get_ewtinst1c():
     
     global id_keys, corr_threshold
     
-    result = stk.tej_get_ewtinst1c(begin_date=shift_begin,
-                                          end_date=None, 
-                                          symbol=symbol,
-                                          trade=True)
+    result = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
+                                   symbol=symbol, trade=True)
     
     cols = cbyz.df_get_cols_except(
         df=result, 
@@ -1523,6 +1640,29 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
+    # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
+    if market == 'tw':
+        ewtinst1, cols = sam_tej_get_ewtinst1()
+        main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=['SYMBOL'])   
+        del ewtinst1
+        gc.collect()
+
+
+    # TEJ EWGIN ......
+    if market == 'tw':
+        ewgin, cols = tej_get_ewgin()
+        main_data = main_data.merge(ewgin, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=['SYMBOL'])          
+
+
+
     # Ex-Dividend And Ex-Right ...
     if market == 'tw':
         data, cols = sam_ex_dividend()
@@ -1563,14 +1703,13 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # TEJ ewtinst1c - Average Holding Cost of Juridical Persons ......
-    # - 20220317，Stop subscribe this table
-    # if market == 'tw':
-    #     ewtinst1c, cols = sam_tej_get_ewtinst1c()
-    #     main_data = main_data.merge(ewtinst1c, how='left', on=id_keys)
-    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                       sort_keys=time_key, 
-    #                                       method=['ffill', 'bfill'], 
-    #                                       group_by=['SYMBOL'])          
+    if market == 'tw':
+        ewtinst1c, cols = sam_tej_get_ewtinst1c()
+        main_data = main_data.merge(ewtinst1c, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=['SYMBOL'])          
 
     # Buffett Indicator ......
     if market == 'tw':
@@ -1862,6 +2001,10 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add tej_get_ewtinst1
     
     
+    # v3.0400
+    # df_expend_one_hot_signal
+    
+    
     # Bug
     # SNP有NA是合理的嗎？
     #                      COLUMN  NA_COUNT
@@ -1879,7 +2022,7 @@ def master(param_holder, predict_begin, export_model=True,
     
 
     global version
-    version = 3.0200
+    version = 3.0300
     
     # Update
     # - Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，

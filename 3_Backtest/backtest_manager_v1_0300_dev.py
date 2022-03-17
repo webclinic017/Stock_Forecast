@@ -66,7 +66,8 @@ import arsenal as ar
 import arsenal_stock as stk
 import codebase_ml as cbml
 # import stock_analysis_manager_v3_0100 as sam
-import stock_analysis_manager_v3_0200_dev as sam
+# import stock_analysis_manager_v3_0200_dev as sam
+import stock_analysis_manager_v3_0300_dev as sam
 
 
 
