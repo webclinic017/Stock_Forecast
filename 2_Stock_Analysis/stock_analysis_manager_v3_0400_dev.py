@@ -2075,7 +2075,6 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0200
     # - Update for cbml.selectkbest
     # - Update for ut_v1.0001, and add epochs to model_params
-    
     # v3.0300
     # - Add tej_get_ewgin
     # - Add tej_get_ewtinst1
@@ -2085,6 +2084,15 @@ def master(param_holder, predict_begin, export_model=True,
     
     # v3.0400
     # df_expend_one_hot_signal
+
+
+    # v3.0500
+    # - Add df_vif and fix bug
+    # - C:\ProgramData\Anaconda3\lib\site-packages\statsmodels\stats
+    #   \outliers_influence.py:193: RuntimeWarning: divide by zero encountered in
+    #   double_scalars
+    #   vif = 1. / (1. - r_squared_i)
+
 
     global version
     version = 3.0400    
@@ -2342,8 +2350,8 @@ def master(param_holder, predict_begin, export_model=True,
                             {'model': xgb.XGBRegressor(),
                               'params': {
                                 # 'n_estimators': [200],
-                                'eta': [0.1],
-                                # 'eta': [0.1, 0.2],
+                                # 'eta': [0.1],
+                                'eta': [0.1, 0.2],
                                 'min_child_weight': [1],
                                   # 'min_child_weight': [0.5, 1],
                                 'max_depth':[8],
