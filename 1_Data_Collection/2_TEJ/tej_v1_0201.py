@@ -108,10 +108,9 @@ def master(begin=None, end=None, ewprcd=True, ewtinst1c=True,
     #   limit and interupt
     
     
-    
-    
     assert len(str(begin)) == 8 or begin == None, 'begin date error'
     assert len(str(end)) == 8 or end == None, 'end date error'
+    assert begin > end, 'begin date is larger than end date'
     
     msg = 'begin與end不可跨年度，避免儲存以月為單位的檔案時發生錯誤'
     assert str(begin)[0:4] == str(end)[0:4], msg

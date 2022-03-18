@@ -50,7 +50,7 @@ import arsenal_stock as stk
 
 import shareholding_spread
 # import tej_v1_10 as tej
-import tej_v1_0200 as tej
+import tej_v1_0201 as tej
 
 
 

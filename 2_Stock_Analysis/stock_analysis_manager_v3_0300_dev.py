@@ -2229,7 +2229,9 @@ def master(param_holder, predict_begin, export_model=True,
     # Update, add to BTM
     global wma, corr_threshold
     wma = False
-    corr_threshold = 0.85
+
+    # 原本設定為0.85，但CU DTSA 5509將Collinearity的標準設為0.7
+    corr_threshold = 0.7
     
     
     global df_summary_mean, df_summary_min, df_summary_max
