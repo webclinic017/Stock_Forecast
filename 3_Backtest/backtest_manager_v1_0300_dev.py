@@ -67,7 +67,7 @@ import arsenal_stock as stk
 import codebase_ml as cbml
 # import stock_analysis_manager_v3_0100 as sam
 # import stock_analysis_manager_v3_0200_dev as sam
-import stock_analysis_manager_v3_0300_dev as sam
+import stock_analysis_manager_v3_0400_dev as sam
 
 
 
@@ -832,8 +832,9 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
 
 
     # Bug
-    # - Actions會有大量重複，總筆數11465筆，但直接drop_duplicates()，沒設任何subset後，
-    # 就剩961筆
+    # - Actions會有大量重複，總筆數11465筆，但直接drop_duplicates()，沒設
+    # 任何subset後，就剩961筆
+    # - Bug, test=True時，所有INDUSTRY_HIGH_MA_1_MEAN的數值都一樣
     
 
     # Trading Bot
@@ -1577,7 +1578,10 @@ if __name__ == '__main__':
         today = cbyz.date_get_today()
         data_period = cbyz.date_diff(today, 20170101, absolute=True)
     else:
-        data_period = 365    
+        # data_period = 365
+        
+        print('Use before finishing to upload TEJ data')
+        data_period = 200
     
     
     
@@ -1585,12 +1589,12 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20180301, predict_period=1, 
-            time_unit='w',long=False, interval=4, bt_times=1, 
-            data_period=data_period,
-            ma_values=[1,4,12,24,48], volume_thld=400,
-            compete_mode=0, cv=list(range(3, 4)),
-            market='tw', hold=hold)
+        master(bt_last_begin=20180601, predict_period=1, 
+               time_unit='w',long=False, interval=4, bt_times=1, 
+               data_period=data_period,
+               ma_values=[1,4,12,24,48], volume_thld=400,
+               compete_mode=0, cv=list(range(3, 4)),
+               market='tw', hold=hold)
         
     # stk.write_sheet(data=actions, sheet='Week')
     

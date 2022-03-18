@@ -2085,6 +2085,9 @@ def master(param_holder, predict_begin, export_model=True,
     
     # v3.0400
     # df_expend_one_hot_signal
+
+    global version
+    version = 3.0400    
     
     
     # Bug
@@ -2103,8 +2106,6 @@ def master(param_holder, predict_begin, export_model=True,
     # 352     SNP_VOLUME_MA_1_STD       446
     
 
-    global version
-    version = 3.0300
     
     # Update
     # - Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，
