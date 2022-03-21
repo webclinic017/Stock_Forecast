@@ -2461,10 +2461,11 @@ def master(param_holder, predict_begin, export_model=True,
             pred_params = return_params.copy()
             pred_features = return_features.copy()
         else:
-            pred_result = pred_result.merge(return_result, how='left', on=id_keys)
+            pred_result = pred_result \
+                        .merge(return_result, how='left', on=id_keys)
             pred_scores = pred_scores.append(return_scores)
-            pred_params = pred_scores.append(return_params)
-            pred_features = pred_scores.append(return_features)            
+            pred_params = pred_params.append(return_params)
+            pred_features = pred_features.append(return_features)            
 
         # Prvent memory insufficient for saved data in ut
         del tuner
