@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220314',
-                 r'/home/jupyter/Arsenal/20220314',
+                 r'/home/jupyter/Codebase_YZ/20220321',
+                 r'/home/jupyter/Arsenal/20220321',
                  path + '/Function',
                  path_sam]
 
