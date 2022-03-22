@@ -835,6 +835,14 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Actions會有大量重複，總筆數11465筆，但直接drop_duplicates()，沒設
     # 任何subset後，就剩961筆
     # - Bug, test=True時，所有INDUSTRY_HIGH_MA_1_MEAN的數值都一樣
+    # - 當load_data為True時，會出現錯誤，應該是讀取csv時，SYMBOL被當成INT
+    # /tmp/ipykernel_5939/1527144950.py in set_frame()
+    #     224 
+    #     225     actions_main = frame \
+    # --> 226         .merge(actions_main, how='left', on=['SYMBOL'] + time_key_last) \
+    #     227         .merge(bt_result, how='left', on=id_keys)
+        
+    # ValueError: You are trying to merge on int64 and object columns. If you wish to proceed you should use pd.concat
     
 
     # Trading Bot
@@ -1513,6 +1521,8 @@ def simulate(df):
 
 
 
+
+
 # %% Execute ------
 
 if __name__ == '__main__':
@@ -1536,39 +1546,46 @@ if __name__ == '__main__':
     #    高估走勢
 
     
-    # Change Ratio - XGB Params ------
+    # Change Ratio - Day - XGB Params ------
     # eta: 0.3 / 0.01, 0.03, 0.08, 0.1, 0.2
     # min_child_weight: 0.8 / 1
     # max_depth: 10 / 8, 12
-    # subsample: 1 / 0.8    
+    # subsample: 1 / 0.8        
     
+    # Change Ratio - Week - XGB Params ------
+    # n_estimators: 200 / 100, 300
+    # eta: 0.2 / 0.1, 0.3
+    # max_depth: 8 / 4, 6, 10
+    # min_child_weight: 1
+    # subsample: 1
+    # cv: 2 / 3, 4
 
-    # Price - XGB Params ------
+    # Price - Day - XGB Params ------
     # eta: 0.2 /
     # min_child_weight: 0.8 / 
     # max_depth: 10 / 8, 12
     # subsample: 1 / 0.8
     
     
+        
     global weekly_actions, daily_actions
     hold = [3596, 6698]
     
-    
-    # test mode take few data to run, and dev mode will decrease the threshold
-    # to export temp file    
     global dev, test, load_result, load_model_data
     dev = True
     dev = False
     test = True
-    # test = False
+    test = False
     load_result = True    
     load_result = False
     
     load_model_data = True
-    load_model_data = False
+    # load_model_data = False
     
     global action_weekly, action_daily
     
+    # test mode take few data to run, and dev mode will decrease the threshold
+    # to export temp file
     
     if not dev and not test:
         # - TEJ的資料從2017年開始，但用dev的測試結果，即使data_period從20150110開始算
@@ -1578,23 +1595,19 @@ if __name__ == '__main__':
         today = cbyz.date_get_today()
         data_period = cbyz.date_diff(today, 20170101, absolute=True)
     else:
-        # data_period = 365
-        
-        print('Use before finishing to upload TEJ data')
-        data_period = 200
-    
+        data_period = 365
     
     
     # Week
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20190601, predict_period=1, 
-               time_unit='w',long=False, interval=4, bt_times=1, 
-               data_period=data_period,
-               ma_values=[1,4,12,24,48], volume_thld=400,
-               compete_mode=0, cv=list(range(3, 4)),
-               market='tw', hold=hold)
+        master(bt_last_begin=20210801, predict_period=1, 
+            time_unit='w',long=False, interval=4, bt_times=1, 
+            data_period=data_period,
+            ma_values=[1,4,12,24,36], volume_thld=400,
+            compete_mode=0, cv=list(range(2, 3)),
+            market='tw', hold=hold)
         
     # stk.write_sheet(data=actions, sheet='Week')
     
@@ -1603,11 +1616,10 @@ if __name__ == '__main__':
     # action_daily = \
     #     master(bt_last_begin=20220216, predict_period=1, 
     #             time_unit='d', long=False, interval=4, bt_times=1, 
-    #             data_period=data_period,
+    #             data_period=data_period, 
     #             ma_values=[5,10,20,60], volume_thld=400,
     #             compete_mode=0, cv=list(range(3, 4)),
     #             market='tw', hold=hold)
-        
         
         
         

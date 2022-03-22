@@ -21,7 +21,7 @@ import pickle
 
 host = 3
 # host = 2
-host = 4
+# host = 4
 # host = 0
 
 
@@ -2349,14 +2349,14 @@ def master(param_holder, predict_begin, export_model=True,
                               },
                             {'model': xgb.XGBRegressor(),
                               'params': {
-                                # 'n_estimators': [200],
-                                # 'eta': [0.1],
-                                'eta': [0.1, 0.2],
+                                'n_estimators': [200],
+                                'eta': [0.2],
+                                # 'eta': [0.2, 0.3],
                                 'min_child_weight': [1],
                                   # 'min_child_weight': [0.5, 1],
-                                'max_depth':[8],
-                                  # 'max_depth':[6, 8, 12],
-                                'subsample':[1]
+                                  'max_depth':[8],
+                                  # 'max_depth':[8, 10],
+                                  'subsample':[1]
                               }
                             }
                             ]             
