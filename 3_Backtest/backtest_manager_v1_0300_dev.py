@@ -209,7 +209,7 @@ def set_frame():
     else:
         temp_symbol = bt_result['SYMBOL'].unique().tolist()
         symbol_df = pd.DataFrame({'SYMBOL':temp_symbol})        
-    
+        
     
     # Set Frame ......
     frame = cbyz.df_cross_join(symbol_df, calendar_lite)
@@ -221,7 +221,20 @@ def set_frame():
     rename_dict = cbyz.li_to_dict(var_y + time_key, 
                                   var_y_last + time_key_last) 
     actions_main = hist_data_raw.rename(columns=rename_dict)
-            
+
+
+    # Symbole will be integers when load_data = True ......
+    print('Optimize - it should not be here')
+    bt_result = cbyz.df_conv_col_type(df=bt_result, cols='SYMBOL',
+                                       to='str')
+
+    frame = cbyz.df_conv_col_type(df=frame, cols='SYMBOL',
+                                       to='str')
+    
+    actions_main = cbyz.df_conv_col_type(df=actions_main, cols='SYMBOL',
+                                         to='str')
+
+    # ......
     actions_main = frame \
         .merge(actions_main, how='left', on=['SYMBOL'] + time_key_last) \
         .merge(bt_result, how='left', on=id_keys)
@@ -274,19 +287,19 @@ def backtest_predict(bt_last_begin, predict_period, interval,
         
         # ......
         bt_result_file = path_temp + '/bt_result_' \
-                        + suffix + '-' + file_serial + '.csv'
+                        + suffix + '_' + file_serial + '.csv'
                             
         precision_file = path_temp + '/precision_' \
-                        + suffix + '-' + file_serial + '.csv'
+                        + suffix + '_' + file_serial + '.csv'
             
         sam_calendar_file = path_temp + '/sam_calendar_' \
-                        + suffix + '-' + file_serial + '.csv'
+                        + suffix + '_' + file_serial + '.csv'
                         
         sam_predict_date_file = path_temp + '/sam_predict_date_' \
-                                + suffix + '-' + file_serial + '.csv'
+                                + suffix + '_' + file_serial + '.csv'
 
         sam_predict_week_file = path_temp + '/sam_predict_week_' \
-                                + suffix + '-' + file_serial + '.csv'
+                                + suffix + '_' + file_serial + '.csv'
 
         today = cbyz.date_get_today()
         
@@ -1132,6 +1145,12 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     
     # Write Google Sheets ...... 
     if len(actions) > 300:
+        
+        print('Bug - actions has duplicated rows when load_data = True,'
+              ' or it may be caused by stk.write_sheet')
+        
+        
+        actions = actions.drop_duplicates().reset_inex(drop=True)
         
         # Action Workbook
         if time_unit == 'd':
