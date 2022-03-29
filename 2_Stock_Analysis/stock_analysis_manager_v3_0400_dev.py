@@ -22,7 +22,7 @@ import pickle
 host = 3
 # host = 2
 # host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -3195,6 +3195,148 @@ def debug():
     
     pass
     
+
+def upgrade_ewtinst1():
+    
+    print('Update - Export File and weekly backup')
+    print('Update - 目前只處理QFII_EX1')    
+    
+    cols = ['QFII', 'FUND', 'DLR']
+    
+    
+    # Note
+    # - 雙層loop比較有效率，還是一層loop，把三個columns分開寫比較有效率
+    
+    
+    # ewtinst1目前從20170101開始
+    result = stk.tej_get_ewtinst1(begin_date=20110101, end_date=None, 
+                                  symbol=[])    
+    
+    # Dev
+    # result = stk.tej_get_ewtinst1(begin_date=20220101, end_date=None, 
+    #                               symbol=[])
+    
+    
+    result = result[['SYMBOL', 'WORK_DATE', 'QFII_EX1', 'FUND_EX', 'DLR_EX']]
+
+    result = cbyz.df_add_rank(df=result, value='WORK_DATE', 
+                              group_by=['SYMBOL'], sort_ascending=True, 
+                              rank_ascending=True,
+                              rank_name='INDEX',
+                              rank_method='min', inplace=False)
+    
+    max_index = result['INDEX'].max()
+    max_index = int(max_index)
+    
+    min_date = result['WORK_DATE'].min()
+
+    
+    # Market Calendar
+    today = cbyz.date_get_today()
+    market_calendar = stk.get_market_calendar(begin_date=20110101, 
+                                              end_date=today, 
+                                              market=market)
+    
+    market_calendar = market_calendar[market_calendar['TRADE_DATE']==1]
+    market_calendar = market_calendar[['WORK_DATE']]
+    market_calendar = market_calendar[market_calendar['WORK_DATE']<=min_date]
+
+
+    # Because of the new symbol issues, so the filled date of each symbol 
+    # will be different
+    calendar = result[['WORK_DATE']]
+    calendar = calendar.append(market_calendar.iloc[-2, :])
+    calendar = calendar \
+                .drop_duplicates() \
+                .sort_values(by='WORK_DATE') \
+                .reset_index(drop=True)
+                
+    unique_symbol = result[['SYMBOL']].drop_duplicates()
+    frame = cbyz.df_cross_join(unique_symbol, calendar)
+    
+    first_date = result[['SYMBOL', 'WORK_DATE']] \
+                    .drop_duplicates(subset='SYMBOL')
+
+    first_date['FIRST_DATE'] = 1
+    
+    calendar = calendar.merge(first_date, how='left', on='WORK_DATE')
+    
+    calendar, _ = cbyz.df_add_shift(df=calendar, cols='WORK_DATE', shift=-1, 
+                                    sort_by='WORK_DATE', group_by=['SYMBOL'], 
+                                    suffix='_PREV', remove_na=False)
+    
+    
+    # Get the start value
+    start = pd.DataFrame()
+    
+    for i in range(1, max_index):
+        
+        temp = result[result['INDEX']<=i]
+        temp = cbyz.df_anti_merge(temp, start, on='SYMBOL')
+        
+        if len(temp) == 0:
+            break
+        
+        temp = temp \
+                .groupby('SYMBOL') \
+                .agg({'QFII_EX1':'sum'}) \
+                .reset_index()
+                
+        
+        new_start = temp[temp['QFII_EX1']>=0]
+        start = start.append(new_start)
+        
+        print(i, len(temp))
+    
+    print('Check is the result correct')
+    print('The index of start value should be 0')
+    
+    
+    # Calculate
+    result = result \
+            .sort_values(by=['SYMBOL', 'WORK_DATE']) \
+            .reset_index(drop=True)
+            
+        
+    
+    # Hold ......
+    result['QFII_EX1_HOLD'] = np.nan
+    result['FUND_EX_HOLD'] = np.nan
+    result['DLR_EX_HOLD'] = np.nan
+     
+    
+    for i in range(max_index):
+        
+        if i == 0:
+            result['QFII_EX1_HOLD'] = result['QFII_EX1']
+        else:
+            result['QFII_EX1_HOLD'] = \
+                np.where(result['INDEX']==i, 
+                         result['QFII_EX1_HOLD'] + result['QFII_EX1'],
+                         result['QFII_EX1_HOLD'])
+        
+        
+        
+        
+        temp = result[result['INDEX']<=i]
+        temp = cbyz.df_anti_merge(temp, start, on='SYMBOL')
+        
+        if len(temp) == 0:
+            break
+        
+        temp = temp \
+                .groupby('SYMBOL') \
+                .agg({'QFII_EX1':'sum'}) \
+                .reset_index()
+                
+        
+        new_start = temp[temp['QFII_EX1']>=0]
+        start = start.append(new_start)
+        
+        print(i, len(temp))
+    print('Check')
+        
+
 
 
 # %% Execution ------
