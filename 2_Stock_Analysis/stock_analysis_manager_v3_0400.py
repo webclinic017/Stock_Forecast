@@ -21,8 +21,8 @@ import pickle
 
 host = 3
 # host = 2
-# host = 4
-host = 0
+host = 4
+# host = 0
 
 
 # Path .....
@@ -2211,7 +2211,7 @@ def master(param_holder, predict_begin, export_model=True,
     global ohlc, ohlc_ratio, ohlc_change
     log = []
     error_msg = []    
-    ohlc = stk.get_ohlc()
+    ohlc = stk.get_oh`lc()
     ohlc_ratio = stk.get_ohlc(orig=False, ratio=True, change=False)
     ohlc_change = stk.get_ohlc(orig=False, ratio=False, change=True)
     
@@ -3201,6 +3201,10 @@ def upgrade_ewtinst1():
     print('Update - Export File and weekly backup')
     print('Update - 目前只處理QFII_EX1')    
     
+    
+    dev = False
+    dev = True
+    
     cols = ['QFII', 'FUND', 'DLR']
     
     
@@ -3209,61 +3213,88 @@ def upgrade_ewtinst1():
     
     
     # ewtinst1目前從20170101開始
-    result = stk.tej_get_ewtinst1(begin_date=20110101, end_date=None, 
-                                  symbol=[])    
-    
-    # Dev
-    # result = stk.tej_get_ewtinst1(begin_date=20220101, end_date=None, 
-    #                               symbol=[])
-    
-    
-    result = result[['SYMBOL', 'WORK_DATE', 'QFII_EX1', 'FUND_EX', 'DLR_EX']]
+    # data = stk.tej_get_ewtinst1(begin_date=20110101, end_date=None, 
+    #                               symbol=[])    
+    data = pd.read_csv(path_temp + '/ewtinst1.csv')
+    data = data[['SYMBOL', 'WORK_DATE', 'QFII_EX1', 'FUND_EX', 'DLR_EX']]
 
-    result = cbyz.df_add_rank(df=result, value='WORK_DATE', 
-                              group_by=['SYMBOL'], sort_ascending=True, 
-                              rank_ascending=True,
-                              rank_name='INDEX',
-                              rank_method='min', inplace=False)
-    
-    max_index = result['INDEX'].max()
-    max_index = int(max_index)
-    
-    min_date = result['WORK_DATE'].min()
 
-    
     # Market Calendar
     today = cbyz.date_get_today()
-    market_calendar = stk.get_market_calendar(begin_date=20110101, 
-                                              end_date=today, 
-                                              market=market)
+    # market_calendar = stk.get_market_calendar(begin_date=20110101, 
+    #                                           end_date=today, 
+    #                                           market=market)
+    market_calendar = pd.read_csv(path_temp + '/market_calendar.csv')
+    
     
     market_calendar = market_calendar[market_calendar['TRADE_DATE']==1]
     market_calendar = market_calendar[['WORK_DATE']]
     market_calendar = market_calendar[market_calendar['WORK_DATE']<=min_date]
 
 
-    # Because of the new symbol issues, so the filled date of each symbol 
-    # will be different
-    calendar = result[['WORK_DATE']]
+    # Build Canledar
+    # - Because of the new symbol issues, so the filled date of each symbol 
+    #   will be different
+    calendar = data[['WORK_DATE']]
     calendar = calendar.append(market_calendar.iloc[-2, :])
+    
     calendar = calendar \
                 .drop_duplicates() \
                 .sort_values(by='WORK_DATE') \
                 .reset_index(drop=True)
                 
-    unique_symbol = result[['SYMBOL']].drop_duplicates()
+    unique_symbol = data[['SYMBOL']].drop_duplicates()
     frame = cbyz.df_cross_join(unique_symbol, calendar)
     
-    first_date = result[['SYMBOL', 'WORK_DATE']] \
+    first_date = data[['SYMBOL', 'WORK_DATE']] \
+                    .sort_values(by=['SYMBOL', 'WORK_DATE']) \
                     .drop_duplicates(subset='SYMBOL')
 
     first_date['FIRST_DATE'] = 1
+    calendar = frame.merge(first_date, how='left', on=['SYMBOL', 'WORK_DATE'])
     
-    calendar = calendar.merge(first_date, how='left', on='WORK_DATE')
+    calendar = calendar \
+                .sort_values(by=['SYMBOL', 'WORK_DATE']) \
+                .reset_index(drop=True)
     
-    calendar, _ = cbyz.df_add_shift(df=calendar, cols='WORK_DATE', shift=-1, 
-                                    sort_by='WORK_DATE', group_by=['SYMBOL'], 
+    calendar, _ = cbyz.df_add_shift(df=calendar, cols='FIRST_DATE', shift=-1, 
+                                    sort_by=['SYMBOL', 'WORK_DATE'], 
+                                    group_by=['SYMBOL'], 
                                     suffix='_PREV', remove_na=False)
+    
+    calendar = cbyz.df_fillna(df=calendar, cols='FIRST_DATE', 
+                              sort_keys=['SYMBOL', 'WORK_DATE'],
+                              method='ffill')
+        
+    calendar['REMOVE'] = np.where((calendar['FIRST_DATE'].isna()) \
+                                  & (calendar['FIRST_DATE_PREV'].isna()), 
+                                  1, 0)
+        
+    calendar = calendar[calendar['REMOVE']==0]
+    calendar = calendar[['SYMBOL', 'WORK_DATE']]
+    calendar = cbyz.df_add_rank(df=calendar, value='WORK_DATE',
+                                group_by=['SYMBOL'], sort_ascending=True,
+                                rank_ascending=True, rank_name='INDEX',
+                                rank_method='min', inplace=False)
+
+    calendar['INDEX'] = calendar['INDEX'] - 1
+
+    
+    # Update data ......
+    data = data.merge(calendar, how='outer', on=['SYMBOL', 'WORK_DATE'])
+    
+    data = data \
+            .sort_values(by=['SYMBOL', 'WORK_DATE']) \
+            .reset_index(drop=True)
+            
+    # Calendar may contains the unlisted symbols and date            
+    data = data[(~data['QFII_EX1'].isna()) | (data['INDEX']==0)]
+
+
+
+    # Index And Date
+    max_index = int(calendar['INDEX'].max())
+    min_date = data['WORK_DATE'].min()
     
     
     # Get the start value
@@ -3271,22 +3302,26 @@ def upgrade_ewtinst1():
     
     for i in range(1, max_index):
         
-        temp = result[result['INDEX']<=i]
+        temp = data[data['INDEX']<=i]
         temp = cbyz.df_anti_merge(temp, start, on='SYMBOL')
+        temp_symbol = temp[['SYMBOL']].drop_duplicates()
         
-        if len(temp) == 0:
+        if len(temp_symbol) == 0 or (dev and len(temp_symbol)<=100):
             break
         
         temp = temp \
-                .groupby('SYMBOL') \
-                .agg({'QFII_EX1':'sum'}) \
-                .reset_index()
+            .groupby('SYMBOL') \
+            .agg({'QFII_EX1':'sum'}) \
+            .reset_index()
                 
         
         new_start = temp[temp['QFII_EX1']>=0]
+        new_start['INDEX'] = i
         start = start.append(new_start)
         
         print(i, len(temp))
+        
+        
     
     print('Check is the result correct')
     print('The index of start value should be 0')
