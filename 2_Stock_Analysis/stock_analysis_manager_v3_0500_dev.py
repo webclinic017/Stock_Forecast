@@ -1375,12 +1375,12 @@ def sam_od_us_get_snp(begin_date):
 # ...............
 
 
-def sam_tej_get_ewsale(begin_date):
+def sam_tej_ewsale(begin_date):
 
     
     print('還沒加df_drop_high_corr_var')
     global main_data_frame, symbol
-    loc_df = stk.tej_get_ewsale(begin_date=begin_date, end_date=None, 
+    loc_df = stk.tej_ewsale(begin_date=begin_date, end_date=None, 
                                 symbol=symbol, fill=True, host=host)
     
     
@@ -1410,11 +1410,11 @@ def sam_tej_get_ewsale(begin_date):
 # ...........
 
 
-def tej_get_ewgin():
+def tej_ewgin():
     
     global id_keys, corr_threshold
     
-    result = stk.tej_get_ewgin(begin_date=shift_begin, end_date=None, 
+    result = stk.tej_ewgin(begin_date=shift_begin, end_date=None, 
                                symbol=symbol)
     
     cols = cbyz.df_get_cols_except(
@@ -1468,14 +1468,14 @@ def tej_get_ewgin():
 # ...........
 
 
-def sam_tej_get_ewifinq():
+def sam_tej_ewifinq():
 
     global ma_values, predict_period, predict_date
     global calendar, main_data_frame_calendar
     global symbol
     
     print('還沒加df_drop_high_corr_var')    
-    result = stk.tej_get_ewifinq(fill_date=True, target_type='symbol',
+    result = stk.tej_ewifinq(fill_date=True, target_type='symbol',
                                  target=symbol)
 
     cols = cbyz.df_get_cols_except(
@@ -1498,11 +1498,11 @@ def sam_tej_get_ewifinq():
 # ..............
     
 
-def sam_tej_get_ewtinst1():
+def sam_tej_ewtinst1():
     
     global id_keys, corr_threshold
     
-    result = stk.tej_get_ewtinst1(begin_date=shift_begin, end_date=None, 
+    result = stk.tej_ewtinst1(begin_date=shift_begin, end_date=None, 
                                   symbol=symbol)
     
     cols = cbyz.df_get_cols_except(
@@ -1558,11 +1558,11 @@ def sam_tej_get_ewtinst1():
 # .............
 
 
-def sam_tej_get_ewtinst1c():
+def sam_tej_ewtinst1c():
     
     global id_keys, corr_threshold
     
-    result = stk.tej_get_ewtinst1c(begin_date=shift_begin, end_date=None, 
+    result = stk.tej_ewtinst1c(begin_date=shift_begin, end_date=None, 
                                    symbol=symbol, trade=True)
     
     cols = cbyz.df_get_cols_except(
@@ -1716,7 +1716,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
     # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
     if market == 'tw':
-        ewtinst1, cols = sam_tej_get_ewtinst1()
+        ewtinst1, cols = sam_tej_ewtinst1()
         main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
         main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
                                           sort_keys=time_key, 
@@ -1728,7 +1728,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
     # TEJ EWGIN ......
     if market == 'tw':
-        ewgin, cols = tej_get_ewgin()
+        ewgin, cols = tej_ewgin()
         main_data = main_data.merge(ewgin, how='left', on=id_keys)
         main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
                                           sort_keys=time_key, 
@@ -1875,12 +1875,12 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # 2. 主要邏輯就是顯示最新的營收資料
     # if market == 'tw':
         
-    #     msg = '''Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
+    #     msg = '''Bug - sam_tej_ewsale，在1/18 23:00跑1/19時會出現chk_na error，但1/19 00:00過後
     #     再跑就正常了
     #     '''
     #     print(msg)
         
-    #     ewsale = sam_tej_get_ewsale(begin_date=shift_begin)
+    #     ewsale = sam_tej_ewsale(begin_date=shift_begin)
     #     main_data = main_data \
     #                 .merge(ewsale, how='left', on=['SYMBOL', 'WORK_DATE'])      
     
@@ -1891,7 +1891,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # if market == 'tw':
         # print('目前只用單季，需確認是否有缺漏')
         # 20220218 - Dev=True，eta=0.2時，即使只保留一個欄位也會overfitting
-        # financial_statement, cols = sam_tej_get_ewifinq()
+        # financial_statement, cols = sam_tej_ewifinq()
         
         # main_data = main_data \
         #         .merge(financial_statement, how='left', on=id_keys)
@@ -1904,7 +1904,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
     # TEJ ewtinst1c - Average Holding Cost of Juridical Persons ......
     # if market == 'tw':
-    #     ewtinst1c, cols = sam_tej_get_ewtinst1c()
+    #     ewtinst1c, cols = sam_tej_ewtinst1c()
     #     main_data = main_data.merge(ewtinst1c, how='left', on=id_keys)
     #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
     #                                       sort_keys=time_key, 
@@ -2057,7 +2057,7 @@ def master(param_holder, predict_begin, export_model=True,
     # v2.501 - 20220216
     # - Replace YEAR with YEAR_ISO, and WEEK with WEEK_ISO
     # v2.502 - 20220216
-    # - Restore sam_tej_get_ewifinq, but removed again
+    # - Restore sam_tej_ewifinq, but removed again
     # - Set model params for week and day seperately
     # - Move od_tw_get_ex_dividends to arsenal_stock
     # - Optimize load_data feature of get_model_data 
@@ -2076,15 +2076,16 @@ def master(param_holder, predict_begin, export_model=True,
     # - Update for cbml.selectkbest
     # - Update for ut_v1.0001, and add epochs to model_params
     # v3.0300
-    # - Add tej_get_ewgin
-    # - Add tej_get_ewtinst1
+    # - Add tej_ewgin
+    # - Add tej_ewtinst1
     # - Add od_us_get_dji
     # - Completed test
     # v3.0400
     # - Stable
     
     # v3.0500
-    # - Develop upgrade_ewtins1 
+    # - Develop tej_ewtins1 _hold
+    # - Rename tej function in stk
     
     # df_expend_one_hot_signal
 
@@ -2118,7 +2119,7 @@ def master(param_holder, predict_begin, export_model=True,
 
     
     # Update
-    # - Bug - sam_tej_get_ewsale，在1/18 23:00跑1/19時會出現chk_na error，
+    # - Bug - sam_tej_ewsale，在1/18 23:00跑1/19時會出現chk_na error，
     #   但1/19 00:00過後再跑就正常。end_date應該要改成data_begin, 這個問題應該
     #   是today比data_begin少一天    
     # - Replace symbol with target, and add target_type which may be symbol
@@ -2126,7 +2127,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add financial_statement
     #   > 2021下半年還沒更新，需要改code，可以自動化更新並合併csv
     # - 財報的更新時間很慢，20220216的時候，2021年12月的財報還沒出來；所以
-    #   在tej_get_ewtinst1c需要有提醒，列出最新的財報日期，並用assert檢查中間
+    #   在tej_ewtinst1c需要有提醒，列出最新的財報日期，並用assert檢查中間
     #   是否有空缺
     # - Fix Support and resistant
     # - select_symbols用過去一周的總成交量檢查
@@ -3198,257 +3199,15 @@ def debug():
     pass
     
 
-def upgrade_ewtinst1_v0():
-    
-    worklist = '''
-    1. 目前只處理QFII_EX1
-    2. Export File and weekly backup
-    '''
-    print(worklist)
-    
-    dev = False
-    dev = True
-    
-    cols = ['QFII_EX1', 'FUND_EX', 'DLR_EX']
-    
-    
-    # Note
-    
-    
-    # ewtinst1目前從20170101開始
-    # data = stk.tej_get_ewtinst1(begin_date=20110101, end_date=None, 
-    #                               symbol=[])    
-    data = pd.read_csv(path_temp + '/ewtinst1.csv')
-    data = data[['SYMBOL', 'WORK_DATE', 'QFII_EX1', 'FUND_EX', 'DLR_EX']]
-    min_date = data['WORK_DATE'].min()
-
-    # Market Calendar
-    today = cbyz.date_get_today()
-    # market_calendar = stk.get_market_calendar(begin_date=20110101, 
-    #                                           end_date=today, 
-    #                                           market=market)
-    market_calendar = pd.read_csv(path_temp + '/market_calendar.csv')
-    
-    
-    market_calendar = market_calendar[market_calendar['TRADE_DATE']==1]
-    market_calendar = market_calendar[['WORK_DATE']]
-    market_calendar = market_calendar[market_calendar['WORK_DATE']<=min_date]
-
-
-    # Build Canledar
-    # - Because of the new symbol issues, so the filled date of each symbol 
-    #   will be different
-    calendar = data[['WORK_DATE']]
-    calendar = calendar.append(market_calendar.iloc[-2, :])
-    
-    calendar = calendar \
-                .drop_duplicates() \
-                .sort_values(by='WORK_DATE') \
-                .reset_index(drop=True)
-                
-    unique_symbol = data[['SYMBOL']].drop_duplicates()
-    frame = cbyz.df_cross_join(unique_symbol, calendar)
-    
-    first_date = data[['SYMBOL', 'WORK_DATE']] \
-                    .sort_values(by=['SYMBOL', 'WORK_DATE']) \
-                    .drop_duplicates(subset='SYMBOL')
-
-    first_date['FIRST_DATE'] = 1
-    calendar = frame.merge(first_date, how='left', on=['SYMBOL', 'WORK_DATE'])
-    
-    calendar = calendar \
-                .sort_values(by=['SYMBOL', 'WORK_DATE']) \
-                .reset_index(drop=True)
-    
-    calendar, _ = cbyz.df_add_shift(df=calendar, cols='FIRST_DATE', shift=-1, 
-                                    sort_by=['SYMBOL', 'WORK_DATE'], 
-                                    group_by=['SYMBOL'], 
-                                    suffix='_PREV', remove_na=False)
-    
-    calendar = cbyz.df_fillna(df=calendar, cols='FIRST_DATE', 
-                              sort_keys=['SYMBOL', 'WORK_DATE'],
-                              method='ffill')
-        
-    calendar['REMOVE'] = np.where((calendar['FIRST_DATE'].isna()) \
-                                  & (calendar['FIRST_DATE_PREV'].isna()), 
-                                  1, 0)
-        
-    calendar = calendar[calendar['REMOVE']==0]
-    calendar = calendar[['SYMBOL', 'WORK_DATE']]
-    calendar = cbyz.df_add_rank(df=calendar, value='WORK_DATE',
-                                group_by=['SYMBOL'], sort_ascending=True,
-                                rank_ascending=True, rank_name='INDEX',
-                                rank_method='min', inplace=False)
-
-    calendar['INDEX'] = calendar['INDEX'] - 1
-    calendar = cbyz.df_conv_col_type(df=calendar, cols='INDEX', to=np.int16)
-
-    
-    # Update data ......
-    data = data.merge(calendar, how='outer', on=['SYMBOL', 'WORK_DATE'])
-    
-    data = data \
-            .sort_values(by=['SYMBOL', 'WORK_DATE']) \
-            .reset_index(drop=True)
-            
-    # Calendar may contains the unlisted symbols and date            
-    data = data[(~data['QFII_EX1'].isna()) | (data['INDEX']==0)]
-
-    # Index And Date
-    max_index = int(data['INDEX'].max())
-    
-    
-    
-    # Start Value - Method 1
-    # - 這個方式會有Bug，如10,15,-50就會出錯，所以需要下面的method2作補強
-    method_1 = pd.DataFrame()
-    
-    for c in cols:
-
-        col_data = data.copy()
-        col_data = col_data[['SYMBOL', 'INDEX', c]]
-        col_start = pd.DataFrame()
-        
-        for i in range(1, max_index):
-            
-            temp = col_data[col_data['INDEX']<=i]
-            temp = cbyz.df_anti_merge(temp, col_start, on='SYMBOL')
-            temp_symbol = temp[['SYMBOL']].drop_duplicates()
-            
-            if len(temp_symbol) == 0 or (dev and len(temp_symbol)<=1900):
-                break
-            
-            temp = temp \
-                .groupby('SYMBOL') \
-                .agg({c:'sum'}) \
-                .reset_index()
-                    
-            new_start = temp[temp[c]>0]
-            
-            if len(new_start) == 0:
-                continue
-            
-            new_start = new_start.rename(columns={c:'METHOD_1'})
-            new_start.loc[:, 'INDEX'] = i
-            col_start = col_start.append(new_start)
-            
-            print(i, len(temp))
-            
-        col_start['TYPE'] = c
-        method_1 = method_1.append(col_start)
-            
-        
-    # Start Value - Method 2
-    # - 將所有歷史資料by symbol加總，如果總值是負的，且絕對值小於start，
-    #   則取代start
-    method_2 = data.dropna(axis=0)
-    method_2 = method_2 \
-            .groupby('SYMBOL') \
-            .agg({'QFII_EX1':'sum',
-                  'FUND_EX':'sum',
-                  'DLR_EX':'sum'}) \
-            .reset_index()
-            
-    method_2 = pd.melt(method_2, id_vars='SYMBOL', value_vars=cols,
-                      var_name='TYPE', value_name='METHOD_2')
-        
-    method_2 = method_2[method_2['METHOD_2']<0]
-    method_2['METHOD_2'] = method_2['METHOD_2'].abs()
-    
-    # Combine
-    start_raw = method_1.merge(method_2, how='outer', on=['SYMBOL', 'TYPE'])
-    
-    start = cbyz.df_conv_na(df=start_raw,
-                            cols=['METHOD_1', 'METHOD_2'],
-                            value=0)
-    
-    start['START'] = np.where(start['METHOD_1']>=start['METHOD_2'],
-                              start['METHOD_1'], start['METHOD_2'])
-    
-    start = start[['SYMBOL', 'TYPE', 'START']]
-    start['TYPE'] = start['TYPE'] + '_START'
-    start = start \
-            .pivot_table(index='SYMBOL', columns='TYPE', 
-                         values='START', fill_value=0) \
-            .reset_index()
-    
-    # Add Start Value To Data
-    data = data.merge(start, how='left', on='SYMBOL')
-    
-    data['QFII_EX1'] = np.where(data['QFII_EX1'].isna(),
-                                data['QFII_EX1_START'], data['QFII_EX1'])
-    
-    data['FUND_EX'] = np.where(data['FUND_EX'].isna(),
-                                data['FUND_EX_START'], data['FUND_EX'])
-
-    data['DLR_EX'] = np.where(data['DLR_EX'].isna(),
-                              data['DLR_EX_START'], data['DLR_EX'])    
-    
-    data = data.drop(['QFII_EX1_START', 'FUND_EX_START', 'DLR_EX_START'],
-                     axis=1)
-    
-    
-    print('Check is the result correct')
-    print('The index of start value should be 0')
-    
-    
-    # Calculate
-    result = result \
-            .sort_values(by=['SYMBOL', 'WORK_DATE']) \
-            .reset_index(drop=True)
-            
-        
-    
-    # Hold ......
-    result['QFII_EX1_HOLD'] = np.nan
-    result['FUND_EX_HOLD'] = np.nan
-    result['DLR_EX_HOLD'] = np.nan
-     
-    
-    for i in range(max_index):
-        
-        if i == 0:
-            result['QFII_EX1_HOLD'] = result['QFII_EX1']
-        else:
-            result['QFII_EX1_HOLD'] = \
-                np.where(result['INDEX']==i, 
-                         result['QFII_EX1_HOLD'] + result['QFII_EX1'],
-                         result['QFII_EX1_HOLD'])
-        
-        
-        
-        
-        temp = result[result['INDEX']<=i]
-        temp = cbyz.df_anti_merge(temp, start, on='SYMBOL')
-        
-        if len(temp) == 0:
-            break
-        
-        temp = temp \
-                .groupby('SYMBOL') \
-                .agg({'QFII_EX1':'sum'}) \
-                .reset_index()
-                
-        
-        new_start = temp[temp['QFII_EX1']>=0]
-        start = start.append(new_start)
-        
-        print(i, len(temp))
-    print('Check')
-
-
-
 
 def tej_ewtinst1_hold(dev=False):
     
     worklist = '''
-    1. 目前只處理QFII_EX1
     2. Export File and weekly backup
     '''
     print(worklist)
     
-    dev = False
-    dev = True
+
     
     cols = ['QFII_EX1', 'FUND_EX', 'DLR_EX']
     cols_start = [c + '_START' for c in cols]
@@ -3458,7 +3217,7 @@ def tej_ewtinst1_hold(dev=False):
     
     
     # ewtinst1目前從20170101開始
-    # data = stk.tej_get_ewtinst1(begin_date=20110101, end_date=None, 
+    # data = stk.tej_ewtinst1(begin_date=20110101, end_date=None, 
     #                               symbol=[])    
     data = pd.read_csv(path_temp + '/ewtinst1.csv')
     data['SYMBOL'] = data['SYMBOL'].astype('str')
@@ -3566,7 +3325,7 @@ def tej_ewtinst1_hold(dev=False):
         start_raw = start_raw.append(temp)
 
         
-        if i % 50 == 0 or i == max_index - 1:
+        if i % 100 == 0 or i == max_index - 1:
             
             # INDEX is used to validate
             if not dev:
@@ -3606,6 +3365,12 @@ def tej_ewtinst1_hold(dev=False):
     
     del loop_data
     gc.collect()
+    
+    
+    start = start \
+            .pivot_table(index=['SYMBOL'],
+                         columns='TYPE', values='VALUE') \
+            .reset_index()
     
     start = start.rename(columns={'QFII_EX1':'QFII_EX1_START',
                                   'FUND_EX':'FUND_EX_START',
@@ -3661,10 +3426,9 @@ def tej_ewtinst1_hold(dev=False):
         result_update = result_update.drop(shift_cols, axis=1)
         result = result_keep.append(result_update)
         
-        gc.collect()
-        
         if i % 100 == 0:
             print('upgrade_ewtinst1 - calculate hold ', i, '/', max_index)
+            gc.collect()
                 
     result = result \
             .sort_values(by=['SYMBOL', 'WORK_DATE']) \
