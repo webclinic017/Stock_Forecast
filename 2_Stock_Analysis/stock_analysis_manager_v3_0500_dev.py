@@ -3439,7 +3439,7 @@ def upgrade_ewtinst1_v0():
 
 
 
-def upgrade_ewtinst1():
+def tej_ewtinst1_hold(dev=False):
     
     worklist = '''
     1. 目前只處理QFII_EX1
@@ -3451,7 +3451,8 @@ def upgrade_ewtinst1():
     dev = True
     
     cols = ['QFII_EX1', 'FUND_EX', 'DLR_EX']
-    
+    cols_start = [c + '_START' for c in cols]
+    cols_hold = [c + '_HOLD' for c in cols]
     
     # Note
     
@@ -3544,7 +3545,7 @@ def upgrade_ewtinst1():
     
     
     # Calculate Start Value
-    # - 這個方式會有Bug，如10,15,-50就會出錯，所以需要下面的method2作補強
+    start_raw = pd.DataFrame()
     start = pd.DataFrame()
     
     loop_data = data[data['INDEX']>0] \
@@ -3562,80 +3563,115 @@ def upgrade_ewtinst1():
                 .reset_index()
         
         temp['INDEX'] = i
-        start = start.append(temp)
+        start_raw = start_raw.append(temp)
 
         
-        if i % 20 == 0 or i == max_index - 1:
+        if i % 50 == 0 or i == max_index - 1:
             
-            start_index = start \
-                    .melt(id_vars=['SYMBOL', 'INDEX'], 
-                          value_vars=cols, 
-                          value_name='VALUE')
+            # INDEX is used to validate
+            if not dev:
+                new_start = start_raw \
+                            .groupby('SYMBOL') \
+                            .agg({'QFII_EX1':'min',
+                                  'FUND_EX':'min', 
+                                  'DLR_EX':'min'}) \
+                            .reset_index()
+                            
+                start = start.append(new_start)
+                
+                start = start \
+                        .groupby('SYMBOL') \
+                        .agg({'QFII_EX1':'min',
+                              'FUND_EX':'min', 
+                              'DLR_EX':'min'}) \
+                        .reset_index()                
                     
-            start_min = start \
-                    .groupby(['SYMBOL']) \
-                    .agg({'QFII_EX1':'min',
-                          'FUND_EX':'min',
-                          'DLR_EX':'min'}) \
-                    .reset_index()
-                    
-        # Dev
-        if i == 10:
-            break
+            else:
+                # The value may be duplicated, but it doesn't matter, just 
+                # take the minimun index.
+                new_start = start_raw \
+                        .melt(id_vars=['SYMBOL', 'INDEX'], 
+                              value_vars=cols, var_name='TYPE',
+                              value_name='VALUE')
+                
+                start = start.append(new_start)
+                
+                start = start \
+                        .sort_values(by=['SYMBOL', 'TYPE', 'VALUE']) \
+                        .drop_duplicates(subset=['SYMBOL', 'TYPE'])
+            
+            del new_start
+            gc.collect()
+            print('upgrade_ewtinst1 - calculate start ', i, '/', max_index)
+    
+    del loop_data
+    gc.collect()
+    
+    start = start.rename(columns={'QFII_EX1':'QFII_EX1_START',
+                                  'FUND_EX':'FUND_EX_START',
+                                  'DLR_EX':'DLR_EX_START'})
+    
+    # If the value lager than zero, then convert it to zero.
+    for c in cols_start:
+        start[c] = np.where(start[c]>0, 0, start[c].abs())
+    
+    result = data.merge(start, how='left', on='SYMBOL')
+    
+    
+    for i in range(len(cols)):
         
-        print(i, '/', max_index)
-
-
+        col = cols[i]
+        col_start = cols_start[i]
+        
+        result[col] = np.where(result[col].isna(), 
+                               result[col_start], result[col])
+        
+        # Add hold columns
+        result[col + '_HOLD'] = np.where(result['INDEX']==0, 
+                                         result[col], np.nan)        
+        
+    result = result.drop(cols_start, axis=1)
+    gc.collect()
     
     
-    
-    print('Check is the result correct')
-    print('The index of start value should be 0')
-    
-    
-    # Calculate
+    # Calculate Hold ......
+    for i in range(1, max_index):
+        
+        result_update = result[result['INDEX'].isin([i, i-1])]
+        result_keep = result[~result['INDEX'].isin([i, i-1])]
+        
+        result_update, shift_cols = \
+            cbyz.df_add_shift(df=result_update, cols=cols_hold, shift=1,
+                              sort_by=['SYMBOL', 'WORK_DATE'],
+                              group_by=['SYMBOL'], 
+                              suffix='_PREV', remove_na=False)        
+        
+        for j in range(len(cols)):
+        
+            col = cols[j]
+            col_hold = cols_hold[j]
+            col_prev = col_hold + '_PREV'
+            
+            result_update[col_hold] = \
+                np.where(result_update['INDEX']==i,
+                          result_update[col_prev] + result_update[col],
+                          result_update[col_hold])
+        
+        # Here doesn't need to sort values
+        result_update = result_update.drop(shift_cols, axis=1)
+        result = result_keep.append(result_update)
+        
+        gc.collect()
+        
+        if i % 100 == 0:
+            print('upgrade_ewtinst1 - calculate hold ', i, '/', max_index)
+                
     result = result \
             .sort_values(by=['SYMBOL', 'WORK_DATE']) \
             .reset_index(drop=True)
-            
-        
-    
-    # Hold ......
-    result['QFII_EX1_HOLD'] = np.nan
-    result['FUND_EX_HOLD'] = np.nan
-    result['DLR_EX_HOLD'] = np.nan
-     
-    
-    for i in range(max_index):
-        
-        if i == 0:
-            result['QFII_EX1_HOLD'] = result['QFII_EX1']
-        else:
-            result['QFII_EX1_HOLD'] = \
-                np.where(result['INDEX']==i, 
-                         result['QFII_EX1_HOLD'] + result['QFII_EX1'],
-                         result['QFII_EX1_HOLD'])
-        
-        
-        
-        
-        temp = result[result['INDEX']<=i]
-        temp = cbyz.df_anti_merge(temp, start, on='SYMBOL')
-        
-        if len(temp) == 0:
-            break
-        
-        temp = temp \
-                .groupby('SYMBOL') \
-                .agg({'QFII_EX1':'sum'}) \
-                .reset_index()
-                
-        
-        new_start = temp[temp['QFII_EX1']>=0]
-        start = start.append(new_start)
-        
-        print(i, len(temp))
-    print('Check')        
+
+    return result
+
 
 
 
