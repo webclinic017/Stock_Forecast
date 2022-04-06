@@ -17,7 +17,7 @@ import random
 
 host = 3
 # host = 2
-host = 4
+# host = 4
 # host = 0
 market = 'tw'
 
@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220321',
-                 r'/home/jupyter/Arsenal/20220321',
+                 r'/home/jupyter/Codebase_YZ/20220401',
+                 r'/home/jupyter/Arsenal/20220401',
                  path + '/Function',
                  path_sam]
 
@@ -67,7 +67,7 @@ import arsenal_stock as stk
 import codebase_ml as cbml
 # import stock_analysis_manager_v3_0100 as sam
 # import stock_analysis_manager_v3_0200_dev as sam
-import stock_analysis_manager_v3_0500_dev as sam
+import stock_analysis_manager_v3_0500 as sam
 
 
 
@@ -1152,8 +1152,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
         print('Bug - actions has duplicated rows when load_data = True,'
               ' or it may be caused by stk.write_sheet')
         
-        
-        actions = actions.drop_duplicates().reset_inex(drop=True)
+        actions = actions.drop_duplicates().reset_index(drop=True)
         
         # Action Workbook
         if time_unit == 'd':
@@ -1597,7 +1596,7 @@ if __name__ == '__main__':
     dev = True
     dev = False
     test = True
-    test = False
+    # test = False
     load_result = True    
     load_result = False
     
@@ -1624,7 +1623,7 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20210801, predict_period=1, 
+        master(bt_last_begin=20220401, predict_period=1, 
             time_unit='w',long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,

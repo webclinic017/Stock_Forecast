@@ -15,7 +15,7 @@ import sys, time, os, gc
 
 host = 2
 # host = 4
-# host = 0
+host = 0
 
 market = 'tw'
 
@@ -528,9 +528,9 @@ def manually_upload():
     chk = chk_date()
     
     # print('ewtinst1 中有na')
-    master(begin=20170101, end=20170105, ewprcd=False, ewtinst1c=False, 
-            ewsale=False, ewifinq=False, ewnprcstd=False, 
-            ewgin=True, ewtinst1=True, delete=False, upload=False, export=True)
+    master(begin=20220301, end=20220331, ewprcd=True, ewtinst1c=False, 
+            ewsale=True, ewifinq=True, ewnprcstd=False, 
+            ewgin=True, ewtinst1=True, delete=False, upload=True, export=True)
 
     chk2 = chk_date()
 

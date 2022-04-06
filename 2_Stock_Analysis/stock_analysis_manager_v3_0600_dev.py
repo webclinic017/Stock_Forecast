@@ -19,10 +19,10 @@ import sys, time, os, gc
 import pickle
 
 
-host = 3
+# host = 3
 # host = 2
-host = 4
-# host = 0
+# host = 4
+host = 0
 
 
 # Path .....
@@ -52,8 +52,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220321',
-                 r'/home/jupyter/Arsenal/20220321',
+                 r'/home/jupyter/Codebase_YZ/20220401',
+                 r'/home/jupyter/Arsenal/20220401',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -1410,9 +1410,10 @@ def sam_tej_ewsale(begin_date):
 # ...........
 
 
-def tej_ewgin():
+def sam_tej_ewgin():
     
     global id_keys, corr_threshold
+    global symbol
     
     result = stk.tej_ewgin(begin_date=shift_begin, end_date=None, 
                                symbol=symbol)
@@ -1501,6 +1502,7 @@ def sam_tej_ewifinq():
 def sam_tej_ewtinst1():
     
     global id_keys, corr_threshold
+    global symbol
     
     result = stk.tej_ewtinst1(begin_date=shift_begin, end_date=None, 
                                   symbol=symbol)
@@ -1554,6 +1556,65 @@ def sam_tej_ewtinst1():
     return result, ma_cols   
 
 
+# .............
+
+
+def sam_tej_ewtinst1_hold():
+    
+    global id_keys, corr_threshold
+    global symbol
+    global predict_date
+    
+    result = stk.tej_ewtinst1_hold(end_date=predict_date.loc[0, 'WORK_DATE'],
+                                   symbol=symbol, dev=False)
+    
+    cols = cbyz.df_get_cols_except(
+        df=result, 
+        except_cols=['SYMBOL', 'WORK_DATE']
+        )
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
+    
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=['SYMBOL'], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+    
+    
+    if time_unit == 'w':
+        result = result \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        
+        result, ma_cols = cbyz.df_summary(
+            df=result, cols=ma_cols, group_by=id_keys, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )    
+    
+    result = main_data_frame.merge(result, how='left', on=id_keys)
+    result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
+                                  sort_keys=time_key,
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+
+
+    # Drop Highly Correlated Features
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols) 
+
+    return result, ma_cols
 
 # .............
 
@@ -1714,6 +1775,19 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #                           on=['SYMBOL', 'WORK_DATE'])      
 
 
+    # TEJ EWTINST1 HOLD ......
+    if market == 'tw':
+        ewtinst1_hold, cols = sam_tej_ewtinst1_hold()
+        main_data = main_data.merge(ewtinst1_hold, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=['SYMBOL'])   
+        del ewtinst1_hold
+        gc.collect()
+
+
+
     # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
     if market == 'tw':
         ewtinst1, cols = sam_tej_ewtinst1()
@@ -1728,7 +1802,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
     # TEJ EWGIN ......
     if market == 'tw':
-        ewgin, cols = tej_ewgin()
+        ewgin, cols = sam_tej_ewgin()
         main_data = main_data.merge(ewgin, how='left', on=id_keys)
         main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
                                           sort_keys=time_key, 
@@ -1949,18 +2023,18 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #   檔，且都是ewtinst1c的欄位，應該也是新股的問題，直接排除
     # - 新股的ewtinst1c一定會有NA，但SNP不會是NA，導致na_min和na_max不一定相等
     # - 如果只是某幾天缺資料的話，chk_na_min和chk_na_max應該不會相等
-    chk_na = cbyz.df_chk_col_na(df=hist_df)
-    chk_na = chk_na[~chk_na['COLUMN'].isin(var_y)]
+    chk_na = cbyz.df_chk_col_na(df=hist_df, except_cols=var_y)
     
-    assert_cond = len(chk_na) < 600
+    assert_cond = chk_na == None or len(chk_na) < 600
     if not assert_cond:
         chk_na.to_csv(path_temp + '/chk_na_id_01.csv', index=False)
 
     assert assert_cond, \
         'get_model_data - hist_df has ' + str(len(chk_na)) + ' NA'
     
-    na_cols = chk_na['COLUMN'].tolist()
-    main_data = main_data.dropna(subset=na_cols, axis=0)
+    if isinstance(chk_na, pd.DataFrame):
+        na_cols = chk_na['COLUMN'].tolist()
+        main_data = main_data.dropna(subset=na_cols, axis=0)
     
     
     # Predict有NA是正常的，但NA_COUNT必須全部都一樣
@@ -1975,7 +2049,8 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     min_value = chk_predict_na['NA_COUNT'].min()
     max_value = chk_predict_na['NA_COUNT'].max()    
     
-    assert len(chk_predict_na) == 0 or min_value == max_value, \
+    # chk_predict_na == None, chk_predict_na應該不可能是None？
+    assert min_value == max_value, \
         'All the NA_COUNT should be the same.'
     
 
@@ -1999,11 +2074,12 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                                             threshold=corr_threshold, 
                                             except_cols=id_keys + var_y) 
     # Select Best Features
-    best_var_raw, best_var_score, best_var = \
-        cbml.selectkbest(df=main_data, model_type='reg', 
-                          y=var_y, X=[], except_cols=id_keys, k=60)
+    print('Disable selectkbest to test random forest')
+    # best_var_raw, best_var_score, best_var = \
+    #     cbml.selectkbest(df=main_data, model_type='reg', 
+    #                       y=var_y, X=[], except_cols=id_keys, k=60)
         
-    main_data = main_data[id_keys + var_y + best_var] 
+    # main_data = main_data[id_keys + var_y + best_var] 
 
 
     # Variables ......
@@ -2084,8 +2160,18 @@ def master(param_holder, predict_begin, export_model=True,
     # - Stable
     
     # v3.0500
-    # - Develop tej_ewtins1 _hold
     # - Rename tej function in stk
+    # - Add tej_ewtins1 _hold
+    # - Try random forest, refer to 〈DTSA 5509 Week 5 - Ensemble Methods.〉
+    #   Random forest may fit better than XGBoost if dataset contains 
+    #   many features.
+    
+    
+    # v3.0600
+    # - Add tej_ewtins1 _hold ratio, getting data from ewprcd
+    # - 可以從三大法人買賣明細自己推三大法人持股成本
+    
+    # bug, main_data中有SNP_CLOSE_ADJ_MA_4_STD_y 
     
     # df_expend_one_hot_signal
 
@@ -2098,7 +2184,7 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     global version
-    version = 3.0400    
+    version = 3.0600    
     
     
     # Bug
@@ -2288,6 +2374,7 @@ def master(param_holder, predict_begin, export_model=True,
     # Training Model ......
     import xgboost as xgb
     from sklearn.linear_model import LinearRegression
+    from sklearn.ensemble import RandomForestRegressor
     import tensorflow as tf
 
     
@@ -2350,6 +2437,10 @@ def master(param_holder, predict_begin, export_model=True,
                                   'normalize': [True, False],
                                   }
                               },
+                            {'model': RandomForestRegressor(),
+                              'params': {
+                                }                     
+                            },                            
                             {'model': xgb.XGBRegressor(),
                               'params': {
                                 'n_estimators': [200],
@@ -3191,18 +3282,45 @@ def test_support_resistance():
                            days=True, threshold=0.9, plot_data=False)    
 
 
+def dev():
+    
+    symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    data = \
+        stk.get_data(
+            data_begin=20170101,
+            data_end=20211231, 
+            market='tw', 
+            symbol=symbol,
+            ratio_limit=True,
+            price_change=True, 
+            price_limit=True,
+            trade_value=True,
+            restore=True
+            )
+        
+    
+    data['VOLUME'] = np.where(data['SYMBOL']=='2409', np.nan,
+                              data['VOLUME'])
+    
+    
+    chk_na = cbyz.df_chk_col_na(df=data, cols=[], positive_only=True,
+                                except_cols=[], mode='alert',
+                                return_obj=True)
+
+
 
 # %% Debug ------
 
 def debug():
     
-    data = stk.tej_ewtinst1_hold(end_date=None, symbol=[], dev=False)
+    
+    symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
+    data = stk.tej_ewtinst1_hold(end_date=None, symbol=symbol, dev=False)
     
 
+    stk.od_tw_update_index_manually()
 
-
-
-
+        
 
 # %% Execution ------
 
