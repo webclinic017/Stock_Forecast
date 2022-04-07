@@ -1554,7 +1554,12 @@ if __name__ == '__main__':
     #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
     #   改成[]。經測試過後，R2差不多，所以保留新的版本，應該可以提高計算速度。
     # 2. y為price時會一直overfitting
+    # 3. 20220407 - XGB的MSE好像不會比RF差，雖然可能會Overfitting，但是
+    #    Overfitting後的Test MSE還是比其他model好
+    # 4. 20220407 - MLP的training MSE可以達到0.003，但是Test MSE只有0.05，
+    #    雖然Overfitting，但再調一下可能可以變成最佳解    
 
+    
     # BTM Note
     # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
     # 2. 當price為y時，industry的importance超高，可能是造成overfitting的主因

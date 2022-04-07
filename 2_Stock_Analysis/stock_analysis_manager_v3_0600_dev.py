@@ -2105,41 +2105,6 @@ def master(param_holder, predict_begin, export_model=True,
     主工作區
     '''
     
-    # v2.10
-    # - Rename symbols as symbol
-    # - Add symbol params to ewifinq
-    # - Update cbml for df_scaler
-    # v2.11 - 20220119
-    # - The MVP version of data_for = 2
-    # - Y can be price or change ratio
-    # v2.112 - 20220123
-    # - MVP of weekly prediction
-    # v2.2 - 20220209
-    # - Restore variables for weekly prediction
-    # - Change the way to shift day. The original method is shift var_x, and 
-    #   the new version is to shift var_y and id_keys
-    # - Remove ml_data_process
-    # - Remove switch of trade_value
-    # v2.3 - 20220210
-    # - Combine result of daily prediction and weekly prediction in BTM
-    # - Add time_unit as suffix for saved_file of model_data
-    # - industry_one_hot 不用df_summary    
-    # - Modify dev mode and test mode
-    # v2.400 - 20220214
-    # - Collect fx_rate in dcm
-    # - Add fx_rate to pipeline
-    # - Remove open_change_ratio and open from var_y
-    # v2.500 - 20220215
-    # v2.501 - 20220216
-    # - Replace YEAR with YEAR_ISO, and WEEK with WEEK_ISO
-    # v2.502 - 20220216
-    # - Restore sam_tej_ewifinq, but removed again
-    # - Set model params for week and day seperately
-    # - Move od_tw_get_ex_dividends to arsenal_stock
-    # - Optimize load_data feature of get_model_data 
-    # v2.0600 - 20220221
-    # - 當time_unit為w時，讓predict_begin可以不是星期一
-    # - week_align為True時，get_model_data最下面的assert會出錯
     # v3.0000 - 20220225
     # - 開發重心轉移至trading bot
     # - Update for ultra_tuner v0.3100
@@ -2663,7 +2628,41 @@ def update_history():
     # - Add load data feature for get_model_data > Done
     # - Update cbml and df_scaler > Done
     # - Remove df_chk_col_min_max > Done
-
+    # v2.10
+    # - Rename symbols as symbol
+    # - Add symbol params to ewifinq
+    # - Update cbml for df_scaler
+    # v2.11 - 20220119
+    # - The MVP version of data_for = 2
+    # - Y can be price or change ratio
+    # v2.112 - 20220123
+    # - MVP of weekly prediction
+    # v2.2 - 20220209
+    # - Restore variables for weekly prediction
+    # - Change the way to shift day. The original method is shift var_x, and 
+    #   the new version is to shift var_y and id_keys
+    # - Remove ml_data_process
+    # - Remove switch of trade_value
+    # v2.3 - 20220210
+    # - Combine result of daily prediction and weekly prediction in BTM
+    # - Add time_unit as suffix for saved_file of model_data
+    # - industry_one_hot 不用df_summary    
+    # - Modify dev mode and test mode
+    # v2.400 - 20220214
+    # - Collect fx_rate in dcm
+    # - Add fx_rate to pipeline
+    # - Remove open_change_ratio and open from var_y
+    # v2.500 - 20220215
+    # v2.501 - 20220216
+    # - Replace YEAR with YEAR_ISO, and WEEK with WEEK_ISO
+    # v2.502 - 20220216
+    # - Restore sam_tej_ewifinq, but removed again
+    # - Set model params for week and day seperately
+    # - Move od_tw_get_ex_dividends to arsenal_stock
+    # - Optimize load_data feature of get_model_data 
+    # v2.0600 - 20220221
+    # - 當time_unit為w時，讓predict_begin可以不是星期一
+    # - week_align為True時，get_model_data最下面的assert會出錯
     
     pass
 
