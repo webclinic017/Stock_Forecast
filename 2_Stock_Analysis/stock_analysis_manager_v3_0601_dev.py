@@ -19,9 +19,9 @@ import sys, time, os, gc
 import pickle
 
 
-# host = 3
+host = 3
 # host = 2
-host = 4
+# host = 4
 # host = 0
 
 
@@ -52,8 +52,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220401',
-                 r'/home/jupyter/Arsenal/20220401',
+                 r'/home/jupyter/Codebase_YZ/20220408',
+                 r'/home/jupyter/Arsenal/20220408',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -1559,19 +1559,49 @@ def sam_tej_ewtinst1():
 # .............
 
 
+
+
+    
+    
 def sam_tej_ewtinst1_hold():
     
     global id_keys, corr_threshold
     global symbol
     global predict_date
+    global shift_begin, data_end
     
+    
+    hold_cols = ['QFII_EX1_HOLD', 'FUND_EX_HOLD', 'DLR_EX_HOLD']
+    
+    
+    # Stock Outstanding / Shares outstanding
+    outstanding = stk.tej_ewprcd(begin_date=shift_begin, end_date=data_end,
+                                 symbol=symbol, trade=False, adj=False,
+                                 price=False, outstanding=True)
+    
+    # Trans Details
     result = stk.tej_ewtinst1_hold(end_date=predict_date.loc[0, 'WORK_DATE'],
                                    symbol=symbol, dev=False)
     
+    
+    # Calculate Spreadholding Ratio
+    result = result.merge(outstanding, how='left', on=['SYMBOL', 'WORK_DATE'])
+    result = cbyz.df_fillna_chain(df=result, cols='OUTSTANDING_SHARES',
+                                  sort_keys=['SYMBOL', 'WORK_DATE'],
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+    for c in hold_cols:
+        result[c + '_RATIO'] = result[c] / result['OUTSTANDING_SHARES']
+    
+    result = result.drop('OUTSTANDING_SHARES', axis=1)
+
+
+    # Get columns list
     cols = cbyz.df_get_cols_except(
         df=result, 
         except_cols=['SYMBOL', 'WORK_DATE']
         )
+    
     
     # Scale Data
     result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
@@ -1615,6 +1645,69 @@ def sam_tej_ewtinst1_hold():
     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols) 
 
     return result, ma_cols
+    
+
+
+# def sam_tej_ewtinst1_hold_20220408():
+    
+#     global id_keys, corr_threshold
+#     global symbol
+#     global predict_date
+    
+#     result = stk.tej_ewtinst1_hold(end_date=predict_date.loc[0, 'WORK_DATE'],
+#                                    symbol=symbol, dev=False)
+    
+#     cols = cbyz.df_get_cols_except(
+#         df=result, 
+#         except_cols=['SYMBOL', 'WORK_DATE']
+#         )
+    
+#     # Scale Data
+#     result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
+    
+#     # MA
+#     result, ma_cols = \
+#         cbyz.df_add_ma(df=result, cols=cols,
+#                        group_by=['SYMBOL'], date_col='WORK_DATE',
+#                        values=ma_values, wma=wma, 
+#                        show_progress=False
+#                        )   
+        
+#     result = result.drop(cols, axis=1)
+    
+    
+#     if time_unit == 'w':
+#         result = result \
+#             .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+#         result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        
+#         result, ma_cols = cbyz.df_summary(
+#             df=result, cols=ma_cols, group_by=id_keys, 
+#             add_mean=True, add_min=True, 
+#             add_max=True, add_median=True, add_std=True, 
+#             add_skew=False, add_count=False, quantile=[]
+#             )    
+    
+#     result = main_data_frame.merge(result, how='left', on=id_keys)
+#     result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
+#                                   sort_keys=time_key,
+#                                   method=['ffill', 'bfill'], 
+#                                   group_by='SYMBOL')
+
+
+#     # Drop Highly Correlated Features
+#     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+#                                         except_cols=id_keys) 
+
+#     # Filter existing columns
+#     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols) 
+
+#     return result, ma_cols
+
+
+
+
 
 # .............
 
@@ -1910,7 +2003,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # Get Dow Jones Industrial Average (^DJI) ......
-    dji, cols = sam_od_us_get_snp(begin_date=shift_begin)
+    dji, cols = sam_od_us_get_dji()
     main_data = main_data.merge(dji, how='left', on=time_key)
     del dji
     gc.collect()   
@@ -2137,6 +2230,7 @@ def master(param_holder, predict_begin, export_model=True,
     
     # v3.0601
     # - Add tej_ewtins1_hold ratio, getting data from ewprcd
+    # - Fix bug of SNP and DJI
     
     
     # - 可以從三大法人買賣明細自己推三大法人持股成本
@@ -2403,28 +2497,30 @@ def master(param_holder, predict_begin, export_model=True,
             
             # eta 0.1 / 0.2
             model_params = [
+                            {'model': RandomForestRegressor(),
+                               'params': {
+                                   'max_depth': [6],
+                                   'n_estimators': [100]
+                                 }                     
+                             },                     
                             {'model': LinearRegression(),
                               'params': {
-                                  'normalize': [True, False],
+                                  'normalize': [False],
                                   }
                               },
-                            {'model': RandomForestRegressor(),
-                              'params': {
-                                }                     
-                            },                            
                             {'model': xgb.XGBRegressor(),
                               'params': {
                                 'n_estimators': [200],
-                                'eta': [0.2],
+                                'eta': [0.2, 0.25],
                                 # 'eta': [0.2, 0.3],
                                 'min_child_weight': [1],
                                   # 'min_child_weight': [0.5, 1],
                                   'max_depth':[8],
                                   # 'max_depth':[8, 10],
-                                  'subsample':[1]
+                                  'subsample':[0.7, 1]
                               }
                             }
-                            ]             
+                            ]        
             
         # Prevent error on host 4
         if host in [2, 3]:
@@ -3325,6 +3421,17 @@ def debug():
 
     stk.od_tw_update_index_manually()
 
+
+    chk = stk.get_data(data_begin=20210101, data_end=20211231, market='tw',
+                       adj=True,unit='d', symbol=symbol, ratio_limit=True,
+                       price_change=False,
+                       price_limit=True, trade_value=False)
+    
+    
+    debug = stk.debug
+
+
+    debug
         
 
 # %% Execution ------

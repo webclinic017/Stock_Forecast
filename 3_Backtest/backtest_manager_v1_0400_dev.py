@@ -50,8 +50,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220401',
-                 r'/home/jupyter/Arsenal/20220401',
+                 r'/home/jupyter/Codebase_YZ/20220408',
+                 r'/home/jupyter/Arsenal/20220408',
                  path + '/Function',
                  path_sam]
 
@@ -67,7 +67,9 @@ import arsenal_stock as stk
 import codebase_ml as cbml
 # import stock_analysis_manager_v3_0100 as sam
 # import stock_analysis_manager_v3_0200_dev as sam
-import stock_analysis_manager_v3_0500 as sam
+# import stock_analysis_manager_v3_0500 as sam
+# import stock_analysis_manager_v3_0600_dev as sam
+import stock_analysis_manager_v3_0601_dev as sam
 
 
 
@@ -180,7 +182,7 @@ def set_frame():
                                  market=market, 
                                  symbol=symbol, 
                                  price_change=True,
-                                 restore=False)
+                                 adj=False)
     
     if _time_unit == 'w':
         # The aggregate method should be the same with SAM
@@ -785,7 +787,7 @@ def view_yesterday():
                             market='tw', 
                             symbol=[], 
                             price_change=True,
-                            restore=False) 
+                            adj=False) 
     
     loc_data = loc_data[['SYMBOL', 'WORK_DATE', 'CLOSE_CHANGE_RATIO']]
     # loc_data = loc_data[abs(loc_data['CLOSE_CHANGE_RATIO'])]
@@ -1373,7 +1375,7 @@ def simulate(df):
                              market=market, 
                              symbol=symbol_li, 
                              price_change=False,
-                             restore=False)
+                             adj=False)
     
     hist_data = hist_data[['SYMBOL', 'WORK_DATE'] + ohlc]
     
@@ -1542,6 +1544,13 @@ def simulate(df):
 
 
 
+# %% Debug ------
+        
+def debug():
+
+    pass
+
+
 
 
 # %% Execute ------
@@ -1554,12 +1563,7 @@ if __name__ == '__main__':
     #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
     #   改成[]。經測試過後，R2差不多，所以保留新的版本，應該可以提高計算速度。
     # 2. y為price時會一直overfitting
-    # 3. 20220407 - XGB的MSE好像不會比RF差，雖然可能會Overfitting，但是
-    #    Overfitting後的Test MSE還是比其他model好
-    # 4. 20220407 - MLP的training MSE可以達到0.003，但是Test MSE只有0.05，
-    #    雖然Overfitting，但再調一下可能可以變成最佳解    
 
-    
     # BTM Note
     # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
     # 2. 當price為y時，industry的importance超高，可能是造成overfitting的主因
@@ -1572,27 +1576,24 @@ if __name__ == '__main__':
     #    高估走勢
 
     
-    # Change Ratio - Day - XGB Params ------
-    # eta: 0.3 / 0.01, 0.03, 0.08, 0.1, 0.2
-    # min_child_weight: 0.8 / 1
-    # max_depth: 10 / 8, 12
-    # subsample: 1 / 0.8        
     
-    # Change Ratio - Week - XGB Params ------
+    # Change Ratio By Week
+
+    # RandomForest ......
+    # n_estimatorsint
+    # max_depth 6 / 4, 8, 10
+    
+    # XGBoost ......
     # n_estimators: 200 / 100, 300
     # eta: 0.2 / 0.1, 0.3
     # max_depth: 8 / 4, 6, 10
     # min_child_weight: 1
     # subsample: 1
     # cv: 2 / 3, 4
+    
+    # Bug, 只有HIGH的param log有寫入，LOW和CLOSE都沒有
+    
 
-    # Price - Day - XGB Params ------
-    # eta: 0.2 /
-    # min_child_weight: 0.8 / 
-    # max_depth: 10 / 8, 12
-    # subsample: 1 / 0.8
-    
-    
         
     global weekly_actions, daily_actions
     hold = [3596, 6698]
@@ -1601,12 +1602,12 @@ if __name__ == '__main__':
     dev = True
     dev = False
     test = True
-    # test = False
+    test = False
     load_result = True    
     load_result = False
     
     load_model_data = True
-    # load_model_data = False
+    load_model_data = False
     
     global action_weekly, action_daily
     
@@ -1628,11 +1629,11 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220401, predict_period=1, 
+        master(bt_last_begin=20220408, predict_period=1, 
             time_unit='w',long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,
-            compete_mode=0, cv=list(range(2, 3)),
+            compete_mode=0, cv=list(range(3, 4)),
             market='tw', hold=hold)
         
     # stk.write_sheet(data=actions, sheet='Week')
