@@ -845,8 +845,16 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Calculate data_period from 20170101
     
     # v1.0400 - 20220305
-    # - Develop
+    # - Update for SAM 3.06
+    
+    # v1.0500
+    # - The best buying price is prediction - RMSE
 
+
+    
+
+
+    
 
 
     # Bug

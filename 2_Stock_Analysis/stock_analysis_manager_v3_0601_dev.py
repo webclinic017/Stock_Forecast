@@ -2216,15 +2216,12 @@ def master(param_holder, predict_begin, export_model=True,
     # - Completed test
     # v3.0400
     # - Stable
-    
     # v3.0500
     # - Rename tej function in stk
     # - Add tej_ewtins1 _hold
     # - Try random forest, refer to 〈DTSA 5509 Week 5 - Ensemble Methods.〉
     #   Random forest may fit better than XGBoost if dataset contains 
     #   many features.
-    
-    
     # v3.0600
     # - Update stk
     
@@ -2233,6 +2230,13 @@ def master(param_holder, predict_begin, export_model=True,
     # - Fix bug of SNP and DJI
     
     
+    # - Bug, UT score features log not sorted
+    # - Update, add training time to UT
+    # - Apply MA on financial statement to prevent overfitting
+    # - 加總三大法人總持股數
+    # - 底扣價
+    # - 隱含波動率
+    # - Add 升息schedule
     # - 可以從三大法人買賣明細自己推三大法人持股成本
     # - Update for new arsenal_stock
     
