@@ -64,12 +64,10 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-import codebase_ml as cbml
+# import codebase_ml as cbml
 # import stock_analysis_manager_v3_0100 as sam
-# import stock_analysis_manager_v3_0200_dev as sam
-# import stock_analysis_manager_v3_0500 as sam
 # import stock_analysis_manager_v3_0600_dev as sam
-import stock_analysis_manager_v3_0601_dev as sam
+import stock_analysis_manager_v3_0701_dev as sam
 
 
 
@@ -1638,7 +1636,7 @@ if __name__ == '__main__':
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
         master(bt_last_begin=20220408, predict_period=1, 
-            time_unit='w',long=False, interval=4, bt_times=1, 
+            time_unit='w', long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,
             compete_mode=0, cv=list(range(3, 4)),

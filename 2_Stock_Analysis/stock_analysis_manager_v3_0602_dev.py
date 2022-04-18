@@ -22,7 +22,7 @@ import pickle
 host = 3
 # host = 2
 # host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -65,7 +65,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v1_0002 as ut
+import ultra_tuner_v1_0003 as ut
 
 ar.host = host
 
@@ -1505,7 +1505,7 @@ def sam_tej_ewtinst1():
     global symbol
     
     result = stk.tej_ewtinst1(begin_date=shift_begin, end_date=None, 
-                                  symbol=symbol)
+                              symbol=symbol)
     
     cols = cbyz.df_get_cols_except(
         df=result, 
@@ -1559,10 +1559,6 @@ def sam_tej_ewtinst1():
 # .............
 
 
-
-
-    
-    
 def sam_tej_ewtinst1_hold():
     
     global id_keys, corr_threshold
@@ -1869,15 +1865,16 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
     # TEJ EWTINST1 HOLD ......
-    if market == 'tw':
-        ewtinst1_hold, cols = sam_tej_ewtinst1_hold()
-        main_data = main_data.merge(ewtinst1_hold, how='left', on=id_keys)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                          sort_keys=time_key, 
-                                          method=['ffill', 'bfill'], 
-                                          group_by=['SYMBOL'])   
-        del ewtinst1_hold
-        gc.collect()
+    # - 20220418, unessential
+    # if market == 'tw':
+    #     ewtinst1_hold, cols = sam_tej_ewtinst1_hold()
+    #     main_data = main_data.merge(ewtinst1_hold, how='left', on=id_keys)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                       sort_keys=time_key, 
+    #                                       method=['ffill', 'bfill'], 
+    #                                       group_by=['SYMBOL'])   
+    #     del ewtinst1_hold
+    #     gc.collect()
 
 
 
@@ -1886,9 +1883,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         ewtinst1, cols = sam_tej_ewtinst1()
         main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
         main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                          sort_keys=time_key, 
-                                          method=['ffill', 'bfill'], 
-                                          group_by=['SYMBOL'])   
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=['SYMBOL'])   
         del ewtinst1
         gc.collect()
 
@@ -2230,17 +2227,34 @@ def master(param_holder, predict_begin, export_model=True,
     # - Fix bug of SNP and DJI
     
     
+    
+    # v3.0602 - 20220418
+    # - Remove tej_ewtinst1_hold - Done
+    # - Visualize the tej_ewtinst1_hold and stock price
+    # - host 0的tej_ewtinst1 max value為20220301
+    # - Bug, tej_ewtinst1_hold
+    #   result[result['QFII_EX1_HOLD_RATIO']>1], 8819 rows
+    #   result[result['DLR_EX_HOLD_RATIO']>1], 31773 rows 
+    # - Add pe_ratio from ewprcd
+    #   price-earning ratio, P/E ratio
+    # - Use ratio in ewgin
+    # - Bug, ewtinst1; Send mail to TEJ
+    #   > FLD023有大於100
+    #   > T_PCT有小於0
+        
+    
+    # - Add transaction volume divide outstanding
+    # - Optimize, y是不是可以用log transform，底數要設多少？
     # - Bug, UT score features log not sorted
     # - Update, add training time to UT
     # - Apply MA on financial statement to prevent overfitting
     # - 加總三大法人總持股數
     # - 底扣價
     # - 隱含波動率
-    # - Add 升息schedule
+    # - New Incident
     # - 可以從三大法人買賣明細自己推三大法人持股成本
     # - Update for new arsenal_stock
     
-    # bug, main_data中有SNP_CLOSE_ADJ_MA_4_STD_y 
     
     # df_expend_one_hot_signal
 
@@ -2253,7 +2267,7 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     global version
-    version = 3.0600    
+    version = 3.0602
     
     
     # Bug
@@ -3389,29 +3403,56 @@ def test_support_resistance():
 
 def dev():
     
-    symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    data = \
-        stk.get_data(
-            data_begin=20170101,
-            data_end=20211231, 
-            market='tw', 
-            symbol=symbol,
-            ratio_limit=True,
-            price_change=True, 
-            price_limit=True,
-            trade_value=True,
-            adj=False
-            )
-        
-    
-    data['VOLUME'] = np.where(data['SYMBOL']=='2409', np.nan,
-                              data['VOLUME'])
+    hold_cols = ['QFII_EX1_HOLD', 'FUND_EX_HOLD', 'DLR_EX_HOLD']    
     
     
-    chk_na = cbyz.df_chk_col_na(df=data, cols=[], positive_only=True,
-                                except_cols=[], mode='alert',
-                                return_obj=True)
+    result = stk.tej_ewtinst1(begin_date=20210101, end_date=None, 
+                              symbol=[])
+    
+    
+    # Stock Outstanding / Shares outstanding
+    outstanding = stk.tej_ewprcd(begin_date=20170101, end_date=20220331,
+                                 symbol=symbol, trade=False, adj=False,
+                                 price=False, outstanding=True)
+    
+    # Trans Details
+    # result = stk.tej_ewtinst1_hold(end_date=20220331,
+    #                                symbol=[], dev=False)
+    # result.to_csv(path_temp + '/ewtinst1_hold.csv', index=False)
+    
+    
+    # Calculate Spreadholding Ratio
+    result = result.merge(outstanding, how='left', on=['SYMBOL', 'WORK_DATE'])
+    result = cbyz.df_fillna_chain(df=result, cols='OUTSTANDING_SHARES',
+                                  sort_keys=['SYMBOL', 'WORK_DATE'],
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+    
+    for c in hold_cols:
+        result[c + '_RATIO'] = result[c] / result['OUTSTANDING_SHARES']
+    
+    
+    result = result.dropna(subset=['QFII_EX1_HOLD'], axis=0)
+    result['WORK_DATE'].max()
+    
+    
+    result['QFII_EX1_HOLD_RATIO'].max()
+    result['FUND_EX_HOLD_RATIO'].max()
+    result['DLR_EX_HOLD_RATIO'].max()
+    
+    
 
+    
+    
+    
+    result['QFII_EX1_HOLD_RATIO'].mean()    
+    result['FUND_EX_HOLD_RATIO'].mean()    
+    result['DLR_EX_HOLD_RATIO'].mean()    
+    
+    chk = result[result['SYMBOL']=='2603']
+    chk['QFII_EX1_HOLD_RATIO'].max()
+    
+    
 
 
 # %% Debug ------
