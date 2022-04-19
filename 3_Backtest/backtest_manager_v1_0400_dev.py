@@ -17,7 +17,7 @@ import random
 
 host = 3
 # host = 2
-# host = 4
+host = 4
 # host = 0
 market = 'tw'
 
@@ -67,7 +67,8 @@ import arsenal_stock as stk
 # import codebase_ml as cbml
 # import stock_analysis_manager_v3_0100 as sam
 # import stock_analysis_manager_v3_0600_dev as sam
-import stock_analysis_manager_v3_0701_dev as sam
+# import stock_analysis_manager_v3_0601_dev as sam
+import stock_analysis_manager_v3_0700_dev as sam
 
 
 
@@ -849,11 +850,6 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - The best buying price is prediction - RMSE
 
 
-    
-
-
-    
-
 
     # Bug
     # - Actions會有大量重複，總筆數11465筆，但直接drop_duplicates()，沒設
@@ -1569,6 +1565,9 @@ if __name__ == '__main__':
     #   比較，否則高價股和低價股比感覺很虧。這個版本試著把sam_load_data中的group by
     #   改成[]。經測試過後，R2差不多，所以保留新的版本，應該可以提高計算速度。
     # 2. y為price時會一直overfitting
+    # 3. 當test為True，time_unit為w時，TRAIN_PRECISION約0.0004，TEST_PRECISION
+    #    為0.043743，但正式執行時，TEST_PRECISION也大約是0.04-0.05，是不是代表
+    #    model一直在overfitting
 
     # BTM Note
     # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
@@ -1608,7 +1607,7 @@ if __name__ == '__main__':
     dev = True
     dev = False
     test = True
-    test = False
+    # test = False
     load_result = True    
     load_result = False
     

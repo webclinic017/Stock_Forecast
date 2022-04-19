@@ -21,8 +21,8 @@ import pickle
 
 host = 3
 # host = 2
-# host = 4
-host = 0
+host = 4
+# host = 0
 
 
 # Path .....
@@ -1414,9 +1414,10 @@ def sam_tej_ewgin():
     
     global id_keys, corr_threshold
     global symbol
+    global shift_begin
     
     result = stk.tej_ewgin(begin_date=shift_begin, end_date=None, 
-                               symbol=symbol)
+                           symbol=symbol)
     
     cols = cbyz.df_get_cols_except(
         df=result, 
@@ -1499,10 +1500,12 @@ def sam_tej_ewifinq():
 # ..............
     
 
+
 def sam_tej_ewtinst1():
     
     global id_keys, corr_threshold
     global symbol
+    global shift_begin
     
     result = stk.tej_ewtinst1(begin_date=shift_begin, end_date=None, 
                               symbol=symbol)
@@ -1511,6 +1514,84 @@ def sam_tej_ewtinst1():
         df=result, 
         except_cols=['SYMBOL', 'WORK_DATE']
         )
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
+    
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=['SYMBOL'], date_col='WORK_DATE',
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+    
+    
+    if time_unit == 'w':
+        result = result \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        
+        result, ma_cols = cbyz.df_summary(
+            df=result, cols=ma_cols, group_by=id_keys, 
+            add_mean=True, add_min=True, 
+            add_max=True, add_median=True, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )    
+    
+    result = main_data_frame.merge(result, how='left', on=id_keys)
+    result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
+                                  sort_keys=time_key,
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+
+
+    # Drop Highly Correlated Features
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)    
+
+    return result, ma_cols   
+
+
+
+# ..............
+    
+
+def sam_tej_ewprcd_pe_ratio():
+    
+    global id_keys, corr_threshold
+    global symbol
+    global symbol_df
+    global shift_begin
+    
+    
+    result = stk.tej_ewprcd(begin_date=shift_begin, end_date=None,
+                            symbol=symbol, trade=False, adj=False,
+                            price=False, outstanding=False, pe_ratio=True)
+    
+    result = result.merge(symbol_df, on='SYMBOL')
+    cbyz.df_chk_col_na(df=result, mode='stop')    
+    
+    
+    cols = cbyz.df_get_cols_except(
+        df=result, 
+        except_cols=['SYMBOL', 'WORK_DATE']
+        )
+    
+    
+    # Change Data Type
+    # - The original data types are object, and they can't be converted 
+    #   before drop null values.
+    result = cbyz.df_conv_col_type(df=result, cols=cols, to='float')    
+    
+    global debug_pe_ratio
+    debug_pe_ratio = result.copy()
     
     # Scale Data
     result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
@@ -1711,6 +1792,7 @@ def sam_tej_ewtinst1_hold():
 def sam_tej_ewtinst1c():
     
     global id_keys, corr_threshold
+    global shift_begin
     
     result = stk.tej_ewtinst1c(begin_date=shift_begin, end_date=None, 
                                    symbol=symbol, trade=True)
@@ -1862,6 +1944,20 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     # main_data = main_data.merge(sharehold, how='left', 
     #                           on=['SYMBOL', 'WORK_DATE'])      
+
+
+
+    # TEJ EWPRCD PE Ratio ......
+    if market == 'tw':
+        pe_ratio, cols = sam_tej_ewprcd_pe_ratio()
+        main_data = main_data.merge(pe_ratio, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=['SYMBOL'])   
+        del pe_ratio
+        gc.collect()
+
 
 
     # TEJ EWTINST1 HOLD ......
@@ -2227,33 +2323,48 @@ def master(param_holder, predict_begin, export_model=True,
     # - Fix bug of SNP and DJI
     
     
-    
-    # v3.0602 - 20220418
+    # v3.0700 - 20220418
     # - Remove tej_ewtinst1_hold - Done
+    # - Add pe_ratio from ewprcd - Done
+    
+    
+    # v3.0701
     # - Visualize the tej_ewtinst1_hold and stock price
-    # - host 0的tej_ewtinst1 max value為20220301
-    # - Bug, tej_ewtinst1_hold
-    #   result[result['QFII_EX1_HOLD_RATIO']>1], 8819 rows
-    #   result[result['DLR_EX_HOLD_RATIO']>1], 31773 rows 
-    # - Add pe_ratio from ewprcd
-    #   price-earning ratio, P/E ratio
-    # - Use ratio in ewgin
     # - Bug, ewtinst1; Send mail to TEJ
     #   > FLD023有大於100
     #   > T_PCT有小於0
         
+
+    # - 量價分析；volume / mean price
+    #   > 量價曲線（Volume Price Trend，VPT）
+    #   > https://money.udn.com/money/story/12040/5399621
+    #   > https://wealth.businessweekly.com.tw/m/GArticle.aspx?id=ARTL00300599
+    #   > https://www.wealth.com.tw/articles/81b51a4e-6549-4f6e-a11d-eb80a9a88e91
+    # - Log transform for volume; Add log transform in df_scaler
+    # - Test spreadholding data, and decide to buy it or not
+    # - 加總三大法人總持股數
+    
     
     # - Add transaction volume divide outstanding
     # - Optimize, y是不是可以用log transform，底數要設多少？
     # - Bug, UT score features log not sorted
     # - Update, add training time to UT
     # - Apply MA on financial statement to prevent overfitting
-    # - 加總三大法人總持股數
     # - 底扣價
-    # - 隱含波動率
+    # - 隱含波動率Implied Volatility (IV); 歷史波動率 Historical volatility (HV)
+    #   > https://slashtraders.com/tw/blog/market-volatility-hv-iv/#HV
+    #   > https://www.cw.com.tw/article/5101233
+    #   > https://stackoverflow.com/questions/61289020/fast-implied-volatility-calculation-in-python
     # - New Incident
     # - 可以從三大法人買賣明細自己推三大法人持股成本
     # - Update for new arsenal_stock
+    
+    # - 如果你想要拉回買進，就要趁著「量縮價穩的箱型整理時期」，因此檢視公司的月
+    #   營收與季報的趨勢很重要。因為法人與主力在箱型區間震盪整理時，做價做量容易與
+    #   每月營收、每季財報或利多消息時間搭配完美，股價容易呈現波段式階梯上漲，表示
+    #   著主力籌碼換手積極，在換手過程中進行低買高賣，有效降低持股成本。
+    #   https://wealth.businessweekly.com.tw/m/GArticle.aspx?id=ARTL003005990
+    
     
     
     # df_expend_one_hot_signal
@@ -3403,11 +3514,21 @@ def test_support_resistance():
 
 def dev():
     
+    pass
+
+
+
+def check_ewtinst1():
+    
     hold_cols = ['QFII_EX1_HOLD', 'FUND_EX_HOLD', 'DLR_EX_HOLD']    
     
     
-    result = stk.tej_ewtinst1(begin_date=20210101, end_date=None, 
+    result = stk.tej_ewtinst1(begin_date=20160101, end_date=None, 
                               symbol=[])
+    
+    
+    unique_work_date = result[['WORK_DATE']].drop_duplicates()
+    
     
     
     # Stock Outstanding / Shares outstanding
@@ -3441,10 +3562,6 @@ def dev():
     result['DLR_EX_HOLD_RATIO'].max()
     
     
-
-    
-    
-    
     result['QFII_EX1_HOLD_RATIO'].mean()    
     result['FUND_EX_HOLD_RATIO'].mean()    
     result['DLR_EX_HOLD_RATIO'].mean()    
@@ -3460,24 +3577,17 @@ def dev():
 def debug():
     
     
-    symbol = [2520, 2605, 6116, 6191, 3481, 2409, 2603]
-    data = stk.tej_ewtinst1_hold(end_date=None, symbol=symbol, dev=False)
+    df = sam.debug_pe_ratio.copy()
     
 
-    stk.od_tw_update_index_manually()
+    cols = cbyz.df_get_cols_except(
+        df=df, 
+        except_cols=['SYMBOL', 'WORK_DATE']
+        )    
 
 
-    chk = stk.get_data(data_begin=20210101, data_end=20211231, market='tw',
-                       adj=True,unit='d', symbol=symbol, ratio_limit=True,
-                       price_change=False,
-                       price_limit=True, trade_value=False)
-    
-    
-    debug = stk.debug
+    df = cbyz.df_conv_col_type(df=df, cols=cols, to='float')
 
-
-    debug
-        
 
 # %% Execution ------
 
