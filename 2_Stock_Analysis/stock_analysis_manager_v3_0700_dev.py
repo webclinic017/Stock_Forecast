@@ -1576,13 +1576,18 @@ def sam_tej_ewprcd_pe_ratio():
                             price=False, outstanding=False, pe_ratio=True)
     
     result = result.merge(symbol_df, on='SYMBOL')
-    cbyz.df_chk_col_na(df=result, mode='stop')    
+    
+    global debug_pe_ratio
+    debug_pe_ratio = result.copy()    
     
     
-    cols = cbyz.df_get_cols_except(
-        df=result, 
-        except_cols=['SYMBOL', 'WORK_DATE']
-        )
+    # - All PE_RATIO of 6598 are null.
+    # - The 10th quantile of PE_RATIO is zero, so fill NA with 0.
+    result = cbyz.df_conv_na(df=result, cols='PE_RATIO', value=0)
+    
+    cbyz.df_chk_col_na(df=result, mode='stop')
+    cols = cbyz.df_get_cols_except(df=result,
+                                   except_cols=['SYMBOL', 'WORK_DATE'])
     
     
     # Change Data Type
@@ -1590,8 +1595,6 @@ def sam_tej_ewprcd_pe_ratio():
     #   before drop null values.
     result = cbyz.df_conv_col_type(df=result, cols=cols, to='float')    
     
-    global debug_pe_ratio
-    debug_pe_ratio = result.copy()
     
     # Scale Data
     result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
@@ -1944,7 +1947,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     # main_data = main_data.merge(sharehold, how='left', 
     #                           on=['SYMBOL', 'WORK_DATE'])      
-
 
 
     # TEJ EWPRCD PE Ratio ......
