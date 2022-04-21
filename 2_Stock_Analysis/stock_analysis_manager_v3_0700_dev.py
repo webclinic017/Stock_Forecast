@@ -2345,7 +2345,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - Log transform for volume; Add log transform in df_scaler
     # - Test spreadholding data, and decide to buy it or not
     # - 加總三大法人總持股數
-    
+    # - 是不是應該修改loss function，不要用MSE
     
     # - Add transaction volume divide outstanding
     # - Optimize, y是不是可以用log transform，底數要設多少？
