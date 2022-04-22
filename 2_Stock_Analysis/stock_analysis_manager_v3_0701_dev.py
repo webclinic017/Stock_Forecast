@@ -52,8 +52,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220408',
-                 r'/home/jupyter/Arsenal/20220408',
+                 r'/home/jupyter/Codebase_YZ/20220422',
+                 r'/home/jupyter/Arsenal/20220422',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -2319,18 +2319,19 @@ def master(param_holder, predict_begin, export_model=True,
     #   many features.
     # v3.0600
     # - Update stk
-    
     # v3.0601
     # - Add tej_ewtins1_hold ratio, getting data from ewprcd
     # - Fix bug of SNP and DJI
-    
-    
     # v3.0700 - 20220418
     # - Remove tej_ewtinst1_hold - Done
     # - Add pe_ratio from ewprcd - Done
+
+
+    # v3.0701 - 20220422
+    # - Update cbml and test wma
     
     
-    # v3.0701
+    # v3.070X
     # - Visualize the tej_ewtinst1_hold and stock price
     # - Bug, ewtinst1; Send mail to TEJ
     #   > FLD023有大於100
@@ -2453,8 +2454,9 @@ def master(param_holder, predict_begin, export_model=True,
     
     global bt_last_begin, data_period, predict_period, long, time_unit
     global dev, test
-    global symbol, ma_values, volume_thld, market, data_form, load_model_data
-
+    global symbol, volume_thld, market, data_form, load_model_data
+    global ma_values, wma
+    
 
     holder = param_holder.params
     
@@ -2467,7 +2469,8 @@ def master(param_holder, predict_begin, export_model=True,
     compete_mode = holder['compete_mode'][0]   
     train_mode = holder['train_mode'][0]       
     dev = holder['dev'][0]
-    symbol = holder['symbol'][0]   
+    symbol = holder['symbol'][0]  
+    wma = holder['wma'][0]
     ma_values = holder['ma_values'][0]   
     data_form = holder['data_form'][0]   
     time_unit = holder['time_unit'][0]
@@ -2519,8 +2522,7 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # Update, add to BTM
-    global wma, corr_threshold
-    wma = False
+    global corr_threshold
 
     # 原本設定為0.85，但CU DTSA 5509將Collinearity的標準設為0.7
     corr_threshold = 0.7
@@ -3186,16 +3188,11 @@ def get_google_treneds(begin_date=None, end_date=None,
   # File "/Users/Aron/Documents/GitHub/Codebase_YZ/codebase_yz.py", line 2527, in df_add_ma
     # temp_main['variable'] = temp_main['variable'].astype(int)    
     
-    
     global ma_values
     cols = cbyz.df_get_cols_except(df=main_data, except_cols=['WORK_DATE'])
-    main_data, ma_cols = cbyz.df_add_ma(df=main_data, cols=cols, 
-                                       group_by=[], 
+    main_data, ma_cols = cbyz.df_add_ma(df=main_data, cols=cols, group_by=[], 
                                        date_col='WORK_DATE', values=ma_values,
                                        wma=False)
-    
-                
-                
     
     # Convert NA
     cols = cbyz.df_get_cols_except(df=main_data, except_cols=['WORK_DATE'])

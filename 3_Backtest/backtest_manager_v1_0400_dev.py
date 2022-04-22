@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
 
-History
-
-20210703 - Replaced MA with WMA in SAM
-
-"""
 
 
 # % 讀取套件 -------
@@ -50,8 +44,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220408',
-                 r'/home/jupyter/Arsenal/20220408',
+                 r'/home/jupyter/Codebase_YZ/20220422',
+                 r'/home/jupyter/Arsenal/20220422',
                  path + '/Function',
                  path_sam]
 
@@ -68,7 +62,7 @@ import arsenal_stock as stk
 # import stock_analysis_manager_v3_0100 as sam
 # import stock_analysis_manager_v3_0600_dev as sam
 # import stock_analysis_manager_v3_0601_dev as sam
-import stock_analysis_manager_v3_0700_dev as sam
+import stock_analysis_manager_v3_0701_dev as sam
 
 
 
@@ -844,7 +838,8 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # - Calculate data_period from 20170101
     
     # v1.0400 - 20220305
-    # - Update for SAM 3.06
+    # - Update for SAM 3.07
+    # - Add wma to params
     
     # v1.0500
     # - The best buying price is prediction - RMSE
@@ -1049,6 +1044,7 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
             'volume_thld':[volume_thld],
             'industry':[True],
             'trade_value':[True],
+            'wma':[True],
             'market':['tw'],
             'compete_mode':[_compete_mode],
             'train_mode':[2],            
