@@ -357,6 +357,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
     # Work area ----------
     bt_results_raw = pd.DataFrame()
     precision = pd.DataFrame()
+    features = pd.DataFrame()
     
     sam_calendar = None
     sam_predict_date = None
@@ -393,6 +394,7 @@ def backtest_predict(bt_last_begin, predict_period, interval,
             
         bt_results_raw = bt_results_raw.append(sam_result)
         precision = precision.append(sam_scores)
+        features = features.append(sam_features)
 
 
     # Organize ......
@@ -1630,7 +1632,7 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220408, predict_period=1, 
+        master(bt_last_begin=20220422, predict_period=1, 
             time_unit='w', long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,

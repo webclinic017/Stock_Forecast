@@ -1942,11 +1942,14 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     # TODC Shareholdings Spread ......
-    # sharehold = stk.tdcc_get_sharehold_spread(shift_begin, end_date=None,
-    #                                           local=local) 
+    if market == 'tw':
+        sharehold = \
+            stk.tdcc_get_sharehold_spread(begin_date=shift_begin,
+                                          end_date=None) 
     
-    # main_data = main_data.merge(sharehold, how='left', 
-    #                           on=['SYMBOL', 'WORK_DATE'])      
+        main_data = main_data.merge(sharehold, how='left', on=id_keys)
+    
+    
 
 
     # TEJ EWPRCD PE Ratio ......
@@ -1993,9 +1996,9 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         ewgin, cols = sam_tej_ewgin()
         main_data = main_data.merge(ewgin, how='left', on=id_keys)
         main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                          sort_keys=time_key, 
-                                          method=['ffill', 'bfill'], 
-                                          group_by=['SYMBOL'])          
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=['SYMBOL'])          
         del ewgin
         gc.collect()
 
@@ -2212,8 +2215,12 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # - 新股的ewtinst1c一定會有NA，但SNP不會是NA，導致na_min和na_max不一定相等
     # - 如果只是某幾天缺資料的話，chk_na_min和chk_na_max應該不會相等
     chk_na = cbyz.df_chk_col_na(df=hist_df, except_cols=var_y)
-    
-    assert_cond = chk_na == None or len(chk_na) < 600
+
+    assert_cond = False
+    if (isinstance(chk_na, pd.DataFrame) and len(chk_na) < 600) \
+        or (chk_na == None):
+        assert_cond = True
+        
     if not assert_cond:
         chk_na.to_csv(path_temp + '/chk_na_id_01.csv', index=False)
 
@@ -2650,7 +2657,7 @@ def master(param_holder, predict_begin, export_model=True,
                                   # 'min_child_weight': [0.5, 1],
                                   'max_depth':[8],
                                   # 'max_depth':[8, 10],
-                                  'subsample':[0.7, 1]
+                                  # 'subsample':[0.7, 1]
                               }
                             }
                             ]        
@@ -3575,18 +3582,9 @@ def check_ewtinst1():
 
 def debug():
     
+    df = stk.dev_df.copy()
+    df['VALUE'] = df['VALUE'] / df['VALUE']
     
-    df = sam.debug_pe_ratio.copy()
-    
-
-    cols = cbyz.df_get_cols_except(
-        df=df, 
-        except_cols=['SYMBOL', 'WORK_DATE']
-        )    
-
-
-    df = cbyz.df_conv_col_type(df=df, cols=cols, to='float')
-
 
 # %% Execution ------
 
