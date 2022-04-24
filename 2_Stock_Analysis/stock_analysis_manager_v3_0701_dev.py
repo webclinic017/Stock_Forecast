@@ -22,7 +22,7 @@ import pickle
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -1375,11 +1375,58 @@ def sam_od_us_get_snp(begin_date):
 # ...............
 
 
+def sam_tdcc_get_sharehold_spread():
+    
+    global main_data_frame, time_unit
+    global id_keys, corr_threshold
+    global symbol
+    global shift_begin    
+    
+    assert time_unit == 'w', 'Update for time_unit not being week'
+    result = stk.tdcc_get_sharehold_spread(begin_date=shift_begin,
+                                           end_date=None)
+    
+    cols = cbyz.df_get_cols_except(df=result, except_cols=id_keys)
+    
+    # Scale Data
+    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)    
+
+
+    # MA
+    # result, ma_cols = \
+    #     cbyz.df_add_ma(df=result, cols=cols,
+    #                    group_by=['SYMBOL'], date_col='WORK_DATE',
+    #                    values=ma_values, wma=wma, 
+    #                    show_progress=False
+    #                    )   
+        
+    # result = result.drop(cols, axis=1)
+    
+    result = main_data_frame.merge(result, how='left', on=id_keys)
+    result = cbyz.df_fillna_chain(df=result, cols=cols,
+                                  sort_keys=time_key,
+                                  method=['ffill', 'bfill'], 
+                                  group_by='SYMBOL')
+
+    # Drop Highly Correlated Features
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys) 
+
+    # Filter existing columns
+    cols = cbyz.df_filter_exist_cols(df=result, cols=cols)            
+    
+    return result, cols
+
+
+# ...............
+
+
 def sam_tej_ewsale(begin_date):
 
     
     print('還沒加df_drop_high_corr_var')
     global main_data_frame, symbol
+    
     loc_df = stk.tej_ewsale(begin_date=begin_date, end_date=None, 
                                 symbol=symbol, fill=True, host=host)
     
@@ -1943,13 +1990,14 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     # TODC Shareholdings Spread ......
     if market == 'tw':
-        sharehold = \
-            stk.tdcc_get_sharehold_spread(begin_date=shift_begin,
-                                          end_date=None) 
-    
+        sharehold, cols = sam_tdcc_get_sharehold_spread()
         main_data = main_data.merge(sharehold, how='left', on=id_keys)
-    
-    
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                         sort_keys=time_key, 
+                                         method=['ffill', 'bfill'], 
+                                         group_by=['SYMBOL'])   
+        del sharehold
+        gc.collect()
 
 
     # TEJ EWPRCD PE Ratio ......
@@ -1962,20 +2010,6 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
                                          group_by=['SYMBOL'])   
         del pe_ratio
         gc.collect()
-
-
-
-    # TEJ EWTINST1 HOLD ......
-    # - 20220418, unessential
-    # if market == 'tw':
-    #     ewtinst1_hold, cols = sam_tej_ewtinst1_hold()
-    #     main_data = main_data.merge(ewtinst1_hold, how='left', on=id_keys)
-    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                       sort_keys=time_key, 
-    #                                       method=['ffill', 'bfill'], 
-    #                                       group_by=['SYMBOL'])   
-    #     del ewtinst1_hold
-    #     gc.collect()
 
 
 
@@ -2233,7 +2267,7 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     # Predict有NA是正常的，但NA_COUNT必須全部都一樣
-    global chk_predict_na
+    global chk_predict_na, predict_df
     if time_unit == 'd':
         predict_df = main_data.merge(predict_date, on=time_key)
         
@@ -2241,12 +2275,14 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
         predict_df = main_data.merge(predict_week, on=time_key)
     
     chk_predict_na = cbyz.df_chk_col_na(df=predict_df, mode='alert')
-    min_value = chk_predict_na['NA_COUNT'].min()
-    max_value = chk_predict_na['NA_COUNT'].max()    
     
-    # chk_predict_na == None, chk_predict_na應該不可能是None？
-    assert min_value == max_value, \
-        'All the NA_COUNT should be the same.'
+    if isinstance(chk_predict_na, pd.DataFrame):
+        min_value = chk_predict_na['NA_COUNT'].min()
+        max_value = chk_predict_na['NA_COUNT'].max()    
+    
+        # chk_predict_na == None, chk_predict_na應該不可能是None？
+        assert min_value == max_value, \
+            'All the NA_COUNT should be the same.'
     
 
     # Check min max ......
@@ -2333,9 +2369,13 @@ def master(param_holder, predict_begin, export_model=True,
     # - Remove tej_ewtinst1_hold - Done
     # - Add pe_ratio from ewprcd - Done
 
-
     # v3.0701 - 20220422
     # - Update cbml and test wma
+    
+    
+    # v3.0800 - 20220422    
+    # Fix bug - 目前MA時的單位是d，parameter is week，但兩者共用相同的ma_values
+    # Time unit是week時，應該先ma再summary，或是先summary再ma？
     
     
     # v3.070X
@@ -2354,6 +2394,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - Test spreadholding data, and decide to buy it or not
     # - 加總三大法人總持股數
     # - 是不是應該修改loss function，不要用MSE
+    # - 應該先ma再summary，或是相反？
     
     # - Add transaction volume divide outstanding
     # - Optimize, y是不是可以用log transform，底數要設多少？
@@ -2388,7 +2429,7 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     global version
-    version = 3.0602
+    version = 3.0701
     
     
     # Bug

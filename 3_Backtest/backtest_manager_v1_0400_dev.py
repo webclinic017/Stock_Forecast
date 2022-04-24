@@ -11,8 +11,8 @@ import random
 
 host = 3
 # host = 2
-host = 4
-# host = 0
+# host = 4
+host = 0
 market = 'tw'
 
 
@@ -1548,6 +1548,9 @@ def simulate(df):
         
 def debug():
 
+    sam.predict_df
+    sam.main_data    
+    
     pass
 
 
@@ -1566,6 +1569,10 @@ if __name__ == '__main__':
     # 3. 當test為True，time_unit為w時，TRAIN_PRECISION約0.0004，TEST_PRECISION
     #    為0.043743，但正式執行時，TEST_PRECISION也大約是0.04-0.05，是不是代表
     #    model一直在overfitting
+    # 4. 20220422 chat with Grace。當市場恐慌時，像中華電信這種平常不太會動的股票就
+    #    有機會可以破新高，因為有些大量的錢沒地方流，像是基金，所以就會轉往看起來相對安全
+    #    的標的。要如何在Model中處理類似的情況？    
+    
 
     # BTM Note
     # 1. 如果用change_ratio當成Y的話，對模型來說，最安全的選項是不是設為0？
@@ -1595,7 +1602,6 @@ if __name__ == '__main__':
     # cv: 2 / 3, 4
     
     # Bug, 只有HIGH的param log有寫入，LOW和CLOSE都沒有
-    
 
         
     global weekly_actions, daily_actions
