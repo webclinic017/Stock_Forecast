@@ -2384,6 +2384,11 @@ def master(param_holder, predict_begin, export_model=True,
     #   > FLD023有大於100
     #   > T_PCT有小於0
         
+    
+    # - Update scale function修改df_scaler的時候，發現確實需要scaled by symbol，
+    #   否則全部資料全部丟進去scaled，normaltest的p value目前是0    
+    # https://machinelearningmastery.com/how-to-transform-data-to-fit-the-normal-distribution/
+    
 
     # - 量價分析；volume / mean price
     #   > 量價曲線（Volume Price Trend，VPT）
