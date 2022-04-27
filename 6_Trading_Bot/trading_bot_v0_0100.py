@@ -91,6 +91,9 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 def master_single():
     
+    # https://developer.fugle.tw/
+    
+    
     # new_data = query_quote()
     
     # extract price and volume 

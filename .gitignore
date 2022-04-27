@@ -1,3 +1,7 @@
 
 *.csv
 *.h5
+6_Trading_Bot/config.simulation.ini.example
+*.p12
+6_Trading_Bot/config.simulation.ini.example
+6_Trading_Bot/config.simulation.ini
