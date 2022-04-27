@@ -11,8 +11,8 @@ import random
 
 host = 3
 # host = 2
-# host = 4
-host = 0
+host = 4
+# host = 0
 market = 'tw'
 
 
@@ -921,8 +921,9 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     # 
     #   How to Perform Data Cleaning for Machine Learning with Python
     #   https://machinelearningmastery.com/basic-data-cleaning-for-machine-learning/
-    
-    # - 費城半導體指數
+
+
+    # 費城半導體指數	
     # - 外資券商不等於外資 https://www.thenewslens.com/article/139790
 
 
@@ -1574,8 +1575,9 @@ if __name__ == '__main__':
     # 4. 20220422 chat with Grace。當市場恐慌時，像中華電信這種平常不太會動的股票就
     #    有機會可以破新高，因為有些大量的錢沒地方流，像是基金，所以就會轉往看起來相對安全
     #    的標的。要如何在Model中處理類似的情況？    
-    # 5. 修改df_scaler的時候，發現確實需要scaled by symbol，否則全部資料全部丟進去
+    # 5. 修改df_scaler的時候，發現確實需要scaled by symbol，否則全部資料全部丟進去	
     #    scaled，normaltest的p valueh前是0
+
     
 
     # BTM Note
@@ -1642,7 +1644,7 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220425, predict_period=1, 
+        master(bt_last_begin=20220422, predict_period=1, 
             time_unit='w', long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,
