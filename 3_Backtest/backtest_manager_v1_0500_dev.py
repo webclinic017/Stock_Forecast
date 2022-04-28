@@ -122,8 +122,7 @@ def set_calendar():
         
     elif _time_unit == 'w':
         calendar = calendar.merge(sam_predict_week, on=time_key)
-        calendar_lite = calendar[['YEAR_ISO', 'WEEK_NUM_ISO', 
-                                  'YEAR_ISO_LAST', 'WEEK_NUM_ISO_LAST']]
+        calendar_lite = calendar[['YEAR_WEEK_ISO', 'YEAR_WEEK_ISO_LAST']]
 
     _bt_last_end = sam_calendar.loc[len(sam_calendar) - 1, 'WORK_DATE']
 
@@ -959,8 +958,11 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     global id_keys, time_key, time_key_last
     
     if time_unit == 'w':
-        id_keys = ['SYMBOL', 'YEAR_ISO', 'WEEK_NUM_ISO']
-        time_key = ['YEAR_ISO', 'WEEK_NUM_ISO']
+        id_keys = ['SYMBOL', 'YEAR_WEEK_ISO']
+        time_key = ['YEAR_WEEK_ISO']
+        
+        # id_keys = ['SYMBOL', 'YEAR_ISO', 'WEEK_NUM_ISO']
+        # time_key = ['YEAR_ISO', 'WEEK_NUM_ISO']
         
     elif time_unit == 'd':
         id_keys = ['SYMBOL', 'WORK_DATE']    

@@ -764,14 +764,14 @@ def set_frame():
         calendar_key = calendar_key[['WORK_DATE']]
         
     elif time_unit == 'w':
-        calendar_key = calendar_key[['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']]
+        calendar_key = calendar_key[['WORK_DATE', 'YEAR_WEEK_ISO']]
     
     
     # Duplicate year and week_num, then these two columns can be variables 
     # of the model
     if time_unit == 'w':
         
-        calendar_proc = calendar_proc[['YEAR_ISO', 'MONTH', 
+        calendar_proc = calendar_proc[['YEAR_WEEK_ISO', 'YEAR_ISO', 'MONTH', 
                                        'WEEK_NUM_ISO', 'TRADE_DATE']]
         
         calendar_proc = calendar_proc \
@@ -780,8 +780,8 @@ def set_frame():
             .reset_index() \
             .rename(columns={'index':'DATE_INDEX'}) 
         
-        calendar_proc.loc[:, 'YEAR_DUP'] = calendar_proc['YEAR_ISO']
-        calendar_proc.loc[:, 'WEEK_NUM_DUP'] = calendar_proc['WEEK_NUM_ISO']
+        # calendar_proc.loc[:, 'YEAR_DUP'] = calendar_proc['YEAR_ISO']
+        # calendar_proc.loc[:, 'WEEK_NUM_DUP'] = calendar_proc['WEEK_NUM_ISO']
         
 
     calendar_proc, _, _ = \
@@ -906,32 +906,19 @@ def sam_covid_19_tw():
     
     cols = cbyz.df_get_cols_except(
         df=result,
-        except_cols=['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']
+        except_cols=['WORK_DATE', 'YEAR_WEEK_ISO']
         )
-    
-    # Scale Data
-    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
-    
-    # MA
-    result, ma_cols = \
-        cbyz.df_add_ma(df=result, cols=cols,
-                       group_by=[], date_col='WORK_DATE',
-                       values=ma_values, wma=wma, 
-                       show_progress=False
-                       )   
-        
-    result = result.drop(cols, axis=1)
     
     
     if time_unit == 'w':
         result = result \
             .merge(calendar_full_key, how='left', on='WORK_DATE')
             
-        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        result = cbyz.df_conv_na(df=result, cols=cols)  
         
-        result, ma_cols = \
+        result, cols = \
             cbyz.df_summary(
-                df=result, cols=ma_cols, group_by=time_key, 
+                df=result, cols=cols, group_by=time_key, 
                 add_mean=df_summary_mean, 
                 add_min=df_summary_min, 
                 add_max=df_summary_max, 
@@ -939,7 +926,21 @@ def sam_covid_19_tw():
                 add_std=df_summary_std, 
                 add_skew=False, add_count=False, quantile=[]
                 )
+    
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=[], date_col=time_key,
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
 
+    # Scale Data
+    result, scaler_log, _ = cbml.df_scaler_v2(df=result, cols=cols, method=0)
+        
+    
     # Drop Highly Correlated Features
     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
                                      except_cols=id_keys)
@@ -953,6 +954,69 @@ def sam_covid_19_tw():
                 .merge(result, how='left', on=time_key)    
 
     return result, ma_cols
+
+
+
+
+# def sam_covid_19_tw_20220428():
+    
+#     global id_keys, time_key
+#     global calendar_full_key, main_data_frame_calendar
+#     global ma_values, wma, corr_threshold
+#     global df_summary_mean, df_summary_min, df_summary_max
+#     global df_summary_median, df_summary_std    
+    
+#     result, _ = cbyz.get_covid19_data(backup=True, path=path_temp)
+    
+#     cols = cbyz.df_get_cols_except(
+#         df=result,
+#         except_cols=['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']
+#         )
+    
+#     # Scale Data
+#     result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
+    
+#     # MA
+#     result, ma_cols = \
+#         cbyz.df_add_ma(df=result, cols=cols,
+#                        group_by=[], date_col='WORK_DATE',
+#                        values=ma_values, wma=wma, 
+#                        show_progress=False
+#                        )   
+        
+#     result = result.drop(cols, axis=1)
+    
+    
+#     if time_unit == 'w':
+#         result = result \
+#             .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+#         result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        
+#         result, ma_cols = \
+#             cbyz.df_summary(
+#                 df=result, cols=ma_cols, group_by=time_key, 
+#                 add_mean=df_summary_mean, 
+#                 add_min=df_summary_min, 
+#                 add_max=df_summary_max, 
+#                 add_median=df_summary_median,
+#                 add_std=df_summary_std, 
+#                 add_skew=False, add_count=False, quantile=[]
+#                 )
+
+#     # Drop Highly Correlated Features
+#     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+#                                      except_cols=id_keys)
+        
+#     # Filter existing columns
+#     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
+    
+    
+#     # Merge ......
+#     result = main_data_frame_calendar \
+#                 .merge(result, how='left', on=time_key)    
+
+#     return result, ma_cols
 
 
 # .................
@@ -1986,184 +2050,184 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     main_data = main_data.merge(calendar_proc, how='left', on=time_key)
     
     
-    # TODC Shareholdings Spread ......
-    if market == 'tw':
-        sharehold, cols = sam_tdcc_get_sharehold_spread()
-        main_data = main_data.merge(sharehold, how='left', on=id_keys)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                         sort_keys=time_key, 
-                                         method=['ffill', 'bfill'], 
-                                         group_by=['SYMBOL'])   
-        del sharehold
-        gc.collect()
+    # # TODC Shareholdings Spread ......
+    # if market == 'tw':
+    #     sharehold, cols = sam_tdcc_get_sharehold_spread()
+    #     main_data = main_data.merge(sharehold, how='left', on=id_keys)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                      sort_keys=time_key, 
+    #                                      method=['ffill', 'bfill'], 
+    #                                      group_by=['SYMBOL'])   
+    #     del sharehold
+    #     gc.collect()
 
 
-    # TEJ EWPRCD PE Ratio ......
-    if market == 'tw':
-        pe_ratio, cols = sam_tej_ewprcd_pe_ratio()
-        main_data = main_data.merge(pe_ratio, how='left', on=id_keys)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                         sort_keys=time_key, 
-                                         method=['ffill', 'bfill'], 
-                                         group_by=['SYMBOL'])   
-        del pe_ratio
-        gc.collect()
+    # # TEJ EWPRCD PE Ratio ......
+    # if market == 'tw':
+    #     pe_ratio, cols = sam_tej_ewprcd_pe_ratio()
+    #     main_data = main_data.merge(pe_ratio, how='left', on=id_keys)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                      sort_keys=time_key, 
+    #                                      method=['ffill', 'bfill'], 
+    #                                      group_by=['SYMBOL'])   
+    #     del pe_ratio
+    #     gc.collect()
 
 
 
-    # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
-    if market == 'tw':
-        ewtinst1, cols = sam_tej_ewtinst1()
-        main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                         sort_keys=time_key, 
-                                         method=['ffill', 'bfill'], 
-                                         group_by=['SYMBOL'])   
-        del ewtinst1
-        gc.collect()
+    # # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
+    # if market == 'tw':
+    #     ewtinst1, cols = sam_tej_ewtinst1()
+    #     main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                      sort_keys=time_key, 
+    #                                      method=['ffill', 'bfill'], 
+    #                                      group_by=['SYMBOL'])   
+    #     del ewtinst1
+    #     gc.collect()
 
 
-    # TEJ EWGIN ......
-    if market == 'tw':
-        ewgin, cols = sam_tej_ewgin()
-        main_data = main_data.merge(ewgin, how='left', on=id_keys)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                         sort_keys=time_key, 
-                                         method=['ffill', 'bfill'], 
-                                         group_by=['SYMBOL'])          
-        del ewgin
-        gc.collect()
+    # # TEJ EWGIN ......
+    # if market == 'tw':
+    #     ewgin, cols = sam_tej_ewgin()
+    #     main_data = main_data.merge(ewgin, how='left', on=id_keys)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                      sort_keys=time_key, 
+    #                                      method=['ffill', 'bfill'], 
+    #                                      group_by=['SYMBOL'])          
+    #     del ewgin
+    #     gc.collect()
 
 
-    # Ex-Dividend And Ex-Right ...
-    if market == 'tw':
-        data, cols = sam_ex_dividend()
-        main_data = main_data.merge(data, how='left', on=id_keys)
-        main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)
+    # # Ex-Dividend And Ex-Right ...
+    # if market == 'tw':
+    #     data, cols = sam_ex_dividend()
+    #     main_data = main_data.merge(data, how='left', on=id_keys)
+    #     main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)
 
 
-    # Buffett Indicator ......
-    if market == 'tw':
+    # # Buffett Indicator ......
+    # if market == 'tw':
         
-        buffett_indicator, cols = sam_buffett_indicator()
+    #     buffett_indicator, cols = sam_buffett_indicator()
         
-        # 因為部份欄位和下面的tw_index重複，所以刪除
-        drop_cols = cbyz.df_get_cols_contains(df=buffett_indicator, 
-                                              string=['TW_INDEX'])
+    #     # 因為部份欄位和下面的tw_index重複，所以刪除
+    #     drop_cols = cbyz.df_get_cols_contains(df=buffett_indicator, 
+    #                                           string=['TW_INDEX'])
         
-        buffett_indicator = buffett_indicator.drop(drop_cols, axis=1)
-        cols = cbyz.li_remove_items(cols, drop_cols)
+    #     buffett_indicator = buffett_indicator.drop(drop_cols, axis=1)
+    #     cols = cbyz.li_remove_items(cols, drop_cols)
         
-        # Merge
-        main_data = main_data \
-                    .merge(buffett_indicator, how='left', on=time_key)
+    #     # Merge
+    #     main_data = main_data \
+    #                 .merge(buffett_indicator, how='left', on=time_key)
 
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                          sort_keys=time_key, 
-                                          method=['ffill', 'bfill'], 
-                                          group_by=[])
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                       sort_keys=time_key, 
+    #                                       method=['ffill', 'bfill'], 
+    #                                       group_by=[])
 
 
-    # Government Invest ......
-    if market == 'tw':
-        # gov_invest = sam_tw_gov_invest(dev=True)
-        gov_invest = sam_tw_gov_invest(dev=False)
-        cols = cbyz.df_get_cols_except(df=gov_invest, except_cols=id_keys)
+    # # Government Invest ......
+    # if market == 'tw':
+    #     # gov_invest = sam_tw_gov_invest(dev=True)
+    #     gov_invest = sam_tw_gov_invest(dev=False)
+    #     cols = cbyz.df_get_cols_except(df=gov_invest, except_cols=id_keys)
         
-        # 沒有交集時就不merge，避免一整欄都是NA
-        if len(gov_invest) > 0:
-            main_data = main_data.merge(gov_invest, how='left', on=id_keys)
-            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                        sort_keys=id_keys, group_by=['SYMBOL'], 
-                                        method='ffill')
+    #     # 沒有交集時就不merge，避免一整欄都是NA
+    #     if len(gov_invest) > 0:
+    #         main_data = main_data.merge(gov_invest, how='left', on=id_keys)
+    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
+    #                                     method='ffill')
             
-            # 避免開頭的資料是NA，所以再用一次bfill
-            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                        sort_keys=id_keys, group_by=['SYMBOL'], 
-                                        method='bfill')                        
+    #         # 避免開頭的資料是NA，所以再用一次bfill
+    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
+    #                                     method='bfill')                        
     
-            main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)
+    #         main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)
     
     
-    # Government Own ......
-    if market == 'tw':
-        # gov_own = sam_tw_gov_own(dev=True)
-        gov_own = sam_tw_gov_own(dev=False)
-        cols = cbyz.df_get_cols_except(df=gov_own, except_cols=id_keys)
+    # # Government Own ......
+    # if market == 'tw':
+    #     # gov_own = sam_tw_gov_own(dev=True)
+    #     gov_own = sam_tw_gov_own(dev=False)
+    #     cols = cbyz.df_get_cols_except(df=gov_own, except_cols=id_keys)
         
-        # 沒有交集時就不merge，避免一整欄都是NA
-        if len(gov_own) > 0:
-            main_data = main_data.merge(gov_own, how='left', on=id_keys)
-            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                        sort_keys=id_keys, group_by=['SYMBOL'], 
-                                        method='ffill')
+    #     # 沒有交集時就不merge，避免一整欄都是NA
+    #     if len(gov_own) > 0:
+    #         main_data = main_data.merge(gov_own, how='left', on=id_keys)
+    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
+    #                                     method='ffill')
             
-            # 避免開頭的資料是NA，所以再用一次bfill
-            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-                                        sort_keys=id_keys, group_by=['SYMBOL'], 
-                                        method='bfill')    
+    #         # 避免開頭的資料是NA，所以再用一次bfill
+    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
+    #                                     method='bfill')    
 
-            main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)                   
+    #         main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)                   
 
 
-    # ^TWII .......
-    if market == 'tw':
+    # # ^TWII .......
+    # if market == 'tw':
          
-        tw_index, cols = \
-            sam_od_tw_get_index(
-                begin_date=shift_begin,
-                end_date=predict_date.loc[len(predict_date)-1, 'WORK_DATE']
-                )
+    #     tw_index, cols = \
+    #         sam_od_tw_get_index(
+    #             begin_date=shift_begin,
+    #             end_date=predict_date.loc[len(predict_date)-1, 'WORK_DATE']
+    #             )
         
-        main_data = main_data.merge(tw_index, how='left', on=time_key)
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                          sort_keys=time_key, 
-                                          method=['ffill', 'bfill'], 
-                                          group_by=[])    
+    #     main_data = main_data.merge(tw_index, how='left', on=time_key)
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                       sort_keys=time_key, 
+    #                                       method=['ffill', 'bfill'], 
+    #                                       group_by=[])    
 
     
-    # Fiat Currency Exchange ......
-    fx_rate, cols = sam_od_tw_get_fx_rate()
-    main_data = main_data.merge(fx_rate, how='left', on=time_key)
+    # # Fiat Currency Exchange ......
+    # fx_rate, cols = sam_od_tw_get_fx_rate()
+    # main_data = main_data.merge(fx_rate, how='left', on=time_key)
 
-    main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                      sort_keys=time_key, 
-                                      method=['ffill', 'bfill'], 
-                                      group_by=[])
-
-
-    # Get Dow Jones Industrial Average (^DJI) ......
-    dji, cols = sam_od_us_get_dji()
-    main_data = main_data.merge(dji, how='left', on=time_key)
-    del dji
-    gc.collect()   
+    # main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                   sort_keys=time_key, 
+    #                                   method=['ffill', 'bfill'], 
+    #                                   group_by=[])
 
 
-    # S&P 500 ......
-    snp, cols = sam_od_us_get_snp(begin_date=shift_begin)
-    main_data = main_data.merge(snp, how='left', on=time_key)
-    del snp
-    gc.collect()
+    # # Get Dow Jones Industrial Average (^DJI) ......
+    # dji, cols = sam_od_us_get_dji()
+    # main_data = main_data.merge(dji, how='left', on=time_key)
+    # del dji
+    # gc.collect()   
+
+
+    # # S&P 500 ......
+    # snp, cols = sam_od_us_get_snp(begin_date=shift_begin)
+    # main_data = main_data.merge(snp, how='left', on=time_key)
+    # del snp
+    # gc.collect()
     
     
-    # COVID-19 ......
-    if market == 'tw':
-        covid_tw, cols = sam_covid_19_tw()
+    # # COVID-19 ......
+    # if market == 'tw':
+    #     covid_tw, cols = sam_covid_19_tw()
         
-        # Future Plan
-        # sam_covid_19_global()
+    #     # Future Plan
+    #     # sam_covid_19_global()
         
-        main_data = main_data.merge(covid_tw, how='left', on=time_key)
-        main_data = cbyz.df_conv_na(df=main_data, cols=cols)
+    #     main_data = main_data.merge(covid_tw, how='left', on=time_key)
+    #     main_data = cbyz.df_conv_na(df=main_data, cols=cols)
         
-        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-                                          sort_keys=time_key, 
-                                          method=['ffill', 'bfill'], 
-                                          group_by=[])
-    elif market == 'en':
-        # Future Plan
-        # covid_en = sam_covid_19_global()        
-        pass
+    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+    #                                       sort_keys=time_key, 
+    #                                       method=['ffill', 'bfill'], 
+    #                                       group_by=[])
+    # elif market == 'en':
+    #     # Future Plan
+    #     # covid_en = sam_covid_19_global()        
+    #     pass
 
 
     
@@ -2372,11 +2436,13 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # v3.0800 - 20220422    
+    # - Replace time_key from ['YEAR_ISO', 'WEEK_NUM_ISO'] to ['YEAR_WEEK_ISO'],
+    #   then can be apply df_add_ma    
     # Time unit是week時，應該先ma再summary，或是先summary再ma？
     # Fix bug - 目前MA時的單位是d，parameter is week，但兩者共用相同的ma_values
     
     
-    # v3.070X
+    # v3.080X
     # - Visualize the tej_ewtinst1_hold and stock price
     # - Bug, ewtinst1; Send mail to TEJ
     #   > FLD023有大於100
@@ -2395,7 +2461,6 @@ def master(param_holder, predict_begin, export_model=True,
     # - Test spreadholding data, and decide to buy it or not
     # - 加總三大法人總持股數
     # - 是不是應該修改loss function，不要用MSE
-    # - 應該先ma再summary，或是相反？
     
     # - Add transaction volume divide outstanding
     # - Optimize, y是不是可以用log transform，底數要設多少？
@@ -2557,8 +2622,11 @@ def master(param_holder, predict_begin, export_model=True,
     global var_y, var_y_orig
     
     if time_unit == 'w':
-        id_keys = ['SYMBOL', 'YEAR_ISO', 'WEEK_NUM_ISO']
-        time_key = ['YEAR_ISO', 'WEEK_NUM_ISO']
+        # id_keys = ['SYMBOL', 'YEAR_ISO', 'WEEK_NUM_ISO']
+        # time_key = ['YEAR_ISO', 'WEEK_NUM_ISO']
+        
+        id_keys = ['SYMBOL', 'YEAR_WEEK_ISO']
+        time_key = ['YEAR_WEEK_ISO']        
         
     elif time_unit == 'd':
         id_keys = ['SYMBOL', 'WORK_DATE']    
@@ -2602,13 +2670,14 @@ def master(param_holder, predict_begin, export_model=True,
                                data_period=data_period,
                                unit=time_unit, week_align=True,
                                shift=int((max(ma_values) + 20)))
+                
 
     # df may have na if week_align is true
     if time_unit == 'w':
         calendar = calendar.dropna(subset=time_key, axis=0)
         
     # 有些資料可能包含非交易日，像是COVID-19，所以需要一個額外的calendar作比對
-    calendar_full_key = calendar[['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']]
+    calendar_full_key = calendar[['WORK_DATE', 'YEAR_WEEK_ISO']]
                 
                 
     # ......

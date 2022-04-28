@@ -9,6 +9,12 @@ History
 """
 
 
+# Link
+# https://developer.fugle.tw/
+# https://developer.fugle.tw/docs/trading/tutorial/trade
+
+
+
 # % 讀取套件 -------
 import pandas as pd
 import numpy as np
@@ -68,7 +74,7 @@ import arsenal_stock as stk
 
 # import multiprocessing as mp
 # import trading_bot_function as tbf
-import fugle_v1_0100_dev as arfg
+# import fugle_v1_0200_dev as arfg
 
 ar.host = host
 
@@ -89,9 +95,12 @@ cbyz.os_create_folder(path=[path_resource, path_function,
 
 
 
+
+
+
 def master_single():
     
-    # https://developer.fugle.tw/
+    
     
     
     # new_data = query_quote()
@@ -220,8 +229,8 @@ def master_level_1():
     
     while 2 > 1:
         
-        Bug, query quote一定要從arfg啟動嗎？還是可以從其他fuction呼叫，後者的話還需要
-        儲存嗎
+        # Bug, query quote一定要從arfg啟動嗎？還是可以從其他fuction呼叫，後者的話還需要
+        # 儲存嗎
         arfg.query_quote(hold)
         
         # Reference ......
@@ -259,6 +268,8 @@ def master_level_1():
 
 
         sys.sleep(1)
+
+
 
 
 
@@ -341,6 +352,11 @@ def multiplrocessing_archive():
     #         job.wait()
 
     pass
+
+
+# %% Test API ------
+    
+
 
 
 # %% Execution ------
