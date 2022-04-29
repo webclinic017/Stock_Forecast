@@ -288,22 +288,64 @@ def sam_load_data(industry=True, trade_value=True):
     # - price和change_ratio都用method 1 scale
     # - Remove open price and open_price_change
     
-    market_data, scale_orig_ratio, y_scaler_ratio = \
-        cbml.df_scaler(df=market_data, 
-                       cols=['HIGH_CHANGE_RATIO', 'LOW_CHANGE_RATIO',
-                             'CLOSE_CHANGE_RATIO'],
-                       show_progress=False, method=1)
     
-    market_data, scale_orig_price, y_scaler_price = \
-        cbml.df_scaler(df=market_data,
-                       cols=['HIGH', 'LOW', 'CLOSE'],
-                       show_progress=False, method=1)
+    # 20220429 Commented
+    # market_data, scale_orig_ratio, y_scaler_ratio = \
+    #     cbml.df_scaler(df=market_data, 
+    #                    cols=['HIGH_CHANGE_RATIO', 'LOW_CHANGE_RATIO',
+    #                          'CLOSE_CHANGE_RATIO'],
+    #                    show_progress=False, method=1)
+        
+    ratio_cols = ['HIGH_CHANGE_RATIO', 'LOW_CHANGE_RATIO', 
+                  'CLOSE_CHANGE_RATIO']        
+        
+    y_scaler_ratio = {}
+    scale_orig_ratio = pd.DataFrame()
     
-    market_data, _, _ = \
-        cbml.df_scaler(df=market_data,
-                       cols=['OPEN', 'OPEN_CHANGE_RATIO'],
-                       show_progress=False, method=1)
+    for c in ratio_cols:
+        market_data, new_log, new_scaler = \
+            cbml.df_scaler_v2(df=market_data, cols=c, except_cols=[],
+                              method=0, alpha=0.05, export_scaler=True,
+                              show_progress=True)
+        
+        y_scaler_ratio[c] = new_scaler
+        scale_orig_ratio = scale_orig_ratio.append(new_log)
+        
+        
+    # 20220429 Commented
+    # market_data, scale_orig_price, y_scaler_price = \
+    #     cbml.df_scaler(df=market_data,
+    #                    cols=['HIGH', 'LOW', 'CLOSE'],
+    #                    show_progress=False, method=1)
+    price_cols = ['HIGH', 'LOW', 'CLOSE']
+    
+    y_scaler_price = {}
+    scale_orig_price = pd.DataFrame()
+    
+    for c in price_cols:
+        market_data, new_log, new_scaler = \
+            cbml.df_scaler_v2(df=market_data, cols=c, except_cols=[],
+                              method=0, alpha=0.05, export_scaler=True,
+                              show_progress=True)
+        
+        y_scaler_price[c] = new_scaler
+        scale_orig_price = scale_orig_price.append(new_log)
+            
+    
+    # 20220429 Commented
+    # market_data, _, _ = \
+    #     cbml.df_scaler(df=market_data,
+    #                    cols=['OPEN', 'OPEN_CHANGE_RATIO'],
+    #                    show_progress=False, method=1)
 
+    open_cols = ['OPEN', 'OPEN_CHANGE_RATIO']
+    for c in open_cols:
+        market_data, _, _ = \
+            cbml.df_scaler_v2(df=market_data, cols=c, except_cols=[],
+                              method=0, alpha=0.05, export_scaler=True,
+                              show_progress=True)
+        
+    # scale_orig = scale_orig_ratio.update(scale_orig_price)
     scale_orig = scale_orig_ratio.append(scale_orig_price)
     
     if 'CLOSE_CHANGE_RATIO' in var_y:
@@ -2887,12 +2929,13 @@ def master(param_holder, predict_begin, export_model=True,
     # Inverse Scale
     global y_scaler        
     pred_result = pred_result[id_keys + var_y]
-    y_inverse = pred_result[var_y]
-    y_inverse = y_scaler.inverse_transform(y_inverse)
-    y_inverse = pd.DataFrame(y_inverse, columns=var_y)
+    pred_result_inverse = pred_result.copy()
     
-    pred_result_inverse = pd.concat([pred_result[id_keys], y_inverse],
-                                    axis=1)
+    for key, scaler in y_scaler.items():
+        y_inverse = pred_result[key]
+        y_inverse = scaler.inverse_transform(y_inverse)
+        pred_result_inverse[key] = y_inverse
+    
         
     # Upload to Google Sheet
     if predict_begin == bt_last_begin:
