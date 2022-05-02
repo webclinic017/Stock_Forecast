@@ -131,12 +131,15 @@ def master_level_1():
     #   這樣勝率是不是會很高
     # - Set global complete marke_data in stk
     # - Review buy_signa, did the price of symbol increase in the past days
+    # - 您好，從您的截圖看不出來您修改了哪些部分。如果您是想要 log websocket 的 error message，可以修改部分程式碼， 使用 on_error 這個 hook 來記錄。
+    #   https://github.com/fugle-dev/fugle-realtime-python/blob/master/fugle_realtime/websocket_client/ws.py#L6    
     
     
     # Sell Signal
     # - 停損不停利策略
     # - 事先預判有多少法人持股，如果數量很少，當他們賣的時候就要跟著賣了
         
+
 
 
     # Get Mean Cost ......
