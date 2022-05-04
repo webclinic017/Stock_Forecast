@@ -375,26 +375,34 @@ def sam_load_data(industry=True, trade_value=True):
             df=loc_main, 
             except_cols=ohlc+ohlc_ratio+['SYMBOL', 'WORK_DATE']
             )
+
         
-        loc_main, _, _ = cbml.df_scaler(df=loc_main, cols=cols,
-                                        show_progress=False, method=0)
-            
+        # loc_main, _, _ = cbml.df_scaler(df=loc_main, cols=cols,
+        #                                 show_progress=False, method=0)
+        
+        # 20220504 - Replace new df_scaler
+        loc_main, _, _ = cbml.df_scaler_v2(df=loc_main, cols=cols, 
+                                           except_cols=[], method=0,
+                                           alpha=0.05, export_scaler=False,
+                                           show_progress=True)        
+        
         # MA
-        cols = \
-            cbyz.df_get_cols_except(
-                df=loc_main, 
-                except_cols=['SYMBOL', 'WORK_DATE'] + var_y
-                )
+        # 20220504 - Remove
+        # cols = \
+        #     cbyz.df_get_cols_except(
+        #         df=loc_main, 
+        #         except_cols=['SYMBOL', 'WORK_DATE'] + var_y
+        #         )
             
-        loc_main, ma_cols_done = \
-            cbyz.df_add_ma(df=loc_main, cols=cols,
-                           group_by=['SYMBOL'], 
-                           date_col='WORK_DATE',
-                           values=ma_values,
-                           wma=wma, 
-                           show_progress=False
-                           )
-        loc_main = loc_main.drop(cols, axis=1)
+        # loc_main, ma_cols_done = \
+        #     cbyz.df_add_ma(df=loc_main, cols=cols,
+        #                    group_by=['SYMBOL'], 
+        #                    date_col='WORK_DATE',
+        #                    values=ma_values,
+        #                    wma=wma, 
+        #                    show_progress=False
+        #                    )
+        # loc_main = loc_main.drop(cols, axis=1)
         
         
     elif data_form == 2:
@@ -447,8 +455,8 @@ def sam_load_data(industry=True, trade_value=True):
             
             # Scale Data
             total_trade, _, _ = cbml.df_scaler(df=total_trade, 
-                                            cols='TOTAL_TRADE_VALUE',
-                                            method=0)
+                                               cols='TOTAL_TRADE_VALUE',
+                                               method=0)
             # MA
             total_trade, _ = \
                 cbyz.df_add_ma(df=total_trade, cols='TOTAL_TRADE_VALUE',
@@ -456,6 +464,8 @@ def sam_load_data(industry=True, trade_value=True):
                                values=ma_values, wma=wma, 
                                show_progress=False
                                )   
+                
+            assert 2 < 1, 'remove MA'
                 
             total_trade = total_trade.drop('TOTAL_TRADE_VALUE', axis=1)
                 
@@ -566,8 +576,7 @@ def sam_load_data(industry=True, trade_value=True):
             .drop('INDUSTRY_ONE_HOT', axis=1)
         
 
-    # backup = loc_main.copy()
-    # loc_main = backup.copy()
+
 
     if time_unit == 'w':
 
@@ -614,6 +623,28 @@ def sam_load_data(industry=True, trade_value=True):
                             add_median=df_summary_median,
                             add_std=df_summary_std, 
                             add_skew=False, add_count=False, quantile=[])
+
+        # MA
+        # - 20220504 add
+        cols = \
+            cbyz.df_get_cols_except(
+                df=loc_main, 
+                except_cols=['SYMBOL', 'WORK_DATE'] + var_y
+                )
+            
+        loc_main, ma_cols_done = \
+            cbyz.df_add_ma(df=loc_main, cols=cols,
+                           group_by=['SYMBOL'], 
+                           date_col=time_key,
+                           values=ma_values,
+                           wma=wma, 
+                           show_progress=False
+                           )
+        loc_main = loc_main.drop(cols, axis=1)
+        
+
+
+
             
         loc_main = loc_main.merge(y_data, how='left', on=id_keys)
         del y_data
