@@ -22,7 +22,7 @@ import pickle
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -450,25 +450,29 @@ def sam_load_data(industry=True, trade_value=True):
         total_trade = market_data[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
                         .drop_duplicates(subset=['WORK_DATE'])
 
-
         if data_form == 1:    
+
+            # # Scale Data
+            # total_trade, _, _ = cbml.df_scaler(df=total_trade, 
+            #                                    cols='TOTAL_TRADE_VALUE',
+            #                                    method=0)
+            # # MA
+            # total_trade, _ = \
+            #     cbyz.df_add_ma(df=total_trade, cols='TOTAL_TRADE_VALUE',
+            #                    group_by=[], date_col='WORK_DATE',
+            #                    values=ma_values, wma=wma, 
+            #                    show_progress=False
+            #                    )   
+            #
+            # total_trade = total_trade.drop('TOTAL_TRADE_VALUE', axis=1)
             
-            # Scale Data
-            total_trade, _, _ = cbml.df_scaler(df=total_trade, 
-                                               cols='TOTAL_TRADE_VALUE',
-                                               method=0)
-            # MA
-            total_trade, _ = \
-                cbyz.df_add_ma(df=total_trade, cols='TOTAL_TRADE_VALUE',
-                               group_by=[], date_col='WORK_DATE',
-                               values=ma_values, wma=wma, 
-                               show_progress=False
-                               )   
-                
-            assert 2 < 1, 'remove MA'
-                
-            total_trade = total_trade.drop('TOTAL_TRADE_VALUE', axis=1)
-                
+            total_trade, new_scaler_log, _ = \
+                cbml.df_scaler_v2(df=total_trade,
+                                  cols='TOTAL_TRADE_VALUE', 
+                                  except_cols=[], method=0,
+                                  alpha=0.05, export_scaler=False,
+                                  show_progress=True)               
+            
         elif data_form == 2:
                 
             total_trade, _, _ = \
@@ -553,20 +557,22 @@ def sam_load_data(industry=True, trade_value=True):
         new_cols = ['INDUSTRY_' + c for c in cols]                  
         rename_dict = cbyz.li_to_dict(cols, new_cols)
         industry_data = industry_data.rename(columns=rename_dict)
-                       
-        # MA ......
-        cols = cbyz.df_get_cols_except(
-            df=industry_data, 
-            except_cols=['WORK_DATE', 'INDUSTRY_ONE_HOT']
-            )
+                   
         
-        industry_data, _ = \
-            cbyz.df_add_ma(df=industry_data, cols=cols,
-                           group_by=[], date_col='WORK_DATE',
-                           values=ma_values, wma=wma, 
-                           show_progress=False
-                           )    
-        industry_data = industry_data.drop(cols, axis=1)   
+        # MA ......
+        # cols = cbyz.df_get_cols_except(
+        #     df=industry_data, 
+        #     except_cols=['WORK_DATE', 'INDUSTRY_ONE_HOT']
+        #     )
+        
+        # industry_data, _ = \
+        #     cbyz.df_add_ma(df=industry_data, cols=cols,
+        #                    group_by=[], date_col='WORK_DATE',
+        #                    values=ma_values, wma=wma, 
+        #                    show_progress=False
+        #                    )    
+        # industry_data = industry_data.drop(cols, axis=1)   
+        
         
         # Merge ...
         # .merge(stock_info_dummy, how='left', on='SYMBOL') \
@@ -613,7 +619,6 @@ def sam_load_data(industry=True, trade_value=True):
         # y用平均就好，不要用high of high, low of low，避免漲一天跌四天
         print('skew很容易產生NA，先移除 / 還是每個skew的第一個數值都是NA？')
         
-        
         loc_main, _ = \
             cbyz.df_summary(df=loc_main, cols=cols, 
                             group_by=id_keys, 
@@ -629,7 +634,7 @@ def sam_load_data(industry=True, trade_value=True):
         cols = \
             cbyz.df_get_cols_except(
                 df=loc_main, 
-                except_cols=['SYMBOL', 'WORK_DATE'] + var_y
+                except_cols=['SYMBOL', 'WORK_DATE', 'YEAR_WEEK_ISO'] + var_y
                 )
             
         loc_main, ma_cols_done = \
@@ -642,9 +647,6 @@ def sam_load_data(industry=True, trade_value=True):
                            )
         loc_main = loc_main.drop(cols, axis=1)
         
-
-
-
             
         loc_main = loc_main.merge(y_data, how='left', on=id_keys)
         del y_data
@@ -741,9 +743,6 @@ def sam_load_data(industry=True, trade_value=True):
     # assert len(chk_min_max) == 0, 'chk_min_max failed'
     
     return loc_main, scale_orig
-
-
-# ...........
 
 
 
@@ -2508,11 +2507,15 @@ def master(param_holder, predict_begin, export_model=True,
     # - Update cbml and test wma
     
     
-    # v3.0800 - 20220422    
+    # v3.0800 - 20220422
     # - Replace time_key from ['YEAR_ISO', 'WEEK_NUM_ISO'] to ['YEAR_WEEK_ISO'],
     #   then can be apply df_add_ma    
     # Time unit是week時，應該先ma再summary，或是先summary再ma？
     # Fix bug - 目前MA時的單位是d，parameter is week，但兩者共用相同的ma_values
+
+
+    # v3.0801 - 202205
+    # - Add VIF
     
     
     # v3.080X
