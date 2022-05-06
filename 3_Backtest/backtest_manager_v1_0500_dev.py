@@ -12,7 +12,7 @@ import random
 host = 3
 # host = 2
 host = 4
-host = 0
+# host = 0
 market = 'tw'
 
 
@@ -1578,6 +1578,7 @@ if __name__ == '__main__':
     #    的標的。要如何在Model中處理類似的情況？    
     # 5. 修改df_scaler的時候，發現確實需要scaled by symbol，否則全部資料全部丟進去	
     #    scaled，normaltest的p valueh前是0
+    # 6. Scaling process: Summary > MA > Scaler > Merge Frame > Fillna
 
     
 

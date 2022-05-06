@@ -22,7 +22,7 @@ import pickle
 host = 3
 # host = 2
 host = 4
-host = 0
+# host = 0
 
 
 # Path .....
@@ -267,7 +267,7 @@ def sam_load_data(industry=True, trade_value=True):
     global id_keys, var_y, var_y_orig, symbol
     global market_data
     global predict_period, data_end
-    global symbol_df, wma
+    global symbol_df, wma, corr_threshold
     global stock_info_raw
     global data_form
     global ohlc, ohlc_ratio, ohlc_change
@@ -466,7 +466,7 @@ def sam_load_data(industry=True, trade_value=True):
             #
             # total_trade = total_trade.drop('TOTAL_TRADE_VALUE', axis=1)
             
-            total_trade, new_scaler_log, _ = \
+            total_trade, new_scale_log, _ = \
                 cbml.df_scaler_v2(df=total_trade,
                                   cols='TOTAL_TRADE_VALUE', 
                                   except_cols=[], method=0,
@@ -498,15 +498,14 @@ def sam_load_data(industry=True, trade_value=True):
 
     # Stock Info ...
     stock_info = stock_info_raw.drop('INDUSTRY_ONE_HOT', axis=1)
-    stock_info, _, _ = \
-        cbml.df_scaler(
-            df=stock_info,
-            except_cols=['SYMBOL'],
-            show_progress=False,
-            method=0
-            )      
-    
-    loc_main = loc_main.merge(stock_info, how='left', on=['SYMBOL'])      
+        
+    stock_info, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=stock_info, cols=[], except_cols=id_keys,
+                          method=0, alpha=0.05, export_scaler=False,
+                          show_progress=True)        
+        
+    info_cols = cbyz.df_get_cols_except(df=stock_info, except_cols=id_keys)        
+    loc_main = loc_main.merge(stock_info, how='left', on='SYMBOL')
     
 
     # Industry ......       
@@ -601,8 +600,10 @@ def sam_load_data(industry=True, trade_value=True):
         loc_main = loc_main.dropna(subset=['WORK_DATE'] + time_key, axis=0)
         loc_main = loc_main.drop('WORK_DATE', axis=1)
         
-        cols = cbyz.df_get_cols_except(df=loc_main, 
-                                       except_cols=id_keys + var_y)
+        cols = cbyz.df_get_cols_except(
+                df=loc_main, 
+                except_cols=id_keys + var_y + info_cols
+                )
         
         
         # - df_summary中的groupby會讓var_y消失，所以需要先獨立出來，而且也
@@ -629,28 +630,6 @@ def sam_load_data(industry=True, trade_value=True):
                             add_std=df_summary_std, 
                             add_skew=False, add_count=False, quantile=[])
 
-        # MA
-        # - 20220504 add
-        cols = \
-            cbyz.df_get_cols_except(
-                df=loc_main, 
-                except_cols=['SYMBOL', 'WORK_DATE', 'YEAR_WEEK_ISO'] + var_y
-                )
-            
-        loc_main, ma_cols_done = \
-            cbyz.df_add_ma(df=loc_main, cols=cols,
-                           group_by=['SYMBOL'], 
-                           date_col=time_key,
-                           values=ma_values,
-                           wma=wma, 
-                           show_progress=False
-                           )
-        loc_main = loc_main.drop(cols, axis=1)
-        
-            
-        loc_main = loc_main.merge(y_data, how='left', on=id_keys)
-        del y_data
-        gc.collect()
         
     elif time_unit == 'd':
         
@@ -660,8 +639,34 @@ def sam_load_data(industry=True, trade_value=True):
             .merge(loc_main, how='outer', on=['SYMBOL', 'WORK_DATE'])        
 
 
-    # backup2 = loc_main.copy()
-    # loc_main = backup2.copy()
+
+
+    # MA
+    # - 20220504 add
+    cols = \
+        cbyz.df_get_cols_except(
+            df=loc_main, 
+            except_cols=['SYMBOL', 'WORK_DATE', 'YEAR_WEEK_ISO'] \
+                + var_y + info_cols
+            )
+        
+    loc_main, ma_cols_done = \
+        cbyz.df_add_ma(df=loc_main, cols=cols,
+                       group_by=['SYMBOL'], 
+                       date_col=time_key,
+                       values=ma_values,
+                       wma=wma, 
+                       show_progress=False
+                       )
+    loc_main = loc_main.drop(cols, axis=1)
+    
+        
+    loc_main = loc_main.merge(y_data, how='left', on=id_keys)
+    del y_data
+    gc.collect()
+
+
+
 
     # Shift Y ......
     # 1. 因為X與y之間需要做shift，原始的版本都是移動X，但是X的欄位很多，因此改成
@@ -676,11 +681,15 @@ def sam_load_data(industry=True, trade_value=True):
             suffix='', 
             remove_na=False
             )
-        
-    # 因為One Hot Encoding後的Industry欄位不用df_summary，也不用shift，所以最後
-    # 再merge即可
-    if industry:
-        loc_main = loc_main.merge(stock_info_dummy, how='left', on='SYMBOL')
+    
+    
+    # Industry Dummy Variables
+    # - 因為One Hot Encoding後的Industry欄位不用df_summary，也不用shift，所以最後
+    #   再merge即可
+    # - 20220506, industry的dummary variable可能不重要，因為趨勢會變，重要的只是
+    # cash flow and volume of each industry
+    # if industry:
+    #     loc_main = loc_main.merge(stock_info_dummy, how='left', on='SYMBOL')
 
 
     # 檢查shift完後YEAR和WEEK_NUM_ISO的NA
@@ -717,6 +726,10 @@ def sam_load_data(industry=True, trade_value=True):
     na_cols = cbyz.df_chk_col_na(df=loc_main, except_cols=var_y)
     # na_cols = cbyz.df_chk_col_na(df=loc_main)
     
+
+    # Drop Highly Correlated Features
+    loc_main = cbml.df_drop_high_corr_var(df=loc_main, threshold=corr_threshold, 
+                                          except_cols=id_keys + var_y)
     
     
     # df_summary可能造成每一欄的NA數不一樣，所以先排除time_unit = 'w'
@@ -743,7 +756,6 @@ def sam_load_data(industry=True, trade_value=True):
     # assert len(chk_min_max) == 0, 'chk_min_max failed'
     
     return loc_main, scale_orig
-
 
 
 # .............
@@ -909,30 +921,14 @@ def sam_buffett_indicator():
     global id_keys, time_key
     global calendar_full_key, main_data_frame_calendar
     global ma_values, wma, corr_threshold
+    global scale_log
     
     result = stk.cal_buffett_indicator(
             end_date=predict_date.loc[len(predict_date) - 1, 'WORK_DATE']
             )
     
-    cols = cbyz.df_get_cols_except(df=result,
-                                   except_cols='WORK_DATE')
-    
-    # backup = buffett_indicator.copy()
-    # buffett_indicator = backup.copy()
+    cols = cbyz.df_get_cols_except(df=result, except_cols='WORK_DATE')
 
-    # Scale Data
-    result, _, _ = \
-        cbml.df_scaler(df=result, cols=cols, method=0)
-        
-    # MA
-    result, ma_cols = \
-        cbyz.df_add_ma(df=result, cols=cols,
-                       group_by=[], date_col='WORK_DATE',
-                       values=ma_values, wma=wma, 
-                       show_progress=False
-                       )   
-        
-    result = result.drop(cols, axis=1)
 
     if time_unit == 'w':
 
@@ -940,13 +936,33 @@ def sam_buffett_indicator():
             .merge(result, how='left', on='WORK_DATE') \
             .drop(['WORK_DATE'], axis=1)
 
-        result, ma_cols = \
+        result, cols = \
             cbyz.df_summary(
-                df=result, cols=ma_cols, group_by=time_key, 
-                add_mean=True, add_min=True, 
-                add_max=True, add_median=True, add_std=True, 
+                df=result, cols=cols, group_by=time_key, 
+                add_mean=True, add_min=False, 
+                add_max=False, add_median=False, add_std=True, 
                 add_skew=False, add_count=False, quantile=[]
                 )    
+            
+            
+    # Scale Data
+    result, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=result, cols=cols, except_cols=[],
+                          method=0, alpha=0.05, export_scaler=False,
+                          show_progress=True)
+    
+    scale_log = scale_log.append(new_scale_log)
+    
+        
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=[], date_col=time_key,
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)            
             
 
     # Drop Highly Correlated Features
@@ -957,8 +973,7 @@ def sam_buffett_indicator():
     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
 
     # Merge ......
-    result = main_data_frame_calendar \
-                .merge(result, how='left', on=time_key)    
+    result = main_data_frame_calendar.merge(result, how='left', on=time_key)    
 
     return result, ma_cols
 
@@ -973,6 +988,8 @@ def sam_covid_19_tw():
     global ma_values, wma, corr_threshold
     global df_summary_mean, df_summary_min, df_summary_max
     global df_summary_median, df_summary_std    
+    global scale_log
+                
     
     result, _ = cbyz.get_covid19_data(backup=True, path=path_temp)
     
@@ -1009,86 +1026,30 @@ def sam_covid_19_tw():
         
     result = result.drop(cols, axis=1)
 
+
     # Scale Data
-    result, scaler_log, _ = cbml.df_scaler_v2(df=result, cols=cols, method=0)
+    result, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=result, cols=ma_cols, except_cols=[],
+                          method=0, alpha=0.05, export_scaler=False,
+                          show_progress=True)
+        
+    scale_log = scale_log.append(new_scale_log)        
+        
         
     
     # Drop Highly Correlated Features
     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
-                                     except_cols=id_keys)
+                                        except_cols=id_keys)
         
     # Filter existing columns
     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
     
     
     # Merge ......
-    result = main_data_frame_calendar \
-                .merge(result, how='left', on=time_key)    
+    result = main_data_frame_calendar.merge(result, how='left', on=time_key)    
+    gc.collect()
 
     return result, ma_cols
-
-
-
-
-# def sam_covid_19_tw_20220428():
-    
-#     global id_keys, time_key
-#     global calendar_full_key, main_data_frame_calendar
-#     global ma_values, wma, corr_threshold
-#     global df_summary_mean, df_summary_min, df_summary_max
-#     global df_summary_median, df_summary_std    
-    
-#     result, _ = cbyz.get_covid19_data(backup=True, path=path_temp)
-    
-#     cols = cbyz.df_get_cols_except(
-#         df=result,
-#         except_cols=['WORK_DATE', 'YEAR_ISO', 'WEEK_NUM_ISO']
-#         )
-    
-#     # Scale Data
-#     result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
-    
-#     # MA
-#     result, ma_cols = \
-#         cbyz.df_add_ma(df=result, cols=cols,
-#                        group_by=[], date_col='WORK_DATE',
-#                        values=ma_values, wma=wma, 
-#                        show_progress=False
-#                        )   
-        
-#     result = result.drop(cols, axis=1)
-    
-    
-#     if time_unit == 'w':
-#         result = result \
-#             .merge(calendar_full_key, how='left', on='WORK_DATE')
-            
-#         result = cbyz.df_conv_na(df=result, cols=ma_cols)  
-        
-#         result, ma_cols = \
-#             cbyz.df_summary(
-#                 df=result, cols=ma_cols, group_by=time_key, 
-#                 add_mean=df_summary_mean, 
-#                 add_min=df_summary_min, 
-#                 add_max=df_summary_max, 
-#                 add_median=df_summary_median,
-#                 add_std=df_summary_std, 
-#                 add_skew=False, add_count=False, quantile=[]
-#                 )
-
-#     # Drop Highly Correlated Features
-#     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
-#                                      except_cols=id_keys)
-        
-#     # Filter existing columns
-#     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)
-    
-    
-#     # Merge ......
-#     result = main_data_frame_calendar \
-#                 .merge(result, how='left', on=time_key)    
-
-#     return result, ma_cols
 
 
 # .................
@@ -1248,48 +1209,59 @@ def sam_od_tw_get_fx_rate():
     global id_keys, time_key
     global calendar_full_key, main_data_frame_calendar
     global ma_values, wma, corr_threshold
+    global scaler_log
     
     result = stk.od_tw_get_fx_rate()
     cols = cbyz.df_get_cols_except(df=result, except_cols=['WORK_DATE'])
-    result = pd.melt(result, id_vars=['WORK_DATE'], value_vars=cols)
+    result = pd.melt(result, id_vars=['WORK_DATE'], value_vars=cols,
+                     var_name='CURRENCY', value_name='FX_RATE')
+
     
-    # Scale
-    result, _, _ = \
-        cbml.df_scaler(df=result, cols='value', show_progress=False, method=1)
+    if time_unit == 'w':
         
+        result = result \
+            .merge(calendar_full_key, how='left', on='WORK_DATE')
+            
+        result = result.dropna(subset=time_key, axis=0)            
+            
+        result = cbyz.df_fillna_chain(df=result, cols='FX_RATE',
+                                      sort_keys='WORK_DATE', 
+                                      method=['ffill', 'bfill'], 
+                                      group_by=[])
+        
+        result, cols = cbyz.df_summary(
+            df=result, cols='FX_RATE', group_by=time_key + ['CURRENCY'], 
+            add_mean=True, add_min=False, 
+            add_max=False, add_median=False, add_std=True, 
+            add_skew=False, add_count=False, quantile=[]
+            )
+
+
+    # Pivot
     result = result \
-            .pivot_table(index=['WORK_DATE'], columns='variable',
-                         values='value') \
+            .pivot_table(index=time_key, columns='CURRENCY',
+                         values=cols) \
             .reset_index()
 
-    result = result.reset_index(drop=True)
-    
+    result = cbyz.df_flatten_columns(df=result)
+    cols = cbyz.df_get_cols_except(df=result, except_cols=id_keys)
+
     
     # MA
     result, ma_cols = \
         cbyz.df_add_ma(df=result, cols=cols,
-                       group_by=[], date_col='WORK_DATE',
+                       group_by=[], date_col=time_key,
                        values=ma_values, wma=wma, 
                        show_progress=False
                        )   
     result = result.drop(cols, axis=1)
     
     
-    if time_unit == 'w':
-        result = result \
-            .merge(calendar_full_key, how='left', on='WORK_DATE')
-            
-        result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
-                                      sort_keys='WORK_DATE', 
-                                      method=['ffill', 'bfill'], 
-                                      group_by=[])
-        
-        result, ma_cols = cbyz.df_summary(
-            df=result, cols=ma_cols, group_by=time_key, 
-            add_mean=True, add_min=True, 
-            add_max=True, add_median=True, add_std=True, 
-            add_skew=False, add_count=False, quantile=[]
-            )
+    # Scale
+    result, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=result, cols=ma_cols, except_cols=[], method=0,
+                          alpha=0.05, export_scaler=False, 
+                          show_progress=True)
         
     # Drop Highly Correlated Features
     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
@@ -1309,6 +1281,7 @@ def sam_od_tw_get_index(begin_date, end_date):
     global ma_values, predict_period, corr_threshold
     global id_keys, time_unit, time_key
     global calendar, main_data_frame_calendar
+    global scale_log
     
     # main_data_frame_calendar
     # calendar_full_key
@@ -1319,19 +1292,7 @@ def sam_od_tw_get_index(begin_date, end_date):
     # 如果有NA的話，可能要先做fillna
     cbyz.df_chk_col_na(df=result, mode='stop')
     
-    # Scale Data
-    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
-    
-    # MA
-    result, ma_cols = \
-        cbyz.df_add_ma(df=result, cols=cols,
-                       group_by=[], date_col='WORK_DATE',
-                       values=ma_values, wma=wma, 
-                       show_progress=False
-                       )   
-        
-    result = result.drop(cols, axis=1)
-    
+
     
     if time_unit == 'w':
         
@@ -1339,14 +1300,32 @@ def sam_od_tw_get_index(begin_date, end_date):
             .merge(calendar_full_key, how='left', on='WORK_DATE') \
             .drop(['WORK_DATE'], axis=1)
             
-        result, ma_cols = cbyz.df_summary(
-            df=result, cols=ma_cols, group_by=time_key, 
-            add_mean=True, add_min=True, 
-            add_max=True, add_median=True, add_std=True, 
-            add_skew=False, add_count=False, quantile=[]
+        result, cols = cbyz.df_summary(
+                df=result, cols=cols, group_by=time_key, 
+                add_mean=True, add_min=False, 
+                add_max=False, add_median=False, add_std=True, 
+                add_skew=False, add_count=False, quantile=[]
             )
+
+
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=[], date_col=time_key,
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+
+    # Scale Data
+    result, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=result, cols=ma_cols, except_cols=[], method=0,
+                          alpha=0.05, export_scaler=False, show_progress=True)
     
+    scale_log = scale_log.append(new_scale_log)
     
+
     # Drop Highly Correlated Features
     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
                                         except_cols=id_keys)    
@@ -1370,6 +1349,8 @@ def sam_od_us_get_dji():
     global id_keys, corr_threshold
     global ma_values, predict_period, predict_date
     global calendar, main_data_frame_calendar
+    global sam_od_us_get_dji
+    global scale_log
     
     loc_df = stk.od_us_get_dji(daily_backup=True, path=path_temp)
     cols = cbyz.df_get_cols_except(df=loc_df, except_cols=['WORK_DATE'])
@@ -1398,40 +1379,46 @@ def sam_od_us_get_dji():
     # loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
     #                         group_by=[], method='ffill')
 
-    # Scale
-    loc_df, _, _ = cbml.df_scaler(df=loc_df, cols=cols, method=0)
-    
-    # MA
-    loc_df, ma_cols = \
-        cbyz.df_add_ma(df=loc_df, cols=cols,
-                       group_by=[], date_col='WORK_DATE',
-                       values=ma_values, wma=wma, 
-                       show_progress=False
-                       )   
-    loc_df = loc_df.drop(cols, axis=1)
-    
-    
+
     # Agg for Weekly Prediction
     if time_unit == 'w':
         loc_df = loc_df \
             .merge(calendar_full_key, how='left', on='WORK_DATE')
         
         loc_df, cols = cbyz.df_summary(
-            df=loc_df, cols=ma_cols, group_by=time_key, 
-            add_mean=True, add_min=True, 
-            add_max=True, add_median=True, add_std=True, 
+            df=loc_df, cols=cols, group_by=time_key, 
+            add_mean=True, add_min=False, 
+            add_max=False, add_median=False, add_std=True, 
             add_skew=False, add_count=False, quantile=[]
             )    
     
+    # MA
+    loc_df, ma_cols = \
+        cbyz.df_add_ma(df=loc_df, cols=cols,
+                       group_by=[], date_col=time_key,
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+    loc_df = loc_df.drop(cols, axis=1)
+    
+    
+    # Scale
+    loc_df, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=loc_df, cols=ma_cols, except_cols=[],
+                          method=0, alpha=0.05, 
+                          export_scaler=False, show_progress=True)
+        
+    scale_log = scale_log.append(new_scale_log)        
+
 
     # Drop Highly Correlated Features
     loc_df = cbml.df_drop_high_corr_var(df=loc_df, threshold=corr_threshold, 
                                         except_cols=id_keys) 
 
     # Filter existing columns
-    cols = cbyz.df_filter_exist_cols(df=loc_df, cols=cols)    
+    ma_cols = cbyz.df_filter_exist_cols(df=loc_df, cols=ma_cols)    
         
-    return loc_df, cols    
+    return loc_df, ma_cols    
 
 
 # .................
@@ -1442,6 +1429,7 @@ def sam_od_us_get_snp(begin_date):
     global id_keys, corr_threshold
     global ma_values, predict_period, predict_date
     global calendar, main_data_frame_calendar
+    global scale_log
     
     loc_df = stk.od_us_get_snp(daily_backup=True, path=path_temp)
     cols = cbyz.df_get_cols_except(df=loc_df, except_cols=['WORK_DATE'])
@@ -1457,8 +1445,8 @@ def sam_od_us_get_snp(begin_date):
 
 
     # Fillna .......
-    # 1. 因為美股的交易時間可能和台灣不一樣，包含特殊節日等，為了避免日期無法對應，用fillna
-    #    補上完整的日期
+    # - 因為美股的交易時間可能和台灣不一樣，包含特殊節日等，為了避免日期無法
+    #   對應，用fillna補上完整的日期
     # - 20220317 - 移至stk，待確認是否會出錯，沒問題的話這一段就刪除
     
     # loc_calendar = cbyz.date_get_calendar(begin_date=begin_date, 
@@ -1470,30 +1458,36 @@ def sam_od_us_get_snp(begin_date):
     # loc_df = cbyz.df_fillna(df=loc_df, cols=cols, sort_keys='WORK_DATE', 
     #                         group_by=[], method='ffill')
 
+    
+    # Agg for Weekly Prediction
+    if time_unit == 'w':
+        loc_df = loc_df.merge(calendar_full_key, how='left', on='WORK_DATE')
+        
+        loc_df, cols = cbyz.df_summary(
+                df=loc_df, cols=cols, group_by=time_key, 
+                add_mean=True, add_min=False, 
+                add_max=False, add_median=True, add_std=True, 
+                add_skew=False, add_count=False, quantile=[]
+            )    
+
+
     # Scale
-    loc_df, _, _ = cbml.df_scaler(df=loc_df, cols=cols, method=0)
+    loc_df, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=loc_df, cols=cols, except_cols=[], method=0,
+                          alpha=0.05, export_scaler=False, show_progress=True) 
+        
+    scale_log = scale_log.append(new_scale_log)        
+        
     
     # MA
     loc_df, ma_cols = \
         cbyz.df_add_ma(df=loc_df, cols=cols,
-                       group_by=[], date_col='WORK_DATE',
+                       group_by=[], date_col=time_key,
                        values=ma_values, wma=wma, 
                        show_progress=False
                        )   
     loc_df = loc_df.drop(cols, axis=1)
-    
-    
-    # Agg for Weekly Prediction
-    if time_unit == 'w':
-        loc_df = loc_df \
-            .merge(calendar_full_key, how='left', on='WORK_DATE')
-        
-        loc_df, cols = cbyz.df_summary(
-            df=loc_df, cols=ma_cols, group_by=time_key, 
-            add_mean=True, add_min=True, 
-            add_max=True, add_median=True, add_std=True, 
-            add_skew=False, add_count=False, quantile=[]
-            )    
+
     
 
     # Drop Highly Correlated Features
@@ -1501,9 +1495,9 @@ def sam_od_us_get_snp(begin_date):
                                         except_cols=id_keys) 
 
     # Filter existing columns
-    cols = cbyz.df_filter_exist_cols(df=loc_df, cols=cols)    
+    ma_cols = cbyz.df_filter_exist_cols(df=loc_df, cols=ma_cols)    
         
-    return loc_df, cols
+    return loc_df, ma_cols
 
 
 # ...............
@@ -1596,6 +1590,7 @@ def sam_tej_ewgin():
     global id_keys, corr_threshold
     global symbol
     global shift_begin
+    global scale_log
     
     result = stk.tej_ewgin(begin_date=shift_begin, end_date=None, 
                            symbol=symbol)
@@ -1605,33 +1600,42 @@ def sam_tej_ewgin():
         except_cols=['SYMBOL', 'WORK_DATE']
         )
     
-    # Scale Data
-    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
-    
-    # MA
-    result, ma_cols = \
-        cbyz.df_add_ma(df=result, cols=cols,
-                       group_by=['SYMBOL'], date_col='WORK_DATE',
-                       values=ma_values, wma=wma, 
-                       show_progress=False
-                       )   
-        
-    result = result.drop(cols, axis=1)
-    
     
     if time_unit == 'w':
         result = result \
             .merge(calendar_full_key, how='left', on='WORK_DATE')
             
-        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        result = cbyz.df_conv_na(df=result, cols=cols)  
         
-        result, ma_cols = cbyz.df_summary(
-            df=result, cols=ma_cols, group_by=id_keys, 
-            add_mean=True, add_min=True, 
-            add_max=True, add_median=True, add_std=True, 
+        result, cols = cbyz.df_summary(
+            df=result, cols=cols, group_by=id_keys, 
+            add_mean=True, add_min=False, 
+            add_max=False, add_median=False, add_std=True, 
             add_skew=False, add_count=False, quantile=[]
             )    
+
+
+    # MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                       group_by=['SYMBOL'], date_col=time_key,
+                       values=ma_values, wma=wma, 
+                       show_progress=False
+                       )   
+        
+    result = result.drop(cols, axis=1)
+
+
+    # Scale Data
+    result, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=result, cols=ma_cols, except_cols=[],
+                          method=0, alpha=0.05, export_scaler=False,
+                          show_progress=True)
     
+    scale_log = scale_log.append(new_scale_log)
+
+
+    # Merge And Fill NA
     result = main_data_frame.merge(result, how='left', on=id_keys)
     result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
                                   sort_keys=time_key,
@@ -1687,6 +1691,7 @@ def sam_tej_ewtinst1():
     global id_keys, corr_threshold
     global symbol
     global shift_begin
+    global scale_log
     
     result = stk.tej_ewtinst1(begin_date=shift_begin, end_date=None, 
                               symbol=symbol)
@@ -1696,46 +1701,53 @@ def sam_tej_ewtinst1():
         except_cols=['SYMBOL', 'WORK_DATE']
         )
     
-    # Scale Data
-    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
-    
-    # MA
-    result, ma_cols = \
-        cbyz.df_add_ma(df=result, cols=cols,
-                       group_by=['SYMBOL'], date_col='WORK_DATE',
-                       values=ma_values, wma=wma, 
-                       show_progress=False
-                       )   
-        
-    result = result.drop(cols, axis=1)
-    
     
     if time_unit == 'w':
-        result = result \
-            .merge(calendar_full_key, how='left', on='WORK_DATE')
-            
-        result = cbyz.df_conv_na(df=result, cols=ma_cols)  
+        result = result.merge(calendar_full_key, how='left', on='WORK_DATE')
+        result = cbyz.df_conv_na(df=result, cols=cols)  
         
-        result, ma_cols = cbyz.df_summary(
-            df=result, cols=ma_cols, group_by=id_keys, 
-            add_mean=True, add_min=True, 
-            add_max=True, add_median=True, add_std=True, 
+        result, cols = cbyz.df_summary(
+            df=result, cols=cols, group_by=id_keys, 
+            add_mean=True, add_min=False, 
+            add_max=False, add_median=False, add_std=True, 
             add_skew=False, add_count=False, quantile=[]
             )    
+    
+    
+    # Calculate MA
+    result, ma_cols = \
+        cbyz.df_add_ma(df=result, cols=cols,
+                        group_by=['SYMBOL'], date_col=time_key,
+                        values=ma_values, wma=wma, 
+                        show_progress=False
+                        )       
+    
+    result = result.drop(cols, axis=1)    
+
+
+    # Scale Data
+    result, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=result, cols=ma_cols, except_cols=[],
+                          method=0, alpha=0.05, export_scaler=False,
+                          show_progress=True)
+    
+    scale_log = scale_log.append(new_scale_log)
+    
     
     result = main_data_frame.merge(result, how='left', on=id_keys)
     result = cbyz.df_fillna_chain(df=result, cols=ma_cols,
                                   sort_keys=time_key,
                                   method=['ffill', 'bfill'], 
                                   group_by='SYMBOL')
-
-
+    
+        
     # Drop Highly Correlated Features
     result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
                                         except_cols=id_keys) 
 
     # Filter existing columns
     ma_cols = cbyz.df_filter_exist_cols(df=result, cols=ma_cols)    
+    gc.collect()
 
     return result, ma_cols   
 
@@ -2147,28 +2159,28 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
 
 
 
-    # # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
-    # if market == 'tw':
-    #     ewtinst1, cols = sam_tej_ewtinst1()
-    #     main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
-    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                      sort_keys=time_key, 
-    #                                      method=['ffill', 'bfill'], 
-    #                                      group_by=['SYMBOL'])   
-    #     del ewtinst1
-    #     gc.collect()
+    # TEJ EWTINST1 - Transaction Details of Juridical Persons ......
+    if market == 'tw':
+        ewtinst1, cols = sam_tej_ewtinst1()
+        main_data = main_data.merge(ewtinst1, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=['SYMBOL'])   
+        del ewtinst1
+        gc.collect()
 
 
-    # # TEJ EWGIN ......
-    # if market == 'tw':
-    #     ewgin, cols = sam_tej_ewgin()
-    #     main_data = main_data.merge(ewgin, how='left', on=id_keys)
-    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                      sort_keys=time_key, 
-    #                                      method=['ffill', 'bfill'], 
-    #                                      group_by=['SYMBOL'])          
-    #     del ewgin
-    #     gc.collect()
+    # TEJ EWGIN ......
+    if market == 'tw':
+        ewgin, cols = sam_tej_ewgin()
+        main_data = main_data.merge(ewgin, how='left', on=id_keys)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=['SYMBOL'])          
+        del ewgin
+        gc.collect()
 
 
     # # Ex-Dividend And Ex-Right ...
@@ -2178,128 +2190,128 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     #     main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)
 
 
-    # # Buffett Indicator ......
-    # if market == 'tw':
+    # Buffett Indicator ......
+    if market == 'tw':
         
-    #     buffett_indicator, cols = sam_buffett_indicator()
+        buffett_indicator, cols = sam_buffett_indicator()
         
-    #     # 因為部份欄位和下面的tw_index重複，所以刪除
-    #     drop_cols = cbyz.df_get_cols_contains(df=buffett_indicator, 
-    #                                           string=['TW_INDEX'])
+        # 因為部份欄位和下面的tw_index重複，所以刪除
+        drop_cols = cbyz.df_get_cols_contains(df=buffett_indicator, 
+                                              string=['TW_INDEX'])
         
-    #     buffett_indicator = buffett_indicator.drop(drop_cols, axis=1)
-    #     cols = cbyz.li_remove_items(cols, drop_cols)
+        buffett_indicator = buffett_indicator.drop(drop_cols, axis=1)
+        cols = cbyz.li_remove_items(cols, drop_cols)
         
-    #     # Merge
-    #     main_data = main_data \
-    #                 .merge(buffett_indicator, how='left', on=time_key)
+        # Merge
+        main_data = main_data \
+                    .merge(buffett_indicator, how='left', on=time_key)
 
-    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                       sort_keys=time_key, 
-    #                                       method=['ffill', 'bfill'], 
-    #                                       group_by=[])
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=[])
 
 
-    # # Government Invest ......
-    # if market == 'tw':
-    #     # gov_invest = sam_tw_gov_invest(dev=True)
-    #     gov_invest = sam_tw_gov_invest(dev=False)
-    #     cols = cbyz.df_get_cols_except(df=gov_invest, except_cols=id_keys)
+    # Government Invest ......
+    if market == 'tw':
+        # gov_invest = sam_tw_gov_invest(dev=True)
+        gov_invest = sam_tw_gov_invest(dev=False)
+        cols = cbyz.df_get_cols_except(df=gov_invest, except_cols=id_keys)
         
-    #     # 沒有交集時就不merge，避免一整欄都是NA
-    #     if len(gov_invest) > 0:
-    #         main_data = main_data.merge(gov_invest, how='left', on=id_keys)
-    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
-    #                                     method='ffill')
+        # 沒有交集時就不merge，避免一整欄都是NA
+        if len(gov_invest) > 0:
+            main_data = main_data.merge(gov_invest, how='left', on=id_keys)
+            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                        sort_keys=id_keys, group_by=['SYMBOL'], 
+                                        method='ffill')
             
-    #         # 避免開頭的資料是NA，所以再用一次bfill
-    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
-    #                                     method='bfill')                        
+            # 避免開頭的資料是NA，所以再用一次bfill
+            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                        sort_keys=id_keys, group_by=['SYMBOL'], 
+                                        method='bfill')                        
     
-    #         main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)
+            main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)
     
     
-    # # Government Own ......
-    # if market == 'tw':
-    #     # gov_own = sam_tw_gov_own(dev=True)
-    #     gov_own = sam_tw_gov_own(dev=False)
-    #     cols = cbyz.df_get_cols_except(df=gov_own, except_cols=id_keys)
+    # Government Own ......
+    if market == 'tw':
+        # gov_own = sam_tw_gov_own(dev=True)
+        gov_own = sam_tw_gov_own(dev=False)
+        cols = cbyz.df_get_cols_except(df=gov_own, except_cols=id_keys)
         
-    #     # 沒有交集時就不merge，避免一整欄都是NA
-    #     if len(gov_own) > 0:
-    #         main_data = main_data.merge(gov_own, how='left', on=id_keys)
-    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
-    #                                     method='ffill')
+        # 沒有交集時就不merge，避免一整欄都是NA
+        if len(gov_own) > 0:
+            main_data = main_data.merge(gov_own, how='left', on=id_keys)
+            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                        sort_keys=id_keys, group_by=['SYMBOL'], 
+                                        method='ffill')
             
-    #         # 避免開頭的資料是NA，所以再用一次bfill
-    #         main_data = cbyz.df_fillna(df=main_data, cols=cols, 
-    #                                     sort_keys=id_keys, group_by=['SYMBOL'], 
-    #                                     method='bfill')    
+            # 避免開頭的資料是NA，所以再用一次bfill
+            main_data = cbyz.df_fillna(df=main_data, cols=cols, 
+                                        sort_keys=id_keys, group_by=['SYMBOL'], 
+                                        method='bfill')    
 
-    #         main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)                   
+            main_data = cbyz.df_conv_na(df=main_data, cols=cols, value=0)                   
 
 
-    # # ^TWII .......
-    # if market == 'tw':
+    # ^TWII .......
+    if market == 'tw':
          
-    #     tw_index, cols = \
-    #         sam_od_tw_get_index(
-    #             begin_date=shift_begin,
-    #             end_date=predict_date.loc[len(predict_date)-1, 'WORK_DATE']
-    #             )
+        tw_index, cols = \
+            sam_od_tw_get_index(
+                begin_date=shift_begin,
+                end_date=predict_date.loc[len(predict_date)-1, 'WORK_DATE']
+                )
         
-    #     main_data = main_data.merge(tw_index, how='left', on=time_key)
-    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                       sort_keys=time_key, 
-    #                                       method=['ffill', 'bfill'], 
-    #                                       group_by=[])    
+        main_data = main_data.merge(tw_index, how='left', on=time_key)
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=[])    
 
     
-    # # Fiat Currency Exchange ......
-    # fx_rate, cols = sam_od_tw_get_fx_rate()
-    # main_data = main_data.merge(fx_rate, how='left', on=time_key)
+    # Fiat Currency Exchange ......
+    fx_rate, cols = sam_od_tw_get_fx_rate()
+    main_data = main_data.merge(fx_rate, how='left', on=time_key)
 
-    # main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                   sort_keys=time_key, 
-    #                                   method=['ffill', 'bfill'], 
-    #                                   group_by=[])
-
-
-    # # Get Dow Jones Industrial Average (^DJI) ......
-    # dji, cols = sam_od_us_get_dji()
-    # main_data = main_data.merge(dji, how='left', on=time_key)
-    # del dji
-    # gc.collect()   
+    main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                      sort_keys=time_key, 
+                                      method=['ffill', 'bfill'], 
+                                      group_by=[])
 
 
-    # # S&P 500 ......
-    # snp, cols = sam_od_us_get_snp(begin_date=shift_begin)
-    # main_data = main_data.merge(snp, how='left', on=time_key)
-    # del snp
-    # gc.collect()
+    # Get Dow Jones Industrial Average (^DJI) ......
+    dji, cols = sam_od_us_get_dji()
+    main_data = main_data.merge(dji, how='left', on=time_key)
+    del dji
+    gc.collect()   
+
+
+    # S&P 500 ......
+    snp, cols = sam_od_us_get_snp(begin_date=shift_begin)
+    main_data = main_data.merge(snp, how='left', on=time_key)
+    del snp
+    gc.collect()
     
     
-    # # COVID-19 ......
-    # if market == 'tw':
-    #     covid_tw, cols = sam_covid_19_tw()
+    # COVID-19 ......
+    if market == 'tw':
+        covid_tw, cols = sam_covid_19_tw()
         
-    #     # Future Plan
-    #     # sam_covid_19_global()
+        # Future Plan
+        # sam_covid_19_global()
         
-    #     main_data = main_data.merge(covid_tw, how='left', on=time_key)
-    #     main_data = cbyz.df_conv_na(df=main_data, cols=cols)
+        main_data = main_data.merge(covid_tw, how='left', on=time_key)
+        main_data = cbyz.df_conv_na(df=main_data, cols=cols)
         
-    #     main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-    #                                       sort_keys=time_key, 
-    #                                       method=['ffill', 'bfill'], 
-    #                                       group_by=[])
-    # elif market == 'en':
-    #     # Future Plan
-    #     # covid_en = sam_covid_19_global()        
-    #     pass
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=[])
+    elif market == 'en':
+        # Future Plan
+        # covid_en = sam_covid_19_global()        
+        pass
 
 
     
@@ -2502,7 +2514,6 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0700 - 20220418
     # - Remove tej_ewtinst1_hold - Done
     # - Add pe_ratio from ewprcd - Done
-
     # v3.0701 - 20220422
     # - Update cbml and test wma
     
@@ -2510,8 +2521,8 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0800 - 20220422
     # - Replace time_key from ['YEAR_ISO', 'WEEK_NUM_ISO'] to ['YEAR_WEEK_ISO'],
     #   then can be apply df_add_ma    
-    # Time unit是week時，應該先ma再summary，或是先summary再ma？
-    # Fix bug - 目前MA時的單位是d，parameter is week，但兩者共用相同的ma_values
+    # - Time unit是week時，原本是先ma再summary，改成先summary再ma
+    # - Fix bug - 目前MA時的單位是d，parameter is week，但兩者共用相同的ma_values
 
 
     # v3.0801 - 202205
@@ -2685,9 +2696,10 @@ def master(param_holder, predict_begin, export_model=True,
     global exe_serial
     exe_serial = cbyz.get_time_serial(with_time=True, remove_year_head=True)
 
-    global log, error_msg
+    global log, scale_log, error_msg
     global ohlc, ohlc_ratio, ohlc_change
     log = []
+    scale_log = pd.DataFrame()
     error_msg = []    
     ohlc = stk.get_ohlc()
     ohlc_ratio = stk.get_ohlc(orig=False, ratio=True, change=False)
@@ -2726,11 +2738,11 @@ def master(param_holder, predict_begin, export_model=True,
     global df_summary_median, df_summary_std
     
     
-    print('有些dataset需要sum，如交易量')
+    print('Some columns should be aggregated by sum, like volume')
     df_summary_mean = True
-    df_summary_min = True
-    df_summary_max = True
-    df_summary_median = True
+    df_summary_min = False
+    df_summary_max = False
+    df_summary_median = False
     df_summary_std = True
     
     
@@ -3706,11 +3718,6 @@ def test_support_resistance():
                            days=True, threshold=0.9, plot_data=False)    
 
 
-def dev():
-    
-    pass
-
-
 
 def check_ewtinst1():
     
@@ -3763,6 +3770,29 @@ def check_ewtinst1():
     chk = result[result['SYMBOL']=='2603']
     chk['QFII_EX1_HOLD_RATIO'].max()
     
+    
+def dev():
+    
+    data = stk.get_data(data_begin=20210101,
+                    data_end=20220331, 
+                    market=market, 
+                    symbol=symbol,
+                    ratio_limit=True,
+                    price_change=True, 
+                    price_limit=True,
+                    trade_value=True,
+                    adj=True               
+                    )
+    
+    data.loc[0:1000, 'TEST'] = True
+    data = cbyz.df_conv_na(df=data, cols='TEST', value=False)
+    
+    data = cbml.df_vif(df=data, y=['CLOSE', 'HIGH'],
+                       # except_cols=['SYMBOL', 'YEAR_WEEK_ISO', 'WORK_DATE'],
+                       except_cols=[],
+                       limit=5, method='max')
+    
+    pass    
     
 
 
