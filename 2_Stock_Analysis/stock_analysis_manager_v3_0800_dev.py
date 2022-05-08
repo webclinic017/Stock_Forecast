@@ -22,7 +22,7 @@ import pickle
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 
 
 # Path .....
@@ -52,8 +52,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220422',
-                 r'/home/jupyter/Arsenal/20220422',
+                 r'/home/jupyter/Codebase_YZ/20220506',
+                 r'/home/jupyter/Arsenal/20220506',
                  path + '/Function']
 
 for i in path_codebase:    

@@ -12,7 +12,7 @@ import random
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 market = 'tw'
 
 
@@ -44,8 +44,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220422',
-                 r'/home/jupyter/Arsenal/20220422',
+                 r'/home/jupyter/Codebase_YZ/20220506',
+                 r'/home/jupyter/Arsenal/20220506',
                  path + '/Function',
                  path_sam]
 
@@ -1558,12 +1558,7 @@ def debug():
     pass
 
 
-
-
-# %% Execute ------
-
-if __name__ == '__main__':
-    
+def note():
 
     # SAM Note ------
     # 1. 20220107 v2.06 - 原本在normalize的時候，會group by symbol，讓每一檔都和自己
@@ -1591,10 +1586,16 @@ if __name__ == '__main__':
     #   但兩者MSE差異只在0.01等級
     # 5. time_unit為week，且data_form為1時，兩者都會讓曲線變得更加平滑，因此可能
     #    低估振幅，但強制縮放成-0.1 - 0.1也不妥，如果整體盤勢向下，這個方法會
-    #    高估走勢
+    #    高估走勢    
+    pass    
 
+
+
+# %% Execute ------
+
+if __name__ == '__main__':
     
-    
+
     # Change Ratio By Week
 
     # RandomForest ......
@@ -1646,7 +1647,7 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220427, predict_period=1, 
+        master(bt_last_begin=20220506, predict_period=1, 
             time_unit='w', long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,
