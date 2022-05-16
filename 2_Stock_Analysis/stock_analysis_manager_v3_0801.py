@@ -650,6 +650,10 @@ def sam_load_data(industry=True, trade_value=True):
                 + var_y + info_cols
             )
         
+            
+    global debug_df
+    debug_df = loc_main.copy()
+    
     loc_main, ma_cols_done = \
         cbyz.df_add_ma(df=loc_main, cols=cols,
                        group_by=['SYMBOL'], 
@@ -1660,25 +1664,52 @@ def sam_tej_ewifinq():
     global ma_values, predict_period, predict_date
     global calendar, main_data_frame_calendar
     global symbol
+    global scale_log
+    global corr_threshold
     
-    print('還沒加df_drop_high_corr_var')    
-    result = stk.tej_ewifinq(fill_date=True, target_type='symbol',
+    
+    if time_unit == 'w':
+        result = stk.tej_ewifinq(fill_date=False, target_type='symbol',
                                  target=symbol)
+    elif time_unit == 'd':
+        result = stk.tej_ewifinq(fill_date=True, target_type='symbol',
+                                 target=symbol)        
+
 
     cols = cbyz.df_get_cols_except(
         df=result, 
         except_cols=['SYMBOL', 'WORK_DATE']
         )
     
-    # Scale Data
-    result, _, _ = cbml.df_scaler(df=result, cols=cols, method=0)
-    
     
     if time_unit == 'w':
         result = result.merge(calendar_full_key, on='WORK_DATE')
+        
+        result = cbyz.df_fillna_chain(df=result, cols=cols,
+                                      sort_keys=['SYMBOL', 'WORK_DATE'],
+                                      method=['ffill'], 
+                                      group_by='SYMBOL')        
+        
         cbyz.df_chk_col_na(df=result, mode='stop')
         
+        
+    # Scale Data
+    result, new_scale_log, _ = \
+        cbml.df_scaler_v2(df=result, cols=cols,
+                          except_cols=['SYMBOL', 'WORK_DATE'],
+                          method=0, alpha=0.05, export_scaler=False,
+                          show_progress=True)
+    
+    scale_log = scale_log.append(new_scale_log)            
+        
+        
+    # Drop Highly Correlated Features
+    result = cbml.df_drop_high_corr_var(df=result, threshold=corr_threshold, 
+                                        except_cols=id_keys)         
+        
     result = main_data_frame.merge(result, how='left', on=id_keys)
+    cols = cbyz.df_get_cols_except(df=result, except_cols=id_keys)
+    
     return result, cols
 
 
@@ -2333,18 +2364,18 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     
     # Financial Statement
-    # if market == 'tw':
-        # print('目前只用單季，需確認是否有缺漏')
+    if market == 'tw':
+        print('目前只用單季，需確認是否有缺漏')
         # 20220218 - Dev=True，eta=0.2時，即使只保留一個欄位也會overfitting
-        # financial_statement, cols = sam_tej_ewifinq()
+        financial_statement, cols = sam_tej_ewifinq()
         
-        # main_data = main_data \
-        #         .merge(financial_statement, how='left', on=id_keys)
+        main_data = main_data \
+                .merge(financial_statement, how='left', on=id_keys)
                 
-        # main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
-        #                                   sort_keys=time_key, 
-        #                                   method=['ffill', 'bfill'], 
-        #                                   group_by=[])
+        main_data = cbyz.df_fillna_chain(df=main_data, cols=cols,
+                                          sort_keys=time_key, 
+                                          method=['ffill', 'bfill'], 
+                                          group_by=[])
 
 
     # TEJ ewtinst1c - Average Holding Cost of Juridical Persons ......
@@ -2525,20 +2556,34 @@ def master(param_holder, predict_begin, export_model=True,
     # - Fix bug - 目前MA時的單位是d，parameter is week，但兩者共用相同的ma_values
 
 
-    # v3.0801 - 202205
-    # - Add VIF
+    # v3.0801 - 20220513
+    # - Fix bug for stk.tej_ewtinst1    
+    # - Fix sam_tej_ewifinq
+    
+    
+    # v3.0802 - 20220516
+    # - Fix sam_tej_ewsale  
+    
     
     
     # v3.080X
+    # - Add VIF
     # - Visualize the tej_ewtinst1_hold and stock price
-    # - Bug, ewtinst1; Send mail to TEJ
-    #   > FLD023有大於100
-    #   > T_PCT有小於0
+    # - 把加了financial statement的model data丟到AutoML
+    # - CPI指數
+    
+    
+    # - Add shareholding spread, then train by AutoML to see the importance
+    # - 如果把ewtinst1和amtop1混著用，可能會有一個問題是在外資交易所交易的不一定是真外資
         
     # - Update scale function修改df_scaler的時候，發現確實需要scaled by symbol，	
     #   否則全部資料全部丟進去scaled，normaltest的p value目前是0    	
     # https://machinelearningmastery.com/how-to-transform-data-to-fit-the-normal-distribution/    
 
+
+    # - 景氣對策信號
+    # - 製造業循環
+    #   https://www.macromicro.me/collections/3261/sector-industrial/25709/manufacturing-cycle
     # - 量價分析；volume / mean price
     #   > 量價曲線（Volume Price Trend，VPT）
     #   > https://money.udn.com/money/story/12040/5399621
@@ -2582,7 +2627,7 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     global version
-    version = 3.0800
+    version = 3.0801
     
     
     # Bug

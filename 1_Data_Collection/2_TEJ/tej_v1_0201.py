@@ -528,9 +528,18 @@ def manually_upload():
     chk = chk_date()
     
     # print('ewtinst1 中有na')
-    master(begin=20220421, end=20220426, ewprcd=True, ewtinst1c=False, 
-            ewsale=True, ewifinq=True, ewnprcstd=False, 
-            ewgin=True, ewtinst1=True, delete=False, upload=True, export=True)
+    master(begin=20170101, end=20171231, ewprcd=False, ewtinst1c=False, 
+            ewsale=True, ewifinq=False, ewnprcstd=False, 
+            ewgin=False, ewtinst1=False, 
+            delete=False, upload=True, export=True)
+    
+    
+    # print('ewtinst1 中有na')
+    master(begin=20220101, end=20220520, ewprcd=False, ewtinst1c=False, 
+            ewsale=False, ewifinq=True, ewnprcstd=False, 
+            ewgin=False, ewtinst1=False, 
+            delete=False, upload=True, export=True)
+    
 
     chk2 = chk_date()
 

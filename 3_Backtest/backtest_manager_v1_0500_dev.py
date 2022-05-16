@@ -44,8 +44,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220506',
-                 r'/home/jupyter/Arsenal/20220506',
+                 r'/home/jupyter/Codebase_YZ/20220516',
+                 r'/home/jupyter/Arsenal/20220516',
                  path + '/Function',
                  path_sam]
 
@@ -61,7 +61,7 @@ import arsenal_stock as stk
 # import codebase_ml as cbml
 # import stock_analysis_manager_v3_0601_dev as sam
 # import stock_analysis_manager_v3_0701_dev as sam
-import stock_analysis_manager_v3_0800_dev as sam
+import stock_analysis_manager_v3_0802_dev as sam
 
 
 
@@ -845,6 +845,11 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
     #   then can be apply df_add_ma
 
 
+    msg = ('Test為True的時候，GDP_MEAN_MA_36的unique value太少，會導致df_scaler_v2'
+           '出錯，最後維持原始數值')
+    print(msg)
+
+
     # Bug
     # - The best buying price is prediction - RMSE
     # - Actions會有大量重複，總筆數11465筆，但直接drop_duplicates()，沒設
@@ -1020,10 +1025,20 @@ def master(bt_last_begin, predict_period=14, time_unit='d', long=False,
 
 
     if dev or test:
+        
+        # stock_info = stk.tw_get_stock_info(daily_backup=True, path=path_temp)        
+        
+        #
+        # 2417, 3092, 2014, 3189, 1609, 2884
         symbol = [2520, 2605, 6116, 6191, 3481, 
                    2409, 2520, 2603, 2409, 2603, 
                    2611, 3051, 3562, 2301, 
-                   '2211', '3138', '3530']
+                   '2211', '3138', '3530', 3041, 3596]
+        
+        symbol = [str(s) for s in symbol]
+        symbol = cbyz.li_drop_duplicates(symbol)
+        
+    
     else:
         symbol = []
         
@@ -1284,6 +1299,28 @@ def verify_prediction_results():
     
 
     
+# %% GCP ------
+
+
+def export_gcp_data():
+    
+    # Too few rows: 179. Minimum number is: 1000
+    
+    model_data = sam.model_data.copy()
+    
+    model_data = model_data.dropna(subset=['CLOSE_CHANGE_RATIO'], axis=0)
+    cbyz.df_chk_col_na(df=model_data)
+    
+    model_data = model_data.drop(['HIGH_CHANGE_RATIO', 'LOW_CHANGE_RATIO'],
+                                 axis=1)
+    
+    model_data = model_data.drop(id_keys, axis=0)
+    
+    
+    model_data.to_csv(path_export + '/model_data_20220511.csv',
+                      index=False)    
+
+
 
 # %% Dev -----
 
@@ -1640,14 +1677,15 @@ if __name__ == '__main__':
         today = cbyz.date_get_today()
         data_period = cbyz.date_diff(today, 20170101, absolute=True)
     else:
-        data_period = 365
+        data_period = 365 * 5
+        data_period = 365 * 1 # Test shareholding_spread
     
     
     # Week
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220506, predict_period=1, 
+        master(bt_last_begin=20220513, predict_period=1, 
             time_unit='w', long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,
