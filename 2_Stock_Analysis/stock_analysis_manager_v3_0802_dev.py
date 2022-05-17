@@ -312,11 +312,6 @@ def sam_load_data(industry=True, trade_value=True):
         scale_orig_ratio = scale_orig_ratio.append(new_log)
         
         
-    # 20220429 Commented
-    # market_data, scale_orig_price, y_scaler_price = \
-    #     cbml.df_scaler(df=market_data,
-    #                    cols=['HIGH', 'LOW', 'CLOSE'],
-    #                    show_progress=False, method=1)
     price_cols = ['HIGH', 'LOW', 'CLOSE']
     
     y_scaler_price = {}
@@ -332,12 +327,6 @@ def sam_load_data(industry=True, trade_value=True):
         scale_orig_price = scale_orig_price.append(new_log)
             
     
-    # 20220429 Commented
-    # market_data, _, _ = \
-    #     cbml.df_scaler(df=market_data,
-    #                    cols=['OPEN', 'OPEN_CHANGE_RATIO'],
-    #                    show_progress=False, method=1)
-
     open_cols = ['OPEN', 'OPEN_CHANGE_RATIO']
     for c in open_cols:
         market_data, _, _ = \
@@ -2582,8 +2571,6 @@ def master(param_holder, predict_begin, export_model=True,
     # - Add pe_ratio from ewprcd - Done
     # v3.0701 - 20220422
     # - Update cbml and test wma
-    
-    
     # v3.0800 - 20220422
     # - Replace time_key from ['YEAR_ISO', 'WEEK_NUM_ISO'] to ['YEAR_WEEK_ISO'],
     #   then can be apply df_add_ma    
@@ -2597,8 +2584,10 @@ def master(param_holder, predict_begin, export_model=True,
     
     
     # v3.0802 - 20220516
-    # - Fix sam_tej_ewsale  
-    
+    # - Fix sam_tej_ewsale
+
+    # v3.0803 - 20220517
+    # - Fix scaler
     
     
     # v3.080X
