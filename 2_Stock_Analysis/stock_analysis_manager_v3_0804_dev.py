@@ -299,7 +299,7 @@ def sam_load_data(industry=True, trade_value=True):
     ratio_cols = ['HIGH_CHANGE_RATIO', 'LOW_CHANGE_RATIO', 
                   'CLOSE_CHANGE_RATIO']        
         
-    y_scaler_ratio = {}
+    y_scaler_ratio = []
     scale_orig_ratio = pd.DataFrame()
     
     for c in ratio_cols:
@@ -308,13 +308,13 @@ def sam_load_data(industry=True, trade_value=True):
                               method=0, alpha=0.05, export_scaler=True,
                               show_progress=True)
         
-        y_scaler_ratio[c] = new_scaler
+        y_scaler_ratio = y_scaler_ratio + new_scaler
         scale_orig_ratio = scale_orig_ratio.append(new_log)
         
         
     price_cols = ['HIGH', 'LOW', 'CLOSE']
     
-    y_scaler_price = {}
+    y_scaler_price = []
     scale_orig_price = pd.DataFrame()
     
     for c in price_cols:
@@ -323,7 +323,8 @@ def sam_load_data(industry=True, trade_value=True):
                               method=0, alpha=0.05, export_scaler=True,
                               show_progress=True)
         
-        y_scaler_price[c] = new_scaler
+        # y_scaler_price[c] = new_scaler
+        y_scaler_price = y_scaler_price + new_scaler
         scale_orig_price = scale_orig_price.append(new_log)
             
     
@@ -2576,17 +2577,17 @@ def master(param_holder, predict_begin, export_model=True,
     #   then can be apply df_add_ma    
     # - Time unit是week時，原本是先ma再summary，改成先summary再ma
     # - Fix bug - 目前MA時的單位是d，parameter is week，但兩者共用相同的ma_values
-
-
     # v3.0801 - 20220513
     # - Fix bug for stk.tej_ewtinst1    
     # - Fix sam_tej_ewifinq
-    
     # v3.0802 - 20220516
     # - Fix sam_tej_ewsale
 
     # v3.0803 - 20220518
     # - Upadate inverse_transform for y
+
+    # v3.0804 - 20220518
+    # - Upadate y_scaler
 
 
     # v3.0803 - 20220517
@@ -2658,7 +2659,7 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     global version
-    version = 3.0801
+    version = 3.0804
     
     
     # Bug
@@ -3048,16 +3049,19 @@ def master(param_holder, predict_begin, export_model=True,
         gc.collect()
 
 
-    # Inverse Scale
-    global y_scaler        
+    # Inverse Scale ......
+    global y_scaler
     pred_result = pred_result[id_keys + var_y]
     pred_result_inverse = pred_result.copy()
     
-    for key, scaler in y_scaler.items():
-        y_inverse = pred_result[key]
-        y_inverse = scaler.inverse_transform(y_inverse)
-        pred_result_inverse[key] = y_inverse
+    # 過度時期使用
+    # new_y_scaler = []
     
+    # for key, scaler in y_scaler.items():
+    #     new_y_scaler.append(scaler[0])
+        
+    pred_result_inverse = cbml.df_scaler_inverse_v2(df=pred_result_inverse,
+                                                    scaler=y_scaler)
         
     # Upload to Google Sheet
     if predict_begin == bt_last_begin:

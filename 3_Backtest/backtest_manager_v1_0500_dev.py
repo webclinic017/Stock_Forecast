@@ -12,7 +12,7 @@ import random
 host = 3
 # host = 2
 host = 4
-host = 0
+# host = 0
 market = 'tw'
 
 
@@ -61,7 +61,7 @@ import arsenal_stock as stk
 # import codebase_ml as cbml
 # import stock_analysis_manager_v3_0601_dev as sam
 # import stock_analysis_manager_v3_0701_dev as sam
-import stock_analysis_manager_v3_0802_dev as sam
+import stock_analysis_manager_v3_0804_dev as sam
 
 
 
@@ -1670,22 +1670,22 @@ if __name__ == '__main__':
     # to export temp file
     
     if not dev and not test:
-        # - TEJ的資料從2017年開始，但用dev的測試結果，即使data_period從20150110開始算
-        #   也不會出錯
+        # - TEJ的資料從2017年開始，但用dev的測試結果，即使data_period從20150110
+        #   開始算也不會出錯
         # - TEJ報價
         #   集保股權分散的資料，個人使用9000/年，歷史資料5400/年
         today = cbyz.date_get_today()
         data_period = cbyz.date_diff(today, 20170101, absolute=True)
     else:
         data_period = 365 * 5
-        data_period = 365 * 1 # Test shareholding_spread
+        # data_period = 365 * 1 # Test shareholding_spread
     
     
     # Week
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220513, predict_period=1, 
+        master(bt_last_begin=20220516, predict_period=1, 
             time_unit='w', long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,
