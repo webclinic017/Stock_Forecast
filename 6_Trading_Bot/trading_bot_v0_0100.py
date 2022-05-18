@@ -140,32 +140,90 @@ def master_level_1():
     # - 事先預判有多少法人持股，如果數量很少，當他們賣的時候就要跟著賣了
         
 
+    inv_raw = sdk.get_inventories()    
+    # [{'ap_code': '',
+    #   'cost_qty': '1000',
+    #   'cost_sum': '-29341',
+    #   'make_a_per': '-0.92',
+    #   'make_a_sum': '-269',
+    #   'price_avg': '29.30',
+    #   'price_evn': '29.48',
+    #   'price_mkt': '29.20',
+    #   'price_now': '29.20',
+    #   'price_qty_sum': '29300',
+    #   'qty_b': '1000',
+    #   'qty_bm': '1000',
+    #   'qty_c': '0',
+    #   'qty_l': '0',
+    #   'qty_s': '0',
+    #   'qty_sm': '0',
+    #   'rec_va_sum': '29072',
+    #   'stk_na': '華邦電',
+    #   'stk_no': '2344',
+    #   's_type': 'H',
+    #   'trade': '0',
+    #   'value_mkt': '29200',
+    #   'value_now': '29200',
+    #   'stk_dats': [{'buy_sell': 'B',
+    #     'cost_r': '0',
+    #     'fee': '41',
+    #     'make_a': '-269',
+    #     'make_a_per': '-0.92',
+    #     'ord_no': '60077016896670',
+    #     'pay_n': '-29341',
+    #     'price': '29.30',
+    #     'price_evn': '29.48',
+    #     'qty': '1000',
+    #     'qty_c': '0',
+    #     'qty_h': '0',
+    #     'qty_r': '0',
+    #     't_date': '20220518',
+    #     'tax': '0',
+    #     'tax_g': '0',
+    #     'trade': '0',
+    #     't_time': '131055213',
+    #     'value_mkt': '29200',
+    #     'value_now': '29200'}]}]
+    
+    
+    # 變成function？
+    inv = []
+    for i in range(len(inv_raw)):
+        new_inv = [inv_raw['stk_no'], inv_raw['price_evn'], inv_raw['qty_b']]
+        inv.append(inv)
+        
+    inv = pd.DataFrame(inv, columns=['SYMBOL', 'COST', 'VOLUME'])
+    hold = inv['SYMBOL'].tolist()    
+    
+    
+    
+    t_date': '20220518'，這裡應該可以直接抓到交易日期，找出first trading date
+    
 
 
     # Get Mean Cost ......
+    # - Unessential after apply API
     
-    # Develop
-    ledger, hold_volume, hold_data = \
-        stk.get_ledger(begin_date=20220101, end_date=20220120, market=market)
+    # # Develop
+    # ledger, hold_volume, hold_data = \
+    #     stk.get_ledger(begin_date=20220101, end_date=20220120, market=market)
     
     # # Production
     # ledger, hold_volume, hold_data = \
     #     stk.get_ledger(begin_date=None, end_date=None, market=market)
 
-
-    # Hold Symbol
-    hold = hold_volume['SYMBOL'].tolist()
+    # # Hold Symbol
+    # hold = hold_volume['SYMBOL'].tolist()
     
+    # # Mean Cost
+    # hold_data = hold_data \
+    #             .groupby(['SYMBOL']) \
+    #             .agg({'WORK_DATE':'min',
+    #                   'VOLUME':'sum',
+    #                   'COST':'sum'}) \
+    #             .reset_index()
     
-    # Mean Cost
-    hold_data = hold_data \
-                .groupby(['SYMBOL']) \
-                .agg({'WORK_DATE':'min',
-                      'VOLUME':'sum',
-                      'COST':'sum'}) \
-                .reset_index()
-    
-    hold_data['COST_MEAN'] = hold_data['COST'] / hold_data['VOLUME']
+    # hold_data['COST_MEAN'] = hold_data['COST'] / hold_data['VOLUME']
     
     
     # First BUy
@@ -218,8 +276,9 @@ def master_level_1():
     # - GCP always on schedule
     # - GCP ploty
     # - GCP collect Fugle data on free VM
-    
-    
+
+
+
     
     # Schedule to restart
     # connnect_sql()
