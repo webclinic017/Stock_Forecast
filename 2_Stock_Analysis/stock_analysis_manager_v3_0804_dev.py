@@ -52,8 +52,8 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220516',
-                 r'/home/jupyter/Arsenal/20220516',
+                 r'/home/jupyter/Codebase_YZ/20220519',
+                 r'/home/jupyter/Arsenal/20220519',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -2612,7 +2612,10 @@ def master(param_holder, predict_begin, export_model=True,
     # - 是不是可以跟TEJ買董監事持股的資料，然後減掉Shareholding spread
     # - 董監事持股Open Data
     #   https://data.gov.tw/dataset/22811
+    # - 大戶持股比例是否持續下降
+    #   https://meet.bnext.com.tw/blog/view/9641?
     
+    # - SNP與每個產業的correlation
     # - 景氣對策信號
     # - 製造業循環
     #   https://www.macromicro.me/collections/3261/sector-industrial/25709/manufacturing-cycle

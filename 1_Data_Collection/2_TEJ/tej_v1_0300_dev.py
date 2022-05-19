@@ -91,9 +91,9 @@ print('todayRows - ' + str(info['todayRows']))
 
 
 
-def master(begin=None, end=None, ewprcd=True, ewtinst1c=False, 
-           ewsale=True, ewifinq=False, ewnprcstd=False, 
-           ewgin=False, ewtinst1=False, delete=False, upload=True, export=False):
+def master(begin=None, end=None, ewprcd=True, amtop1=False,
+           ewsale=True, ewifinq=False, ewnprcstd=False, ewtinst1c=True,
+           ewgin=True, ewtinst1=True, delete=False, upload=True, export=False):
     '''
     以月或季為單位的資料，篩選的時候還是用日期下條件，所以當成是d
     '''
@@ -107,6 +107,9 @@ def master(begin=None, end=None, ewprcd=True, ewtinst1c=False,
     # - Rename update as master >> Done
     # - After completing query then deleting old data to prevent reach 
     #   limit and interupt
+    
+    # v1.0301
+    # - Update day by day for amtop1
     
     
     assert len(str(begin)) == 8 or begin == None, 'begin date error'
@@ -137,44 +140,49 @@ def master(begin=None, end=None, ewprcd=True, ewtinst1c=False,
     # 從1/1重抓，並覆寫原始檔案。
     tables = []
     
-    if ewtinst1c:
-        # 三大法人持股成本；存在DB
-        tables.append(['ewtinst1c', 'd', None]) 
-        
+
     if ewprcd:
         # 證券交易資料表，一個月51034筆；存在DB
         tables.append(['ewprcd', 'd', None]) 
+    
+    if amtop1:
+        # 主要券商進出明細-股票別，兩天19萬筆
+        tables.append(['amtop1', 'd', None])     
+
+    if ewsale:
+        # 月營收資料表，一個月約2000筆，等同於股票檔數；存在資料夾
+        tables.append(['ewsale', 'd', 'y'])     
+        
+    if ewifinq:
+        # 單季財務資料表，資料量等同於股票檔數；存在資料夾
+        tables.append(['ewifinq', 'd', 'y'])        
+
+    if ewnprcstd:
+        # 證券屬性表，3125筆，資料量等同於股票檔數
+        tables.append(['ewnprcstd', None]) 
+
+    if ewnprcstd:
+        # 證券屬性表，3125筆，資料量等同於股票檔數
+        tables.append(['ewnprcstd', None]) 
+    
+    # if ewtinst1c:
+    #     # 三大法人持股成本；存在DB
+    #     tables.append(['ewtinst1c', 'd', None]) 
         
     # if ewprcd2:
     #     # 這個資料集不好用
     #     # 報酬率資訊表，兩個月約100000筆        
     #     tables.append(['ewprcd2', 'd']) 
         
-    if ewsale:
-        # 月營收資料表，一個月約2000筆，等同於股票檔數；存在資料夾
-        tables.append(['ewsale', 'd', 'y']) 
-        
-    if ewifinq:
-        # 單季財務資料表，資料量等同於股票檔數；存在資料夾
-        tables.append(['ewifinq', 'd', 'y'])         
+    # if ewgin:
+    #     # 融資券資料
+    #     # - 20220301的資料為1869筆，但每天的數量可能會不一樣
+    #     tables.append(['ewgin', 'd', None]) 
 
-    if ewnprcstd:
-        # 證券屬性表，3125筆，資料量等同於股票檔數
-        tables.append(['ewnprcstd', None]) 
-
-    if ewnprcstd:
-        # 證券屬性表，3125筆，資料量等同於股票檔數
-        tables.append(['ewnprcstd', None]) 
-
-    if ewgin:
-        # 融資券資料
-        # - 20220301的資料為1869筆，但每天的數量可能會不一樣
-        tables.append(['ewgin', 'd', None]) 
-
-    if ewtinst1:
-        # 三大法人資料
-        # - 20220301的資料為2307筆
-        tables.append(['ewtinst1', 'd', None]) 
+    # if ewtinst1:
+    #     # 三大法人資料
+    #     # - 20220301的資料為2307筆
+    #     tables.append(['ewtinst1', 'd', None]) 
 
     
     # Delete Data ......
@@ -479,7 +487,7 @@ def automation():
     
     master(begin=None, end=None, ewprcd=True, ewtinst1c=False, 
             ewsale=True, ewifinq=True, ewnprcstd=False,
-            ewgin=False, ewtinst1=False, delete=True, upload=True)     
+            ewgin=True, ewtinst1=True, delete=True, upload=True)     
 
     # ewsale有bug
     # Failed processing format-parameters; Python 'timestamp' cannot be converted to a MySQL type
@@ -553,7 +561,11 @@ def manually_upload():
 
 def dev():
     
-    pass
+    # print('ewtinst1 中有na')
+    master(begin=20220101, end=20220520, ewprcd=False, ewtinst1c=False, 
+            ewsale=False, ewifinq=True, ewnprcstd=False, 
+            ewgin=False, ewtinst1=False, 
+            delete=False, upload=True, export=True)
     
 
 

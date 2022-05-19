@@ -33,8 +33,8 @@ elif host == 3:
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220213',
-                 r'/home/jupyter/Arsenal/20220213',
+                 r'/home/jupyter/Codebase_YZ/20220519',
+                 r'/home/jupyter/Arsenal/20220519',
                  path + '/1_Shareholding_Spread',
                  path + '/2_TEJ',
                  path + '/Function']
@@ -50,7 +50,7 @@ import arsenal_stock as stk
 
 import shareholding_spread
 # import tej_v1_10 as tej
-import tej_v1_0201 as tej
+import tej_v1_0302 as tej
 
 
 
