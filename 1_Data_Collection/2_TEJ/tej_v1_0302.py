@@ -587,7 +587,7 @@ def master(begin=None, end=None, ewprcd=True, amtop1=False,
 # .............
 
 
-def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True, 
+def upload_saved_files(amtop1=False, ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True, 
            ewifinq=True, ewnprcstd=True,
            delete=False, upload=True):
     
@@ -597,6 +597,12 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
     '''
     
     tables = []
+
+
+    if amtop1:
+        # 主要券商進出明細-股票別，兩天19萬筆
+        tables.append(['amtop1', 'd'])     
+
     
     if ewtinst1c:
         # 三大法人持股成本
@@ -634,7 +640,6 @@ def upload_saved_files(ewprcd2=True, ewtinst1c=True, ewprcd=True, ewsale=True,
                                      remove_temp=True)
 
         files = files['FILES']
-    
     
         for j in range(len(files)):
             
@@ -790,8 +795,8 @@ def manually_upload():
             delete=False, upload=True, export=True)
     
     
-    # print('ewtinst1 中有na')
-    master(begin=20190101, end=20190105, ewprcd=False, amtop1=True,
+    # Update amtop1
+    master(begin=20190108, end=20190115, ewprcd=False, amtop1=True,
            ewsale=False, ewifinq=False, ewnprcstd=False, ewtinst1c=False,
            ewgin=False, ewtinst1=False, delete=True, upload=True, 
            export=True)
