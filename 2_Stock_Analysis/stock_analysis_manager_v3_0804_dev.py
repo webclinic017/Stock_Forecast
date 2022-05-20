@@ -149,6 +149,12 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     market_data = market_data_raw.copy()
     
 
+
+    # Industry Close
+    
+
+
+
     # Check        
     global ohlc
     for c in ohlc:
@@ -178,21 +184,6 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
     # - market_data will merge calendar in this function
     # - market_data會在這裡merge calendar
     set_frame()
-
-
-    # Total Trade
-    # - 如果time_unit是w，欄位名稱會在df_summary後改變，所以要先刪除
-    # - 需要merge calendar_key，所以要寫在set_frame()後面
-    # - total_trade會在sam_load_data中用到
-    # - 
-    # print('Update, total_trade_ratio應該加到get_data中')
-    # if trade_value:
-    #     total_trade = market_data[['WORK_DATE', 'TOTAL_TRADE_VALUE']] \
-    #                     .drop_duplicates()
-                        
-    #     total_trade = total_trade.merge(calendar_key, on='WORK_DATE')         
-    #     market_data = market_data.drop('TOTAL_TRADE_VALUE', axis=1)
-        
 
 
     # First Trading Day ......
@@ -236,18 +227,11 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
 
 
     # Test ......
+
+    # 執行到這裡，因為加入了預測區間，所以會有NA，但所有NA的數量應該要一樣多
+    cbyz.df_chk_col_na(df=market_data, mode='stop')
     
-    # # 執行到這裡，因為加入了預測區間，所以會有NA，但所有NA的數量應該要一樣多
-    # na_cols = cbyz.df_chk_col_na(df=market_data)
-    # na_min = na_cols['NA_COUNT'].min()
-    # na_max = na_cols['NA_COUNT'].max()
-    
-    # msg = 'Number of NA in each column should be the same.'
-    # assert na_min == na_max, msg
-    
-    print('Check - Temoporaily remove df_chk_col_na')
-    
-    
+
     # Check Predict Period
     # chk = market_data.merge(predict_date, on=time_key)
     # chk = chk[time_key].drop_duplicates()
@@ -323,7 +307,6 @@ def sam_load_data(industry=True, trade_value=True):
                               method=0, alpha=0.05, export_scaler=True,
                               show_progress=True)
         
-        # y_scaler_price[c] = new_scaler
         y_scaler_price = y_scaler_price + new_scaler
         scale_orig_price = scale_orig_price.append(new_log)
             
@@ -335,7 +318,6 @@ def sam_load_data(industry=True, trade_value=True):
                               method=0, alpha=0.05, export_scaler=True,
                               show_progress=True)
         
-    # scale_orig = scale_orig_ratio.update(scale_orig_price)
     scale_orig = scale_orig_ratio.append(scale_orig_price)
     
     if 'CLOSE_CHANGE_RATIO' in var_y:
@@ -366,11 +348,6 @@ def sam_load_data(industry=True, trade_value=True):
             except_cols=ohlc+ohlc_ratio+['SYMBOL', 'WORK_DATE']
             )
 
-        
-        # loc_main, _, _ = cbml.df_scaler(df=loc_main, cols=cols,
-        #                                 show_progress=False, method=0)
-        
-        # 20220504 - Replace new df_scaler
         loc_main, _, _ = cbml.df_scaler_v2(df=loc_main, cols=cols, 
                                            except_cols=[], method=0,
                                            alpha=0.05, export_scaler=False,
@@ -850,22 +827,19 @@ def set_frame():
     if time_unit == 'w':
         
         calendar_proc = calendar_proc[['YEAR_WEEK_ISO', 'YEAR_ISO', 'MONTH', 
-                                       'WEEK_NUM_ISO', 'TRADE_DATE']]
+                                       'WEEK_NUM_ISO']]
         
+        # 如果加入YEAR和MONTH，可能會有同一周，但是跨年度的問題
         calendar_proc = calendar_proc \
-            .drop_duplicates() \
+            .drop_duplicates(subset=['YEAR_WEEK_ISO', 'WEEK_NUM_ISO']) \
             .reset_index(drop=True) \
             .reset_index() \
             .rename(columns={'index':'DATE_INDEX'}) 
-        
-        # calendar_proc.loc[:, 'YEAR_DUP'] = calendar_proc['YEAR_ISO']
-        # calendar_proc.loc[:, 'WEEK_NUM_DUP'] = calendar_proc['WEEK_NUM_ISO']
-        
 
     calendar_proc, _, _ = \
         cbml.df_scaler(
             df=calendar_proc,
-            except_cols=id_keys + ['TRADE_DATE'],
+            except_cols=id_keys,
             show_progress=False,
             method=1
             )           
@@ -885,16 +859,9 @@ def set_frame():
         print('chk - 這裡是否需要篩選日期')
 
 
-    # 20220208 - 移到sam_load_data    
-    # market_data = main_data_frame \
-    #     .merge(market_data, how='left', on=['SYMBOL', 'WORK_DATE'])
-
-    
     # Organize
     main_data_frame = main_data_frame[id_keys]
     
-    global debug
-    debug = main_data_frame.copy()
     
     main_data_frame = ar.df_simplify_dtypes(df=main_data_frame)
     
@@ -2494,9 +2461,10 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     # assert len(chk_min_max) == 0, 'get_model_data - normalize error'
 
     
-    print('Bug - TRADE_DATE should not exsits')
-    if 'TRADE_DATE' in main_data.columns:
-        main_data = main_data.drop('TRADE_DATE', axis=1)
+    assert  'TRADE_DATE' not in main_data.columns, \
+        'Bug - TRADE_DATE should not exsits'
+        
+    cbyz.df_chk_duplicates(df=main_data, cols=id_keys)
 
 
     # Select Features ......
@@ -2582,17 +2550,17 @@ def master(param_holder, predict_begin, export_model=True,
     # - Fix sam_tej_ewifinq
     # v3.0802 - 20220516
     # - Fix sam_tej_ewsale
-
     # v3.0803 - 20220518
     # - Upadate inverse_transform for y
-
     # v3.0804 - 20220518
     # - Upadate y_scaler
-
-
     # v3.0803 - 20220517
-    # - Fix scaler
+    # - Fix model_data duplicated issues
     
+    # v3.0804 - 20220520
+    # - Fix scaler
+    # - Fix model_data duplicated issues
+
     
     # v3.080X
     # - Add VIF
@@ -3883,8 +3851,15 @@ def dev():
 
 def debug():
     
-    df = stk.dev_df.copy()
-    df['VALUE'] = df['VALUE'] / df['VALUE']
+    file = pd.read_csv(path_temp + '/model_data_w.csv')
+    file.drop_duplicates()
+    
+    chk = file[file['SYMBOL']==1101]
+    chk = chk[chk['YEAR_WEEK_ISO']==201737]    
+    
+    chk = chk.T    
+    chk2 = chk[chk[0]!=chk[1]]
+    
     
 
 # %% Execution ------

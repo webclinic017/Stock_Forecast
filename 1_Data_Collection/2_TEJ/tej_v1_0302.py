@@ -269,6 +269,8 @@ def master_single(info, begin=None, end=None, delete=False,
 
         # Prevent data incomplete
         used_rows, row_limit = tej_api_info()
+        print('TEJ API -', used_rows, '/', row_limit)
+        
         if used_rows > row_limit:
             break
     
