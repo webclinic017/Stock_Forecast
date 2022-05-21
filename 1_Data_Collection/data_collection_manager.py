@@ -32,8 +32,6 @@ elif host == 3:
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
-                 r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220519',
                  r'/home/jupyter/Arsenal/20220519',
                  path + '/1_Shareholding_Spread',
                  path + '/2_TEJ',

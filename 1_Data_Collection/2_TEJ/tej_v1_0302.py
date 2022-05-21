@@ -33,12 +33,10 @@ elif host == 4:
 
 
 # Codebase ......
-path_codebase = [r'/Users/Aron/Documents/GitHub/Arsenal/',
+path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',                 
-                 r'/Users/Aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220519',
                  r'/home/jupyter/Arsenal/20220519',    
                  path + '/Function']
 
@@ -605,7 +603,6 @@ def upload_saved_files(amtop1=False, ewprcd2=True, ewtinst1c=True, ewprcd=True, 
         # 主要券商進出明細-股票別，兩天19萬筆
         tables.append(['amtop1', 'd'])     
 
-    
     if ewtinst1c:
         # 三大法人持股成本
         tables.append(['ewtinst1c', 'd']) 

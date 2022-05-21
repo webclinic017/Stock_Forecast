@@ -60,8 +60,6 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
-                 r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220519',
                  r'/home/jupyter/Arsenal/20220519',
                  path,
                  path + '/Function']
@@ -76,8 +74,6 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 # import codebase_ml as cbml
-# import stock_analysis_manager_v2_400_dev as sam
-# import stock_analysis_manager_v2_502_dev as sam
 
 
 # import multiprocessing as mp

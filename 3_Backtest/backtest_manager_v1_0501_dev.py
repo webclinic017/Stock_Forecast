@@ -12,7 +12,7 @@ import random
 host = 3
 # host = 2
 host = 4
-# host = 0
+host = 0
 market = 'tw'
 
 
@@ -43,8 +43,6 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
-                 r'/Users/aron/Documents/GitHub/Codebase_YZ',
-                 r'/home/jupyter/Codebase_YZ/20220519',
                  r'/home/jupyter/Arsenal/20220519',
                  path + '/Function',
                  path_sam]
@@ -59,9 +57,8 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 # import codebase_ml as cbml
-# import stock_analysis_manager_v3_0601_dev as sam
 # import stock_analysis_manager_v3_0701_dev as sam
-import stock_analysis_manager_v3_0804_dev as sam
+import stock_analysis_manager_v3_0805_dev as sam
 
 
 
@@ -1688,7 +1685,7 @@ if __name__ == '__main__':
     # - MA 48會超級久，連dev mode都很久
     # - MA max 為24時，drop corr後的欄位數量為530
     action_weekly = \
-        master(bt_last_begin=20220516, predict_period=1, 
+        master(bt_last_begin=20220523, predict_period=1, 
             time_unit='w', long=False, interval=4, bt_times=1, 
             data_period=data_period,
             ma_values=[1,4,12,24,36], volume_thld=400,
