@@ -51,7 +51,7 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
-                 r'/home/jupyter/Arsenal/20220519',
+                 r'/home/jupyter/Arsenal/20220522',
                  path + '/Function']
 
 for i in path_codebase:    
@@ -2461,6 +2461,21 @@ def get_model_data(industry=True, trade_value=True, load_file=False):
     
     assert  'TRADE_DATE' not in main_data.columns, \
         'Bug - TRADE_DATE should not exsits'
+
+    print('1732- 201750有兩筆資料')
+    chk_dup = main_data \
+            .copy() \
+            .groupby(['SYMBOL', 'YEAR_WEEK_ISO']) \
+            .size() \
+            .reset_index(name='COUNT')
+    
+    chk_dup = chk_dup[chk_dup['COUNT']>1]
+    assert len(chk_dup) < 20, 'chk_dup error'
+    
+    main_data = main_data \
+                .drop_duplicates(subset=['SYMBOL', 'YEAR_WEEK_ISO']) \
+                .reset_index()
+
         
     cbyz.df_chk_duplicates(df=main_data, cols=id_keys)
 
