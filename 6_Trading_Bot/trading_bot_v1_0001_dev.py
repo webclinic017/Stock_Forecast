@@ -25,14 +25,14 @@ import random
 from configparser import ConfigParser
 from fugle_trade.sdk import SDK
 from fugle_trade.order import OrderObject
-from fugle_trade.constant import (APCode, Trade, PriceFlag, BSFlag, Action)    
+from fugle_trade.constant import (APCode, Trade, PriceFlag, BSFlag, Action)   
 
 
 
 host = 3
-host = 2
-host = 4
-host = 0
+# host = 2
+# host = 4
+# host = 0
 market = 'tw'
 
 
@@ -60,7 +60,7 @@ path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
-                 r'/home/jupyter/Arsenal/20220519',
+                 r'/home/jupyter/Arsenal/20220522',
                  path,
                  path + '/Function']
 
@@ -138,11 +138,11 @@ def connect_account():
     # stk_no 股票代碼
     # cost_qty 成本股數
     # price_evn 損益平衡價
-    
+    # price_avg 成交均價
+
     # stk_dats 庫存明細
     
     
-    # 變成function？
     inv = []
     for i in range(len(inv_raw)):
         
@@ -158,13 +158,18 @@ def connect_account():
             first_buy = t_date if t_date < first_buy else first_buy
         
         new_inv = [cur_inv['stk_no'], cur_inv['price_evn'], 
-                   cur_inv['cost_qty'], first_buy]
+                   cur_inv['price_avg'], cur_inv['cost_qty'], first_buy]
         
         inv.append(new_inv)        
         
         
-    inv = pd.DataFrame(inv, columns=['symbol', 'cost', 'volume', 'first_buy'])
-    inv = cbyz.df_conv_col_type(df=inv, cols=['cost'], to='float')
+    inv = pd.DataFrame(inv, 
+                       columns=['symbol', 'price_evn', 'price_avg', 
+                                'volume', 'first_buy'])
+    
+    inv = cbyz.df_conv_col_type(df=inv, 
+                                cols=['price_evn', 'price_avg'], 
+                                to='float')
     
     symbol_df = inv[['symbol']]
     symbol = inv['symbol'].tolist()    
@@ -225,10 +230,16 @@ def gen_stop_loss():
                  stop_loss['new_high'], stop_loss['high'])        
      
      
-    stop_loss['stop_loss_pos'] = stop_loss['cost'] \
-        + (stop_loss['high'] - stop_loss['cost']) * stop_loss_pos
+    stop_loss.loc[:, 'stop_loss_pos'] = \
+        np.where(stop_loss['price_evn']>stop_loss['high'],
+                 stop_loss['price_evn'],
+                 stop_loss['price_evn'] \
+                     + (stop_loss['high'] - stop_loss['price_evn']) \
+                     * stop_loss_pos)
+        
+    stop_loss.loc[:, 'stop_loss_pos'] = stop_loss['stop_loss_pos'] * 1.03
 
-    stop_loss['stop_loss_neg'] = stop_loss['cost'] * stop_loss_neg
+    stop_loss['stop_loss_neg'] = stop_loss['price_avg'] * stop_loss_neg
 
     return stop_loss
 
@@ -341,13 +352,18 @@ def master_level_1():
         
             arfg.query_quote(cur_symbol)
             data = arfg.data_raw
+
             
-            # 最新一筆成交記錄
-            price = data['data']['quote']['trade']['price']
+            # Bug, data中有時候會沒有trade，不確定是不是fugle的bug
+            try:
+                # 最新一筆成交記錄
+                price = data['data']['quote']['trade']['price']
             
-            # Add New High
-            new_high = data['data']['quote']['priceHigh']['price']
-            today_high[cur_symbol] = [new_high]
+                # Add New High
+                new_high = data['data']['quote']['priceHigh']['price']
+                today_high[cur_symbol] = [new_high]
+            except Exception as e:
+                print(e)
             
             
             # Calculate stop loss
@@ -356,10 +372,10 @@ def master_level_1():
                             
             temp_pos = temp_stop_loss.loc[0, 'stop_loss_pos']
             temp_neg = temp_stop_loss.loc[0, 'stop_loss_neg']
-            temp_cost = temp_stop_loss.loc[0, 'cost']
+            temp_cost = temp_stop_loss.loc[0, 'price_evn']
             
-            cond_pos = price <= temp_pos \
-                and (price - temp_cost) / temp_cost >= 0.02
+            cond_pos = price >= temp_pos / 1.03 * 1.02 \
+                and price <= temp_pos
             
             print(cur_symbol, '-', price, temp_cost, temp_pos, temp_neg)
             

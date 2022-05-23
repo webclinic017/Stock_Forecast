@@ -607,7 +607,6 @@ def sam_load_data(industry=True, trade_value=True):
 
 
 
-
     # MA
     # - 20220504 add
     cols = \
