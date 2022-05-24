@@ -2573,10 +2573,14 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0804 - 20220520
     # - Fix scaler
     # - Fix model_data duplicated issues
+    
+    # v3.0805
+    # - 
 
     
     # v3.080X
     # - Add VIF
+    # - 是不是要註冊第二個TEJ帳號
     # - Visualize the tej_ewtinst1_hold and stock price
     # - 把加了financial statement的model data丟到AutoML
     # - CPI指數
