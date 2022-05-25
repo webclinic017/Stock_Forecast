@@ -355,6 +355,7 @@ def master_level_1():
 
             
             # Bug, data中有時候會沒有trade，不確定是不是fugle的bug
+            price = None
             try:
                 # 最新一筆成交記錄
                 price = data['data']['quote']['trade']['price']
@@ -364,6 +365,11 @@ def master_level_1():
                 today_high[cur_symbol] = [new_high]
             except Exception as e:
                 print(e)
+                
+            # - If executing before trading time, the data will be empty
+            # - Split the case that data is empty or new_high is null.
+            if price == None:
+                break                
             
             
             # Calculate stop loss

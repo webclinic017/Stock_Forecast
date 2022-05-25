@@ -22,7 +22,7 @@ import pickle
 host = 3
 # host = 2
 host = 4
-host = 0
+# host = 0
 
 
 # Path .....
@@ -30,7 +30,6 @@ if host == 0:
     # Home
     path = '/Users/aron/Documents/GitHub/Stock_Forecast/2_Stock_Analysis'
     path_dcm = '/Users/aron/Documents/GitHub/Stock_Forecast/1_Data_Collection'
-    
     
 elif host == 2:
     path = '/home/jupyter/Production/2_Stock_Analysis'
@@ -42,15 +41,15 @@ elif host == 3:
 
 elif host == 4:
     # RT
-    path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\2_Stock_Analysis'
-    path_dcm = r'D:\Data_Mining\GitHub共用\Stock_Forecast\1_Data_Collection'
+    path = r'D:\GitHub\Stock_Forecast\2_Stock_Analysis'
+    path_dcm = r'D:\GitHub\Stock_Forecast\1_Data_Collection'
 
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
-                 r'D:\Data_Mining\GitHub共用\Arsenal',
+                 r'D:\GitHub\Arsenal',
                  r'/home/jupyter/Arsenal/20220522',
                  path + '/Function']
 
@@ -63,7 +62,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v1_0003 as ut
+import ultra_tuner_v1_0100_dev as ut
 
 ar.host = host
 
@@ -71,13 +70,11 @@ ar.host = host
 
 # 自動設定區 -------
 pd.set_option('display.max_columns', 30)
- 
 
 path_resource = path + '/Resource'
 path_function = path + '/Function'
 path_temp = path + '/Temp'
 path_export = path + '/Export'
-
 
 cbyz.os_create_folder(path=[path_resource, path_function, 
                          path_temp, path_export])        
@@ -146,12 +143,8 @@ def get_market_data_raw(industry=True, trade_value=True, support_resist=False):
 
     market_data = market_data_raw.copy()
     
-
-
     # Industry Close
     
-
-
 
     # Check        
     global ohlc
@@ -281,7 +274,7 @@ def sam_load_data(industry=True, trade_value=True):
     ratio_cols = ['HIGH_CHANGE_RATIO', 'LOW_CHANGE_RATIO', 
                   'CLOSE_CHANGE_RATIO']        
         
-    y_scaler_ratio = []
+    y_scaler_ratio = {}
     scale_orig_ratio = pd.DataFrame()
     
     for c in ratio_cols:
@@ -290,13 +283,13 @@ def sam_load_data(industry=True, trade_value=True):
                               method=0, alpha=0.05, export_scaler=True,
                               show_progress=True)
         
-        y_scaler_ratio = y_scaler_ratio + new_scaler
+        y_scaler_ratio = {**y_scaler_ratio, **new_scaler}
         scale_orig_ratio = scale_orig_ratio.append(new_log)
         
         
     price_cols = ['HIGH', 'LOW', 'CLOSE']
     
-    y_scaler_price = []
+    y_scaler_price = {}
     scale_orig_price = pd.DataFrame()
     
     for c in price_cols:
@@ -305,7 +298,7 @@ def sam_load_data(industry=True, trade_value=True):
                               method=0, alpha=0.05, export_scaler=True,
                               show_progress=True)
         
-        y_scaler_price = y_scaler_price + new_scaler
+        y_scaler_price = {**y_scaler_price, **new_scaler}
         scale_orig_price = scale_orig_price.append(new_log)
             
     
@@ -2992,6 +2985,7 @@ def master(param_holder, predict_begin, export_model=True,
     # - 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同
     #   產業的預測值完全相同
     global pred_result, pred_scores, pred_params, pred_features
+    global y_scaler
     
     long_suffix = 'long' if long else 'short'
     compete_mode = compete_mode if bt_index == 0 else 0
@@ -3001,6 +2995,7 @@ def master(param_holder, predict_begin, export_model=True,
         
         cur_y = var_y[i]
         remove_y = [var_y[j] for j in range(len(var_y)) if j != i]
+        cur_scaler = y_scaler[cur_y]
         
         tuner = ut.Ultra_Tuner(id_keys=id_keys, y=cur_y, 
                                model_type='reg', suffix=long_suffix,
@@ -3038,7 +3033,6 @@ def master(param_holder, predict_begin, export_model=True,
 
 
     # Inverse Scale ......
-    global y_scaler
     pred_result = pred_result[id_keys + var_y]
     pred_result_inverse = pred_result.copy()
     

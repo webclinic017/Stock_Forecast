@@ -12,7 +12,7 @@ import random
 host = 3
 # host = 2
 host = 4
-host = 0
+# host = 0
 market = 'tw'
 
 
@@ -34,14 +34,14 @@ elif host == 3:
 
 elif host == 4:    
     # RT
-    path = r'D:\Data_Mining\GitHub共用\Stock_Forecast\3_Backtest'
-    path_sam = r'D:\Data_Mining\GitHub共用\Stock_Forecast\2_Stock_Analysis'    
+    path = r'D:\GitHub\Stock_Forecast\3_Backtest'
+    path_sam = r'D:\GitHub\Stock_Forecast\2_Stock_Analysis'    
 
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
                  r'/home/aronhack/stock_predict/Function',
-                 r'D:\Data_Mining\GitHub共用\Arsenal',
+                 r'D:\GitHub\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/home/jupyter/Arsenal/20220522',
                  path + '/Function',
@@ -56,8 +56,6 @@ for i in path_codebase:
 import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
-# import codebase_ml as cbml
-# import stock_analysis_manager_v3_0701_dev as sam
 import stock_analysis_manager_v3_0805_dev as sam
 
 
