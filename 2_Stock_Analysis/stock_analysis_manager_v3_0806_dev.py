@@ -62,7 +62,7 @@ import codebase_yz as cbyz
 import codebase_ml as cbml
 import arsenal as ar
 import arsenal_stock as stk
-import ultra_tuner_v1_0100_dev as ut
+import ultra_tuner_v1_0100 as ut
 
 ar.host = host
 
@@ -2565,8 +2565,15 @@ def master(param_holder, predict_begin, export_model=True,
     # v3.0804 - 20220520
     # - Fix scaler
     # - Fix model_data duplicated issues
-    # v3.0805
+    # v3.0805 - 20220524
     # - Update for cbml.df_scaler_inverse_v2
+    # v3.0806 - 20220526
+    # - Update for cbml and ut
+    # v3.0807 - 20220526
+    # Convert columns to lowercase
+
+    # v3.09
+    # - Change number of host
 
     
     # v3.080X
@@ -2921,64 +2928,7 @@ def master(param_holder, predict_begin, export_model=True,
         if host in [2, 3]:
             model_params.insert(0, mlp_param)
             
-        
-        # # Price
-        # model_params = [
-        #                 {'model': LinearRegression(),
-        #                   'params': {
-        #                       'normalize': [True, False],
-        #                       }
-        #                   },
-        #                 {'model': xgb.XGBRegressor(),
-        #                  'params': {
-        #                     # 'n_estimators': [200],
-        #                     'eta': [0.1],
-        #                     # 'eta': [0.5, 0.7],
-        #                     'min_child_weight': [0.8],
-        #                      # 'min_child_weight': [0.5, 1],
-        #                     'max_depth':[10],
-        #                      # 'max_depth':[6, 8, 12],
-        #                     'subsample':[1]
-        #                   }
-        #                 },
-        #                 # {'model': SGDRegressor(),
-        #                 #   'params': {
-        #                 #       # 'max_iter': [1000],
-        #                 #       # 'tol': [1e-3],
-        #                 #       # 'penalty': ['l2', 'l1'],
-        #                 #       }                     
-        #                 #   }
-        #                ]         
-        
-
-        # data_form2 - Price
-        # model_params = [
-        #                 {'model': LinearRegression(),
-        #                   'params': {
-        #                       'normalize': [True, False],
-        #                       }
-        #                   },
-        #                 {'model': xgb.XGBRegressor(),
-        #                   'params': {
-        #                     # 'n_estimators': [200],
-        #                     'eta': [0.2, 0.4],
-        #                     # 'eta': [0.08, 0.1],
-        #                     # 'min_child_weight': [1],
-        #                   'min_child_weight': [0.5, 1],
-        #                     'max_depth':[6, 8],
-        #                       # 'max_depth':[6, 8, 12],
-        #                     'subsample':[1]
-        #                   }
-        #                 },
-        #                 # {'model': SGDRegressor(),
-        #                 #   'params': {
-        #                 #       # 'max_iter': [1000],
-        #                 #       # 'tol': [1e-3],
-        #                 #       # 'penalty': ['l2', 'l1'],
-        #                 #       }                     
-        #                 #   }
-        #                 ]         
-        
+     
         
     # - 如果selectkbest的k設得太小時，importance最高的可能都是industry，導致同
     #   產業的預測值完全相同
@@ -3010,7 +2960,6 @@ def master(param_holder, predict_begin, export_model=True,
                     tuner.fit(data=cur_model_data, 
                               model_params=model_params,
                               cv=cv, threshold=threshold, 
-                              scale_orig=[],
                               export_model=True, export_log=True)
                  
         if i == 0:

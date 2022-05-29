@@ -382,15 +382,12 @@ def download_market_data(overwrite=False, upload=True):
             ar.db_upload(data=data, 
                          table_name='stock_data_us')
     
-    return ''
-
 
 
 # %% Execute ------
 
 
 def automation():
-    
     shareholding_spread.automation()
     tej.automation()
     stk.od_tw_update_fx_rate()

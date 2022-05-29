@@ -30,6 +30,7 @@ from fugle_trade.constant import (APCode, Trade, PriceFlag, BSFlag, Action)
 
 
 host = 3
+host = 1
 # host = 2
 # host = 4
 # host = 0
@@ -41,13 +42,17 @@ if host == 0:
     # Home
     path = '/Users/aron/Documents/GitHub/Stock_Forecast/6_Trading_Bot'
 
-elif host == 2:
+elif host == 1:
     # PythonAnyWhere
-    path = '/home/jupyter/Production/6_Trading_Bot'
+    path = '/home/aronhack/stock_forecast/Develop/6_Trading_Bot'
+
+elif host == 2:
+    # GCP
+    path = '/home/jupyter/Develop/6_Trading_Bot'
     
 elif host == 3:
     # GCP
-    path = '/home/jupyter/Develop/6_Trading_Bot'
+    path = '/home/jupyter/Production/6_Trading_Bot'
 
 elif host == 4:    
     # RT
@@ -57,7 +62,7 @@ elif host == 4:
 
 # Codebase ......
 path_codebase = [r'/Users/aron/Documents/GitHub/Arsenal/',
-                 r'/home/aronhack/stock_predict/Function',
+                 r'/home/aronhack/stock_forecast/Function',
                  r'D:\Data_Mining\GitHub共用\Arsenal',
                  r'D:\Data_Mining\Projects\Codebase_YZ',
                  r'/home/jupyter/Arsenal/20220522',
@@ -74,8 +79,6 @@ import codebase_yz as cbyz
 import arsenal as ar
 import arsenal_stock as stk
 # import codebase_ml as cbml
-
-
 # import multiprocessing as mp
 # import trading_bot_function as tbf
 import fugle_v1_0200_dev as arfg
@@ -291,9 +294,10 @@ def master_level_1():
     # - 考慮query_quote時剛好刷新max high的記錄
     # v1.0000
     # - Launch version
-    
-    # v1.0100
+    # v1.0001
     # - Consider new high price today in gen_stop_loss
+    # - Rename path for host 2
+    
     
     
     # Worklist
@@ -303,6 +307,9 @@ def master_level_1():
     # - Review buy_signa, did the price of symbol increase in the past days
     # - 您好，從您的截圖看不出來您修改了哪些部分。如果您是想要 log websocket 的 error message，可以修改部分程式碼， 使用 on_error 這個 hook 來記錄。
     #   https://github.com/fugle-dev/fugle-realtime-python/blob/master/fugle_realtime/websocket_client/ws.py#L6    
+    # - Static IP on PythonAnyWhere
+    #   https://help.pythonanywhere.com/pages/StaticIPForExternalWhitelists
+    
     
     
     # Sell Signal
